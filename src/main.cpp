@@ -1,45 +1,38 @@
 #include "main.h"
 #include "vision/crimson.hpp"
+#include "display/dashboard.hpp"
 
 namespace {
 	constexpr std::uint8_t kLoopDelayMs = 20;
 	crimson::Crimson crimson_cam(1);
     pros::Imu imu(2);
+    display::Dashboard dashboard;
 
-	void print_crimson_status() {
+	void update_dashboard() {
         double heading = imu.get_heading();
         auto pose = crimson_cam.estimate_global_pose(heading);
 
-		pros::lcd::print(0, "tv:%d age:%ums", crimson_cam.get_tv(), crimson_cam.get_data_age_ms());
-
-        if (pose.has_value()) {
-            pros::lcd::print(1, "POSE X:%5.1f Y:%5.1f", pose->x, pose->y);
-            pros::lcd::print(2, "HEADING: %5.1f", pose->theta);
-        } else if (!crimson_cam.has_target()) {
-			pros::lcd::print(1, "tx: --  ty: --");
-			pros::lcd::print(2, "ta: --  ts: --");
-		} else {
-            pros::lcd::print(1, "tx:%5.1f ty:%5.1f", crimson_cam.get_tx(), crimson_cam.get_ty());
-            pros::lcd::print(2, "NO POSE ESTIMATE");
-        }
-
+        int tag_id = -1;
         if (crimson_cam.has_target()) {
-		    const auto target = crimson_cam.get_raw_target();
-		    pros::lcd::print(3, "TAG ID:%d", target.id);
-        } else {
-            pros::lcd::print(3, "target: none");
+            tag_id = crimson_cam.get_raw_target().id;
         }
+
+        dashboard.update(pose, crimson_cam.get_tv(), tag_id);
 	}
 }
 
 void initialize() {
-	pros::lcd::initialize();
+	// Remove pros::lcd::initialize() to avoid UI conflicts with pros::screen
 	crimson_cam.initialize();
     crimson_cam.set_camera_mount_metrics(100.0, 0.0);
     
     imu.reset();
-	pros::lcd::set_text(0, "crimson AI vision ready");
-	pros::lcd::set_text(1, "Initializing IMU...");
+    dashboard.initialize();
+    
+    // Print init status to our dashboard area
+    pros::screen::set_pen(0xFFFFFF);
+    pros::screen::print(pros::E_TEXT_MEDIUM, 250, 100, "Initializing IMU...");
+    
     while (imu.is_calibrating()) {
         pros::delay(10);
     }
@@ -54,7 +47,7 @@ void autonomous() {}
 void opcontrol() {
 	while (true) {
 		crimson_cam.update();
-		print_crimson_status();
+		update_dashboard();
 		pros::delay(kLoopDelayMs);
 	}
 }
