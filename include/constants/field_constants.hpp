@@ -1,6 +1,8 @@
 #ifndef FIELD_CONSTANTS_HPP_
 #define FIELD_CONSTANTS_HPP_
 
+#include <vector>
+
 namespace field {
 
 // All dimensions are in millimeters (mm)
@@ -34,25 +36,34 @@ constexpr Point2D kRedGoalBottom = { 587.1, 587.1 };
 constexpr Point2D kBlueGoalTop = { 2979.3, 2979.3 };
 constexpr Point2D kBlueGoalBottom = { 2979.3, 587.1 };
 
-// AprilTag IDs
-// Center Goal
-constexpr int kAprilTagCenter = 0;
+// To handle ambiguous tags (multiple goals with the same ID), 
+// we group known locations by their expected tag ID.
+// Note: You may need to verify the exact ID mapping on the physical field.
+struct GoalInfo {
+    Point2D pos;
+    double height;
+};
 
-// Alliance Goals
-constexpr int kAprilTagRedTop = 1;
-constexpr int kAprilTagRedBottom = 2;
-constexpr int kAprilTagBlueTop = 2;
-constexpr int kAprilTagBlueBottom = 1;
-
-// Neutral Short Goals
-constexpr int kAprilTagNeutralTopLeft = 4;
-constexpr int kAprilTagNeutralBottomLeft = 3;
-constexpr int kAprilTagNeutralTopRight = 3;
-constexpr int kAprilTagNeutralBottomRight = 4;
-
-// Scoring Objects Heights
-constexpr double kPinHeight = 165.0; // 6.5 inches
-constexpr double kCupHeight = 164.5; // 6.48 inches
+inline std::vector<GoalInfo> get_goal_locations_for_tag(int tag_id) {
+    switch (tag_id) {
+        case 0:
+            return {{kCenterGoal, kTallGoalHeight}};
+        case 1:
+            // Example mapping: Red Alliance Goals
+            return {{kRedGoalTop, kAllianceGoalHeight}, {kRedGoalBottom, kAllianceGoalHeight}};
+        case 2:
+            // Example mapping: Blue Alliance Goals
+            return {{kBlueGoalTop, kAllianceGoalHeight}, {kBlueGoalBottom, kAllianceGoalHeight}};
+        case 3:
+            // Example mapping: Left/Right Neutral Goals
+            return {{kNeutralGoalTopLeft, kShortNeutralGoalHeight}, {kNeutralGoalBottomRight, kShortNeutralGoalHeight}};
+        case 4:
+            // Example mapping: Top/Bottom Neutral Goals
+            return {{kNeutralGoalTopRight, kShortNeutralGoalHeight}, {kNeutralGoalBottomLeft, kShortNeutralGoalHeight}};
+        default:
+            return {};
+    }
+}
 
 } // namespace field
 

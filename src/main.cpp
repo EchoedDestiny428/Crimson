@@ -1,34 +1,48 @@
 #include "main.h"
-#include "crimson.hpp"
+#include "vision/crimson.hpp"
 
 namespace {
 	constexpr std::uint8_t kLoopDelayMs = 20;
-	crimson::Crimson crimson_cam(1, 1, VISION_ZERO_TOPLEFT);
+	crimson::Crimson crimson_cam(1);
+    pros::Imu imu(2);
 
 	void print_crimson_status() {
-		pros::lcd::print(0, "tv:%d sig:%u age:%ums", crimson_cam.get_tv(), crimson_cam.get_signature_id(),
-		                 crimson_cam.get_data_age_ms());
+        double heading = imu.get_heading();
+        auto pose = crimson_cam.estimate_global_pose(heading);
 
-		if (!crimson_cam.has_target()) {
+		pros::lcd::print(0, "tv:%d age:%ums", crimson_cam.get_tv(), crimson_cam.get_data_age_ms());
+
+        if (pose.has_value()) {
+            pros::lcd::print(1, "POSE X:%5.1f Y:%5.1f", pose->x, pose->y);
+            pros::lcd::print(2, "HEADING: %5.1f", pose->theta);
+        } else if (!crimson_cam.has_target()) {
 			pros::lcd::print(1, "tx: --  ty: --");
 			pros::lcd::print(2, "ta: --  ts: --");
-			pros::lcd::print(3, "target: none");
-			return;
-		}
+		} else {
+            pros::lcd::print(1, "tx:%5.1f ty:%5.1f", crimson_cam.get_tx(), crimson_cam.get_ty());
+            pros::lcd::print(2, "NO POSE ESTIMATE");
+        }
 
-		const auto target = crimson_cam.get_raw_target();
-		pros::lcd::print(1, "tx:%5.1f ty:%5.1f", crimson_cam.get_tx(), crimson_cam.get_ty());
-		pros::lcd::print(2, "ta:%5.1f ts:%5.1f", crimson_cam.get_ta(), crimson_cam.get_ts());
-		pros::lcd::print(3, "x:%d y:%d w:%d h:%d", target.x_middle_coord, target.y_middle_coord,
-		                 target.width, target.height);
+        if (crimson_cam.has_target()) {
+		    const auto target = crimson_cam.get_raw_target();
+		    pros::lcd::print(3, "TAG ID:%d", target.id);
+        } else {
+            pros::lcd::print(3, "target: none");
+        }
 	}
 }
 
 void initialize() {
 	pros::lcd::initialize();
-	crimson_cam.configure_defaults(50, false);
-	pros::lcd::set_text(0, "crimson-style vision ready");
-	pros::lcd::set_text(1, "tv/tx/ty/ta/ts diagnostics");
+	crimson_cam.initialize();
+    crimson_cam.set_camera_mount_metrics(100.0, 0.0);
+    
+    imu.reset();
+	pros::lcd::set_text(0, "crimson AI vision ready");
+	pros::lcd::set_text(1, "Initializing IMU...");
+    while (imu.is_calibrating()) {
+        pros::delay(10);
+    }
 }
 
 void disabled() {}
