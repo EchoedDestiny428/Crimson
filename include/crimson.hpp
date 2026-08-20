@@ -1,14 +1,14 @@
-#ifndef LLV_HPP_
-#define LLV_HPP_
+#ifndef CRIMSON_HPP_
+#define CRIMSON_HPP_
 
 #include "main.h"
 
-namespace llv {
+namespace crimson {
 
-class LimelightVision {
+class Crimson {
 	public:
-	explicit LimelightVision(std::uint8_t port = 1, std::uint8_t signature_id = 1,
-	                         vision_zero_e_t zero_point = E_VISION_ZERO_TOPLEFT);
+	explicit Crimson(std::uint8_t port = 1, std::uint8_t signature_id = 1,
+	                 vision_zero_e_t zero_point = E_VISION_ZERO_TOPLEFT);
 
 	void configure_defaults(std::uint8_t exposure = 50, bool auto_white_balance = false) const;
 	void set_signature_id(std::uint8_t signature_id);
@@ -47,6 +47,6 @@ class LimelightVision {
 	std::uint32_t last_update_ms_;
 };
 
-}  // namespace llv
+}  // namespace crimson
 
 #endif
