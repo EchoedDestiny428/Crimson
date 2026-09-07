@@ -13,7 +13,7 @@ static inline double deg2rad(double deg) { return deg * M_PI / 180.0; }
 static inline double rad2deg(double rad) { return rad * 180.0 / M_PI; }
 
 Crimson::Crimson(std::uint8_t port)
-    : sensor_(port), target_{}, target_valid_(false), last_update_ms_(0) {
+    : sensor_(port), primary_target_{}, target_valid_(false), last_update_ms_(0) {
 }
 
 void Crimson::initialize() {
