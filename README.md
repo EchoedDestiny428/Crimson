@@ -1,1 +1,1 @@
-*According to official vanguard policy, this weapon does not exist.*
+stop trying to larp as a commit farmer boi
