@@ -11,12 +11,16 @@ constexpr std::int8_t kIntakePort = 3; // Change to your intake port (use negati
 
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 pros::Motor intake(kIntakePort);
+pros::Motor elevator_left(kElevatorLeftPort);
+pros::Motor elevator_right(kElevatorRightPort);
 crimson::Crimson crimson_cam(1);
 pros::Imu imu(2);
 display::Dashboard dashboard;
 
-pros::MotorGroup left_motors({1, 2, 3}, pros::MotorGears::blue);
-pros::MotorGroup right_motors({4, 5, 6}, pros::MotorGears::blue);
+pros::MotorGroup left_motors({1, 2, 20}, pros::MotorGears::blue);
+pros::MotorGroup right_motors({4, 5, 19}, pros::MotorGears::blue);
+pros::MotorGroup elevator({17, -18}, pros::MotorGears::blue); // Change to the elevator ports once we wire them up
+
 
 // Drivetrain settings
 lemlib::Drivetrain drivetrain(
@@ -142,6 +146,20 @@ void opcontrol()
         else
         {
             intake.move(0);
+        }
+
+        // Elevator controls (Hold L1 = up, Hold L2 = down)
+        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1))
+        {
+            elevator.move(127);
+        }
+        else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2))
+        {
+            elevator.move(-127);
+        }
+        else
+        {
+            elevator.move(0);
         }
 
         pros::delay(kLoopDelayMs);
