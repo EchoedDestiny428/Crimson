@@ -11,8 +11,6 @@ constexpr std::int8_t kIntakePort = 3; // Change to your intake port (use negati
 
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 pros::Motor intake(kIntakePort);
-pros::Motor elevator_left(kElevatorLeftPort);
-pros::Motor elevator_right(kElevatorRightPort);
 crimson::Crimson crimson_cam(1);
 pros::Imu imu(2);
 display::Dashboard dashboard;
