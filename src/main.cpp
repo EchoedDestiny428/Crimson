@@ -57,7 +57,7 @@ void elev_hold_pid(double pos)
     double error = pos - elevator.get_position();
     double derivative = error - elev_last_error;
     elev_last_error = error;
-    int pid_output = clamp(static_cast<int>(kElevKp * error + kElevKd * derivative));
+    int pid_output = clamp(static_cast<int>(kElevKp * error + kElevKd * derivative + kElevHold));
     elevator.move(pid_output);
 }
 
