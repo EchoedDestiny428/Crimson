@@ -13,11 +13,11 @@ pros::Imu imu(2);
 display::Dashboard dashboard;
 
 //Motor groups
-pros::MotorGroup left_motors({1, 2, 20}, pros::MotorGears::blue);
-pros::MotorGroup right_motors({4, 5, 19}, pros::MotorGears::blue);
-pros::MotorGroup elevator({17, -18}, pros::MotorGears::blue); // Change to the elevator ports once we wire them up
-pros::Motor claw(16, pros::MotorGears::red);
-pros::Motor pivot(15, pros::MotorGears::red);
+pros::MotorGroup left_motors({3, -20}, pros::MotorGears::blue);
+pros::MotorGroup right_motors({-2, 19}, pros::MotorGears::blue);
+pros::MotorGroup elevator({4, -18}, pros::MotorGears::blue);
+pros::Motor claw(12, pros::MotorGears::blue);
+pros::Motor pivot(11, pros::MotorGears::blue);
 
 
 // Drivetrain settings
