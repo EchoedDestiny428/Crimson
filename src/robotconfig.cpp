@@ -1,5 +1,9 @@
 #include "robotconfig.hpp"
-
+#include "main.h"
+#include "display/dashboard.hpp"
+#include "api.h"
+#include "vision/crimson.hpp"
+#include "lemlib/api.hpp"
 
 //I/O
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
@@ -12,6 +16,8 @@ display::Dashboard dashboard;
 pros::MotorGroup left_motors({1, 2, 20}, pros::MotorGears::blue);
 pros::MotorGroup right_motors({4, 5, 19}, pros::MotorGears::blue);
 pros::MotorGroup elevator({17, -18}, pros::MotorGears::blue); // Change to the elevator ports once we wire them up
+pros::Motor claw(16, pros::MotorGears::red);
+pros::Motor pivot(15, pros::MotorGears::red);
 
 
 // Drivetrain settings
