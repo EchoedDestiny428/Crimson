@@ -110,4 +110,49 @@ int SmartMotor::movePID(float target, float timeout, float acceptableRange, bool
     // Return success status 
     return (fabs(target - this->getRotation()) < 0.01) ? 1 : 0;  // Return 1 if target reached, 0 if timed out
 }
+
+void SmartMotor::startLogging(bool enabled) {
+    if (enabled && !logging_active) {
+        logging_active = true;
+        
+        // Spawn logging task
+        logging_task = new pros::Task([this]() {
+            lemlib::Logger logger;
+            
+            while (logging_active) {
+                // Get commanded voltage (average across motor group)
+                std::vector<double> voltages = this->actuator->get_voltage_all();
+                double avg_voltage = 0;
+                for (double v : voltages) {
+                    avg_voltage += v;
+                }
+                avg_voltage /= voltages.size();
+                
+                // Get the commanded output (0-127 scale converted to voltage estimate)
+                // This is approximate based on typical 12V motor supply
+                std::vector<double> commands = this->actuator->get_requested_all();
+                double avg_command = 0;
+                for (double cmd : commands) {
+                    avg_command += cmd;
+                }
+                avg_command /= commands.size();
+                double commanded_voltage = (avg_command / 127.0) * 12.0;
+                
+                // Log both values
+                logger.info("SmartMotor: Commanded={:.2f}V, Real={:.2f}V", commanded_voltage, avg_voltage);
+                
+                pros::delay(10);  // Log at 100Hz
+            }
+        });
+    } 
+    else if (!enabled && logging_active) {
+        logging_active = false;
+        
+        // Task will exit on its own when logging_active becomes false
+        if (logging_task != nullptr) {
+            delete logging_task;
+            logging_task = nullptr;
+        }
+    }
+}
 } // namespace lemlib

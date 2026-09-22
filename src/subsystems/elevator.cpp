@@ -27,6 +27,9 @@ static lemlib::SmartMotor elevator_motor(&elevator, lemlib::PID(1.2, 0, 0.4, 0, 
 void elevator_init() {
     elevator.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
     elevator_motor.reset();
+    
+    // Start logging commanded and real voltage
+    elevator_motor.startLogging(true);
 }
 
 void elev_goto(double target, float timeout) {
@@ -49,13 +52,13 @@ void elevator_update() {
         elev_goto(kAlliance);
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B))
         elev_goto(kShort);
-
-    // Manual elevator controls (Hold L1 = up, Hold L2 = down)
-    if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
-        elevator.move(kElevManualUp);
-    } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
-        elevator.move(kElevManualDown);
-    }
+    //already covered by manual task
+    // // Manual elevator controls (Hold L1 = up, Hold L2 = down)
+    // if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
+    //     elevator.move(kElevManualUp);
+    // } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
+    //     elevator.move(kElevManualDown);
+    // }
     // Note: When neither L1 nor L2 is pressed, the SmartMotor's async task
     // will continue running and holding the last setpoint via its PID loop
 }
