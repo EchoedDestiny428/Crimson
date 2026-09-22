@@ -1,7 +1,9 @@
 #pragma once
 
+#include "lemlib/smartMotor.hpp"
+
 /**
- * @brief Elevator subsystem for height control with PID feedback
+ * @brief Elevator subsystem for height control using SmartMotor PID
  */
 namespace subsystems {
 
@@ -13,19 +15,14 @@ void elevator_init();
 /**
  * @brief Move elevator to a target height with bounds checking
  * @param target Target height in encoder units
+ * @param timeout Maximum time to reach target in milliseconds
  */
-void elev_goto(double target);
-
-/**
- * @brief PID control loop for holding elevator at setpoint
- * @param pos Current elevator position
- */
-void elev_hold_pid(double pos);
+void elev_goto(double target, float timeout = 2000);
 
 /**
  * @brief Update elevator control during driver control
- * @param pos Current elevator position
+ * Handles preset buttons and manual control
  */
-void elevator_update(double pos);
+void elevator_update();
 
 } // namespace subsystems

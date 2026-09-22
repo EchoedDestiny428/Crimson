@@ -5,12 +5,12 @@
 namespace subsystems {
 
 // Elevator tuning constants
-constexpr int kElevMove = 80;       // Elevator movement speed
-constexpr int kElevHold = 10;       // Holding constant to offset gravity
-constexpr double kElevKp = 1.2;     // kP for elevator height control
-constexpr double kElevKd = 0.4;     // kD for elevator height control
 constexpr double kElevMin = 0.0;    // min height
 constexpr double kElevMax = 2000.0; // max height
+
+// Manual control speeds
+constexpr int kElevManualUp = 80;
+constexpr int kElevManualDown = -80;
 
 // Elevator height presets
 constexpr double kDown = 0.0;       // elev collapsed: also the starting position
@@ -19,39 +19,26 @@ constexpr double kAlliance = 400.0; // 3.25" rim (alliance goal)
 constexpr double kShort = 700.0;    // 5.8" rim (neutral quadrant)
 constexpr double kTall = 1000.0;    // 8.7" rim (center goal)
 
-// State variables
-double elev_setpoint = 0;
-double elev_last_error = 0;
-
-// Clamp PID output to motor range
-int clamp(int x) {
-    if (x > 127) return 127;
-    if (x < -127) return -127;
-    return x;
-}
+// SmartMotor for elevator PID control
+// PID gains: kP=1.2, kI=0, kD=0.4
+// Create with static initialization to avoid pointer allocation
+static lemlib::SmartMotor elevator_motor(&elevator, lemlib::PID(1.2, 0, 0.4, 0, false));
 
 void elevator_init() {
     elevator.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
-    elevator.tare_position();
-    elev_setpoint = elevator.get_position();
+    elevator_motor.reset();
 }
 
-void elev_goto(double target) {
+void elev_goto(double target, float timeout) {
     if (target < kElevMin) target = kElevMin;
     if (target > kElevMax) target = kElevMax;
-    elev_setpoint = target;
+    
+    // Move to target using SmartMotor PID (async mode)
+    elevator_motor.movePID(target, timeout, 0.5, true);
 }
 
-void elev_hold_pid(double pos) {
-    double error = pos - elev_setpoint;
-    double derivative = error - elev_last_error;
-    elev_last_error = error;
-    int pid_output = clamp(static_cast<int>(kElevKp * error + kElevKd * derivative + kElevHold));
-    elevator.move(pid_output);
-}
-
-void elevator_update(double pos) {
-    // Elevator preset buttons
+void elevator_update() {
+    // Preset buttons - trigger async movement to preset heights
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN))
         elev_goto(kDown);
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP))
@@ -63,18 +50,14 @@ void elevator_update(double pos) {
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B))
         elev_goto(kShort);
 
-    // Elevator manual controls (Hold L1 = up, Hold L2 = down)
+    // Manual elevator controls (Hold L1 = up, Hold L2 = down)
     if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
-        elevator.move(kElevMove);
-        elev_setpoint = pos; // hold this height
-        elev_last_error = 0.0; // for D-term
+        elevator.move(kElevManualUp);
     } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
-        elevator.move(-kElevMove);
-        elev_setpoint = pos; // hold this height
-        elev_last_error = 0.0; // for D-term
-    } else {
-        elev_hold_pid(pos);
+        elevator.move(kElevManualDown);
     }
+    // Note: When neither L1 nor L2 is pressed, the SmartMotor's async task
+    // will continue running and holding the last setpoint via its PID loop
 }
 
 } // namespace subsystems

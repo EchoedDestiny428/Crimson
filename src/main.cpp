@@ -142,10 +142,8 @@ void opcontrol()
             intake.move(0);
         }
 
-        const double pos = elevator.get_position();
-
         // Update elevator control
-        subsystems::elevator_update(pos);
+        subsystems::elevator_update();
 
         pros::delay(kLoopDelayMs);
     }
