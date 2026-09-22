@@ -86,7 +86,7 @@ static void mechanism_loop(MotorT& motor,
         {
             motor.move(127);
         }
-        else if (controller.get_digit   al(rev_btn))
+        else if (controller.get_digital(rev_btn))
         {
             motor.move(-127);
         }
