@@ -10,7 +10,7 @@
 constexpr std::uint8_t kLoopDelayMs = 20;
 constexpr std::int8_t kIntakePort = 3; // Change to your intake port (use negative if reversed, e.g. -3)
 // below values are all placeholders
-constexpr int kElevMove = 80; // Elevator movement speed
+constexpr int kElevMove = 127; // Elevator movement speed
 constexpr int kElevHold = 10; // Holding constant to offset gravity
 constexpr double kElevKp = 1.2; // kP for elevator height control
 constexpr double kElevKd = 0.4; // kd for elevator height control
@@ -47,10 +47,11 @@ crimson::Crimson crimson_cam(1);
 pros::Imu imu(2);
 display::Dashboard dashboard;
 
-pros::MotorGroup left_motors({1, 2, 20}, pros::MotorGears::blue);
-pros::MotorGroup right_motors({4, 5, 19}, pros::MotorGears::blue);
-pros::MotorGroup elevator({17, -18}, pros::MotorGears::blue); // Change to the elevator ports once we wire them up
-
+pros::MotorGroup left_motors({3, -20}, pros::MotorGears::blue);
+pros::MotorGroup right_motors({-2, 19}, pros::MotorGears::blue);
+pros::MotorGroup elevator({4, -18}, pros::MotorGears::blue); // Change to the elevator ports once we wire them up, motors are green
+pros::Motor claw(12,pros::MotorGears::blue); // Change to the claw port once we wire it up  
+pros::Motor pivot(11,pros::MotorGears::blue); // Change to the pivot port once we wire it up
 // elevator hold PID
 void elev_hold_pid(double pos)
 {
@@ -158,7 +159,7 @@ static void mechanism_loop(MotorT& motor,
         {
             motor.move(127);
         }
-        else if (controller.get_digit   al(rev_btn))
+        else if (controller.get_digital(rev_btn))
         {
             motor.move(-127);
         }
