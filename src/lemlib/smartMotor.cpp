@@ -66,6 +66,15 @@ float SmartMotor::getRotation() {
 }
 
 /**
+ * @brief Returns the current target setpoint.
+ * 
+ * @return The motor's current target position in sensor units as a float.
+ */
+float SmartMotor::getTarget() {
+    return this->target;
+}
+
+/**
  * @brief Moves the motor to a target position using a PID loop.
  * 
  * The motor moves to the target position using PID control. If `async` is true, the function
@@ -73,13 +82,19 @@ float SmartMotor::getRotation() {
  */
 int SmartMotor::movePID(float target, float timeout, float acceptableRange, bool async) {
     if (async) {
+        // Store target setpoint
+        this->target = target;
+        
         // Start an asynchronous task to run the PID loop.
         pros::Task asynctask([=]() {
-            this->movePID(target, timeout, false); // Call the synchronous version
+            this->movePID(target, timeout, acceptableRange, false); // Call the synchronous version
         });
         pros::delay(10); // Delay to give the task time to start
         return 2;                     // Indicate that async task has been started.
     }
+    
+    // Store target setpoint
+    this->target = target;
     unsigned long start_time = pros::millis();
 
     // Loop until the target is reached or the timeout occurs
@@ -117,10 +132,10 @@ void SmartMotor::startLogging(bool enabled) {
         
         // Spawn logging task
         logging_task = new pros::Task([this]() {
-            lemlib::Logger logger;
+            auto sink = lemlib::infoSink();
             
             while (logging_active) {
-                // Get commanded voltage (average across motor group)
+                // Get real voltage (average across motor group)
                 std::vector<double> voltages = this->actuator->get_voltage_all();
                 double avg_voltage = 0;
                 for (double v : voltages) {
@@ -128,18 +143,15 @@ void SmartMotor::startLogging(bool enabled) {
                 }
                 avg_voltage /= voltages.size();
                 
-                // Get the commanded output (0-127 scale converted to voltage estimate)
-                // This is approximate based on typical 12V motor supply
-                std::vector<double> commands = this->actuator->get_requested_all();
-                double avg_command = 0;
-                for (double cmd : commands) {
-                    avg_command += cmd;
-                }
-                avg_command /= commands.size();
-                double commanded_voltage = (avg_command / 127.0) * 12.0;
+                // Get the target (commanded setpoint)
+                float target = this->getTarget();
                 
-                // Log both values
-                logger.info("SmartMotor: Commanded={:.2f}V, Real={:.2f}V", commanded_voltage, avg_voltage);
+                // Get current position
+                float current_pos = this->getRotation();
+                
+                // Log commanded target, current position, and real voltage
+                sink->info("SmartMotor | Target: {:.1f} | Current: {:.1f} | Voltage: {:.2f}V", 
+                           target, current_pos, avg_voltage);
                 
                 pros::delay(10);  // Log at 100Hz
             }
