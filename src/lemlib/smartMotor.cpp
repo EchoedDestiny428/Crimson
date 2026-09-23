@@ -130,28 +130,28 @@ void SmartMotor::startLogging(bool enabled) {
     if (enabled && !logging_active) {
         logging_active = true;
         
+        // Capture current target at the time logging starts
+        float logged_target = this->target;
+        
         // Spawn logging task
-        logging_task = new pros::Task([this]() {
+        logging_task = new pros::Task([this, logged_target]() {
             auto sink = lemlib::infoSink();
             
             while (logging_active) {
-                // Get real voltage (average across motor group)
-                std::vector<double> voltages = this->actuator->get_voltage_all();
+                // Get real voltage (average across motor group) - returns std::vector<int16_t>
+                std::vector<long> voltages = this->actuator->get_voltage_all();
                 double avg_voltage = 0;
-                for (double v : voltages) {
+                for (long v : voltages) {
                     avg_voltage += v;
                 }
                 avg_voltage /= voltages.size();
-                
-                // Get the target (commanded setpoint)
-                float target = this->getTarget();
                 
                 // Get current position
                 float current_pos = this->getRotation();
                 
                 // Log commanded target, current position, and real voltage
-                sink->info("SmartMotor | Target: {:.1f} | Current: {:.1f} | Voltage: {:.2f}V", 
-                           target, current_pos, avg_voltage);
+                sink->info("SmartMotor | Target: {:.1f} | Current: {:.1f} | Voltage: {:.0f}mV", 
+                           logged_target, current_pos, avg_voltage);
                 
                 pros::delay(10);  // Log at 100Hz
             }

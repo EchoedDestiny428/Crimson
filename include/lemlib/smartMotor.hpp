@@ -66,6 +66,13 @@ class SmartMotor {
         float getRotation();
 
         /**
+         * @brief Retrieves the current target setpoint.
+         * 
+         * @return The motor's current target position in sensor units as a float.
+         */
+        float getTarget();
+
+        /**
          * @brief Moves the motor to a target position using PID control.
          * 
          * This function runs a PID loop to drive the motor to a specified target position. It can 
@@ -101,6 +108,7 @@ class SmartMotor {
         pros::Rotation* rotation = nullptr;    ///< Pointer to the V5 Rotation Sensor (if used).
         pros::MotorGroup* ime = nullptr;       ///< Pointer to the IME-based motor group (if used).
 
+        float target = 0.0f;              ///< Current target setpoint for PID movements.
         bool logging_active = false;      ///< Flag to control the logging thread.
         pros::Task* logging_task = nullptr; ///< Pointer to the active logging task.
 };
