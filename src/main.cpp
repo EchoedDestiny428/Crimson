@@ -25,6 +25,13 @@ constexpr double kTall = 1000.0;     // 8.7" rim(center goal)
 double elev_setpoint = 0;
 double elev_last_error = 0;
 
+// Pivot macro
+constexpr double kPivotMacroDeg = 90.0;    // how far one press turns the pivot
+constexpr double kPivotGearRatio = 1.0;    // motor degrees per 1 degree of pivot arm
+                                           // e.g. 12T motor gear -> 60T arm gear = 5.0
+constexpr int kPivotMacroVelocity = 300;   // rpm (blue cartridge max is 600)
+constexpr double kElevMacroRise = 150.0; // TODO: TUNE — how far the elevator rises on the A macro (encoder degrees)
+
 //cap for PID output
 int clamp(int x) 
 {
@@ -49,7 +56,7 @@ display::Dashboard dashboard;
 
 pros::MotorGroup left_motors({3, -20}, pros::MotorGears::blue);
 pros::MotorGroup right_motors({-2, 19}, pros::MotorGears::blue);
-pros::MotorGroup elevator({4, -18}, pros::MotorGears::blue); // Change to the elevator ports once we wire them up, motors are green
+pros::MotorGroup elevator({4, -18}, pros::MotorGears::blue); // Change to the elevator ports once we wire them up, motors are gree
 pros::Motor claw(12,pros::MotorGears::blue); // Change to the claw port once we wire it up  
 pros::Motor pivot(11,pros::MotorGears::blue); // Change to the pivot port once we wire it up
 // elevator hold PID
@@ -174,6 +181,45 @@ static void mechanism_loop(MotorT& motor,
     motor.brake();
 }
 
+// Pivot: Hold X = +, Hold B = -, Tap A = rotate exactly +90 degrees and raise elevator
+static void pivot_loop()
+{
+    bool macro_active = false;
+    double macro_target = 0.0;
+
+    while (!pros::competition::is_disabled() && !pros::competition::is_autonomous())
+    {
+        const bool fwd = controller.get_digital(pros::E_CONTROLLER_DIGITAL_X);
+        const bool rev = controller.get_digital(pros::E_CONTROLLER_DIGITAL_B);
+
+        if (fwd || rev)
+        {
+            // Manual control always overrides the macro
+            macro_active = false;
+            pivot.move(fwd ? 127 : -127);
+        }
+        else if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A))
+        {
+            // Pivot: exactly +90 degrees
+            const double base = macro_active ? macro_target : pivot.get_position();
+            macro_target = base + kPivotMacroDeg * kPivotGearRatio;
+            macro_active = true;
+            pivot.move_absolute(macro_target, kPivotMacroVelocity);
+
+            // Elevator: rise by kElevMacroRise at the same time
+            elev_goto(elev_setpoint + kElevMacroRise);
+        }
+        else if (!macro_active)
+        {
+            pivot.brake();
+        }
+
+        pros::delay(kLoopDelayMs);
+    }
+
+    pivot.brake();
+}
+
 void initialize()
 {
     crimson_cam.initialize();
@@ -215,21 +261,13 @@ void opcontrol()
     pros::Task intake_task([] {
         mechanism_loop(intake, pros::E_CONTROLLER_DIGITAL_R1, pros::E_CONTROLLER_DIGITAL_R2);
     }, "Intake");
-
-    // Elevator: Hold L1 = up, Hold L2 = down
-    pros::Task elevator_task([] {
-        mechanism_loop(elevator, pros::E_CONTROLLER_DIGITAL_L1, pros::E_CONTROLLER_DIGITAL_L2);
-    }, "Elevator");
-
     // Claw: Hold UP = +, Hold DOWN = -
     pros::Task claw_task([] {
         mechanism_loop(claw, pros::E_CONTROLLER_DIGITAL_UP, pros::E_CONTROLLER_DIGITAL_DOWN);
     }, "Claw");
 
-    // Pivot: Hold X = +, Hold B = -
-    pros::Task pivot_task([] {
-        mechanism_loop(pivot, pros::E_CONTROLLER_DIGITAL_X, pros::E_CONTROLLER_DIGITAL_B);
-    }, "Pivot");
+        // Pivot: Hold X = +, Hold B = -, Tap A = +90 degrees and raise elevator
+    pros::Task pivot_task(pivot_loop, "Pivot");
 
     // --- Main thread: drive + camera + dashboard ---
     while (true)
