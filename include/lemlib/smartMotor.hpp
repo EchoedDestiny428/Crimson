@@ -82,6 +82,16 @@ class SmartMotor {
          */
         int movePID(float target, float timeout, float acceptableRange = 0.5, bool async = false);
 
+        /**
+         * @brief Start logging commanded and real voltage to the logger.
+         * 
+         * Spawns a background thread that periodically logs the motor's commanded voltage 
+         * and actual voltage output at 10ms intervals.
+         * 
+         * @param enabled If true, starts the logging thread. If false, stops any existing logging thread.
+         */
+        void startLogging(bool enabled = true);
+
 
     private:
         PID controller;                   ///< PID configuration for the control loop.
@@ -90,5 +100,8 @@ class SmartMotor {
         pros::adi::Encoder* encoder = nullptr; ///< Pointer to the ADI Encoder sensor (if used).
         pros::Rotation* rotation = nullptr;    ///< Pointer to the V5 Rotation Sensor (if used).
         pros::MotorGroup* ime = nullptr;       ///< Pointer to the IME-based motor group (if used).
+
+        bool logging_active = false;      ///< Flag to control the logging thread.
+        pros::Task* logging_task = nullptr; ///< Pointer to the active logging task.
 };
 }

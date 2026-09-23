@@ -3,6 +3,9 @@
 #include "lemlib/api.hpp"
 #include "pros/motors.h"
 #include "vision/crimson.hpp"
+#include "robotconfig.hpp"
+#include "subsystems/elevator.hpp"
+#include <cstdint>
 
 // --------------------------------------------------
 // Hardware Configuration & LemLib Setup
@@ -232,10 +235,8 @@ void initialize()
     // Calibrate chassis (also calibrates the IMU connected in sensors)
     chassis.calibrate();
 
-    //tare the elevator encoders
-    elevator.tare_position();
-    elevator.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
-    elev_setpoint = elevator.get_position(); 
+    // Initialize elevator subsystem
+    subsystems::elevator_init();
 }
 
 void disabled() {}
@@ -280,51 +281,9 @@ void opcontrol()
         crimson_cam.update();
         update_dashboard();
 
-        // Intake controls (Hold R1 = in, Hold R2 = out)
-        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1))
-        {
-            intake.move(127);
-        }
-        else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2))
-        {
-            intake.move(-127);
-        }
-        else
-        {
-            intake.move(0);
-        }
+        // Update elevator control
+        subsystems::elevator_update();
 
-        const double pos = elevator.get_position();
-
-        //presets: kvalues are all constants. Must tune for each height
-        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN))
-            elev_goto(kDown);
-        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP))
-            elev_goto(kTall);
-        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y))
-            elev_goto(kLoader);
-        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X))
-            elev_goto(kAlliance);
-        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B))
-            elev_goto(kShort);
-
-        // Elevator controls (Hold L1 = up, Hold L2 = down)
-        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1))
-        {
-            elevator.move(kElevMove);
-            elev_setpoint = pos; // hold this height
-            elev_last_error = 0.0; // for D-term
-        }
-        else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2))
-        {
-            elevator.move(-kElevMove);
-            elev_setpoint = pos; // hold this height
-            elev_last_error = 0.0; // for D-term
-        }
-        else
-        {
-            elev_hold_pid(pos);
-        }
         pros::delay(kLoopDelayMs);
     }
 }
