@@ -20,6 +20,11 @@ void elevator_init();
 void elev_goto(double target, float timeout = 2000);
 
 /**
+ * @brief Last height commanded by elev_goto, in encoder units
+ */
+double elev_setpoint();
+
+/**
  * @brief Update elevator control during driver control
  * Handles preset buttons and manual control
  */
