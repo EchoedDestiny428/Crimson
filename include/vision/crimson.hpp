@@ -1,8 +1,7 @@
-#ifndef CRIMSON_HPP_
-#define CRIMSON_HPP_
+#pragma once
 
-#include "main.h"
 #include "pros/ai_vision.hpp"
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -11,61 +10,48 @@ namespace crimson {
 struct Pose2D {
     double x;
     double y;
-    double theta; // global heading in degrees
+    double theta;
 };
 
 class Crimson {
 public:
-    explicit Crimson(std::uint8_t port = 1);
+    explicit Crimson(std::uint8_t port);
 
     void initialize();
     void update();
-
-    // Global Pose Estimation
     void set_camera_mount_metrics(double height_mm, double pitch_deg);
-    std::optional<Pose2D> estimate_global_pose(double imu_heading_deg);
+    std::optional<Pose2D> estimate_global_pose(double heading_deg) const;
 
     bool has_target() const;
-    int get_tv() const;
+    int tag_count() const;
+    int primary_tag_id() const;
     double get_tx() const;
     double get_ty() const;
-    
-    // Legacy support methods (might return 0 for tags since tags use corner points)
-    double get_ta() const;
-    double get_ts() const;
     std::uint32_t get_data_age_ms() const;
 
-    pros::AIVision::Object get_raw_target() const;
-    pros::AIVision &sensor();
-
 private:
+    struct Pixel {
+        double x;
+        double y;
+    };
+
     static constexpr double kFrameWidth = 320.0;
     static constexpr double kFrameHeight = 240.0;
-    static constexpr double kCenterX = kFrameWidth / 2.0;
-    static constexpr double kCenterY = kFrameHeight / 2.0;
-
-    // AI Vision FOV (approximate, adjust if necessary)
-    static constexpr double kFovHorizontalDeg = 74.0; 
+    static constexpr double kFovHorizontalDeg = 74.0;
     static constexpr double kFovVerticalDeg = 55.5;
 
+    static Pixel tag_center(const pros::AIVision::Object& tag);
+    static double calc_tx(double px);
+    static double calc_ty(double py);
+    static std::optional<Pose2D> triangulate(const pros::AIVision::Object& first, const pros::AIVision::Object& second,
+                                             double heading_deg);
+    std::optional<Pose2D> from_single_tag(const pros::AIVision::Object& tag, double heading_deg) const;
+
     pros::AIVision sensor_;
-    pros::AIVision::Object primary_target_;
-    bool target_valid_;
-    std::uint32_t last_update_ms_;
-
-    std::vector<pros::AIVision::Object> tags_visible_;
-
+    std::vector<pros::AIVision::Object> tags_;
+    std::uint32_t last_update_ms_ = 0;
     double camera_height_mm_ = 100.0;
     double camera_pitch_deg_ = 0.0;
-
-    // Helper to compute tag center in pixels
-    void get_tag_center(const pros::AIVision::Object& tag, double& px, double& py) const;
-    
-    // Helper to get tx, ty from pixel coordinates
-    double calc_tx(double px) const;
-    double calc_ty(double py) const;
 };
 
-}  // namespace crimson
-
-#endif
+}

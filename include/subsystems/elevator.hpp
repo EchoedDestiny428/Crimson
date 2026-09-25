@@ -1,33 +1,15 @@
 #pragma once
 
-#include "lemlib/smartMotor.hpp"
+#include <cstdint>
 
-/**
- * @brief Elevator subsystem for height control using SmartMotor PID
- */
-namespace subsystems {
+namespace subsystems::elevator {
 
-/**
- * @brief Initialize the elevator subsystem
- */
-void elevator_init();
+void init();
+void update();
+void stop();
+void set_target(double height);
+void raise_by(double delta);
+double target();
+bool wait_until_settled(std::uint32_t timeout_ms);
 
-/**
- * @brief Move elevator to a target height with bounds checking
- * @param target Target height in encoder units
- * @param timeout Maximum time to reach target in milliseconds
- */
-void elev_goto(double target, float timeout = 2000);
-
-/**
- * @brief Last height commanded by elev_goto, in encoder units
- */
-double elev_setpoint();
-
-/**
- * @brief Update elevator control during driver control
- * Handles preset buttons and manual control
- */
-void elevator_update();
-
-} // namespace subsystems
+}

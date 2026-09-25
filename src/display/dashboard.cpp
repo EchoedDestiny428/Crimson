@@ -2,179 +2,166 @@
 #include "constants/field_constants.hpp"
 #include "pros/screen.hpp"
 #include <cmath>
-#include <cstdio>
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-// Modern UI Color Palette
-constexpr uint32_t BG_COLOR        = 0x1E1E24; // Dark charcoal
-constexpr uint32_t HEADER_BG       = 0x15151A; // Darker header
-constexpr uint32_t FIELD_BG        = 0x252830; // Soft field gray
-constexpr uint32_t FIELD_LINE      = 0x4B5363; // Soft line color
-constexpr uint32_t ROBOT_COLOR     = 0x00F0B5; // Neon mint
-constexpr uint32_t ROBOT_GLOW      = 0x117760; // Darker mint for shadow
-constexpr uint32_t ROBOT_HEADING   = 0xFFFFFF; // White heading
-constexpr uint32_t GOAL_RED        = 0xFF4D4D; // Vibrant Red
-constexpr uint32_t GOAL_BLUE       = 0x3B82F6; // Vibrant Blue
-constexpr uint32_t GOAL_NEUTRAL    = 0xFBBF24; // Gold
-constexpr uint32_t TEXT_WHITE      = 0xF8F9FA; // Off-white
-constexpr uint32_t TEXT_ACCENT     = 0xA5B4FC; // Light purple-blue for headings
+#include <numbers>
 
 namespace display {
 
-Dashboard::Dashboard() {}
+namespace {
+
+constexpr std::uint32_t kBackground = 0x1E1E24;
+constexpr std::uint32_t kHeaderBackground = 0x15151A;
+constexpr std::uint32_t kFieldBackground = 0x252830;
+constexpr std::uint32_t kFieldLine = 0x4B5363;
+constexpr std::uint32_t kRobotColor = 0x00F0B5;
+constexpr std::uint32_t kRobotGlow = 0x117760;
+constexpr std::uint32_t kRobotHeading = 0xFFFFFF;
+constexpr std::uint32_t kGoalRed = 0xFF4D4D;
+constexpr std::uint32_t kGoalBlue = 0x3B82F6;
+constexpr std::uint32_t kGoalNeutral = 0xFBBF24;
+constexpr std::uint32_t kTextWhite = 0xF8F9FA;
+constexpr std::uint32_t kTextAccent = 0xA5B4FC;
+
+constexpr int kScreenWidth = 480;
+constexpr int kScreenHeight = 240;
+constexpr int kHeaderHeight = 30;
+constexpr int kStatusPanelX = 320;
+constexpr int kStatusTextX = 340;
+constexpr int kGoalRadius = 5;
+constexpr int kRobotRadius = 5;
+constexpr int kRobotGlowRadius = 8;
+constexpr int kHeadingLength = 14;
+constexpr int kTrailEraseRadius = 16;
+
+}
 
 void Dashboard::initialize() {
-    pros::screen::set_pen(BG_COLOR);
-    pros::screen::set_eraser(BG_COLOR);
+    pros::screen::set_pen(kBackground);
+    pros::screen::set_eraser(kBackground);
     pros::screen::erase();
 
-    // Draw Header Top Bar
-    pros::screen::set_pen(HEADER_BG);
-    pros::screen::fill_rect(0, 0, 480, 30);
-    
-    pros::screen::set_pen(TEXT_WHITE);
+    pros::screen::set_pen(kHeaderBackground);
+    pros::screen::fill_rect(0, 0, kScreenWidth, kHeaderHeight);
+    pros::screen::set_pen(kTextWhite);
     pros::screen::print(pros::E_TEXT_MEDIUM, 15, 6, "CRIMSON | POSE ESTIMATION");
 
     draw_field();
 }
 
-int Dashboard::field_to_screen_x(double field_x) const {
-    return kMapOffsetX + static_cast<int>((field_x / field::kFieldLength) * kMapSize);
+void Dashboard::show_status(const char* text) {
+    draw_status(text, kTextAccent);
 }
 
-int Dashboard::field_to_screen_y(double field_y) const {
-    return kMapOffsetY + kMapSize - static_cast<int>((field_y / field::kFieldWidth) * kMapSize);
+void Dashboard::update(const std::optional<crimson::Pose2D>& pose, int tag_count, int primary_tag_id) {
+    if (last_pose_) {
+        pros::screen::set_pen(kBackground);
+        pros::screen::fill_circle(field_to_screen_x(last_pose_->x), field_to_screen_y(last_pose_->y),
+                                  kTrailEraseRadius);
+    }
+
+    draw_field();
+    if (pose) {
+        draw_robot(*pose);
+    }
+    last_pose_ = pose;
+
+    print_stats(pose, tag_count, primary_tag_id);
+}
+
+int Dashboard::field_to_screen_x(double field_x) {
+    return kMapOffsetX + static_cast<int>(field_x / field::kFieldLength * kMapSize);
+}
+
+int Dashboard::field_to_screen_y(double field_y) {
+    return kMapOffsetY + kMapSize - static_cast<int>(field_y / field::kFieldWidth * kMapSize);
+}
+
+void Dashboard::draw_status(const char* text, std::uint32_t color) {
+    pros::screen::set_pen(kHeaderBackground);
+    pros::screen::fill_rect(kStatusPanelX, 0, kScreenWidth, kHeaderHeight);
+    pros::screen::set_pen(color);
+    pros::screen::print(pros::E_TEXT_MEDIUM, kStatusTextX, 6, "%s", text);
 }
 
 void Dashboard::draw_field() {
-    // Fill Field Area
-    pros::screen::set_pen(FIELD_BG);
+    pros::screen::set_pen(kFieldBackground);
     pros::screen::fill_rect(kMapOffsetX, kMapOffsetY, kMapOffsetX + kMapSize, kMapOffsetY + kMapSize);
 
-    // Outline Field
-    pros::screen::set_pen(FIELD_LINE);
+    pros::screen::set_pen(kFieldLine);
     pros::screen::draw_rect(kMapOffsetX, kMapOffsetY, kMapOffsetX + kMapSize, kMapOffsetY + kMapSize);
 
-    // Draw midfield cross to give visual structure
-    pros::screen::draw_line(field_to_screen_x(field::kNeutralGoalTopLeft.x), field_to_screen_y(field::kNeutralGoalTopLeft.y),
-                            field_to_screen_x(field::kNeutralGoalBottomRight.x), field_to_screen_y(field::kNeutralGoalBottomRight.y));
-    pros::screen::draw_line(field_to_screen_x(field::kNeutralGoalBottomLeft.x), field_to_screen_y(field::kNeutralGoalBottomLeft.y),
-                            field_to_screen_x(field::kNeutralGoalTopRight.x), field_to_screen_y(field::kNeutralGoalTopRight.y));
-
-    // Plot Goals
-    auto draw_goal = [&](const field::Point2D& p, uint32_t color) {
-        pros::screen::set_pen(color);
-        pros::screen::fill_circle(field_to_screen_x(p.x), field_to_screen_y(p.y), 5);
+    const auto draw_line = [](const field::Point2D& from, const field::Point2D& to) {
+        pros::screen::draw_line(field_to_screen_x(from.x), field_to_screen_y(from.y), field_to_screen_x(to.x),
+                                field_to_screen_y(to.y));
     };
+    draw_line(field::kNeutralGoalTopLeft, field::kNeutralGoalBottomRight);
+    draw_line(field::kNeutralGoalBottomLeft, field::kNeutralGoalTopRight);
 
-    draw_goal(field::kCenterGoal, GOAL_NEUTRAL);
-    draw_goal(field::kNeutralGoalTopLeft, GOAL_NEUTRAL);
-    draw_goal(field::kNeutralGoalBottomLeft, GOAL_NEUTRAL);
-    draw_goal(field::kNeutralGoalTopRight, GOAL_NEUTRAL);
-    draw_goal(field::kNeutralGoalBottomRight, GOAL_NEUTRAL);
-
-    draw_goal(field::kRedGoalTop, GOAL_RED);
-    draw_goal(field::kRedGoalBottom, GOAL_RED);
-    
-    draw_goal(field::kBlueGoalTop, GOAL_BLUE);
-    draw_goal(field::kBlueGoalBottom, GOAL_BLUE);
+    const auto draw_goal = [](const field::Point2D& goal, std::uint32_t color) {
+        pros::screen::set_pen(color);
+        pros::screen::fill_circle(field_to_screen_x(goal.x), field_to_screen_y(goal.y), kGoalRadius);
+    };
+    draw_goal(field::kCenterGoal, kGoalNeutral);
+    draw_goal(field::kNeutralGoalTopLeft, kGoalNeutral);
+    draw_goal(field::kNeutralGoalBottomLeft, kGoalNeutral);
+    draw_goal(field::kNeutralGoalTopRight, kGoalNeutral);
+    draw_goal(field::kNeutralGoalBottomRight, kGoalNeutral);
+    draw_goal(field::kRedGoalTop, kGoalRed);
+    draw_goal(field::kRedGoalBottom, kGoalRed);
+    draw_goal(field::kBlueGoalTop, kGoalBlue);
+    draw_goal(field::kBlueGoalBottom, kGoalBlue);
 }
 
 void Dashboard::draw_robot(const crimson::Pose2D& pose) {
-    int rx = field_to_screen_x(pose.x);
-    int ry = field_to_screen_y(pose.y);
+    const int x = field_to_screen_x(pose.x);
+    const int y = field_to_screen_y(pose.y);
 
-    // Draw outer glow/shadow layer
-    pros::screen::set_pen(ROBOT_GLOW);
-    pros::screen::fill_circle(rx, ry, 8);
+    pros::screen::set_pen(kRobotGlow);
+    pros::screen::fill_circle(x, y, kRobotGlowRadius);
+    pros::screen::set_pen(kRobotColor);
+    pros::screen::fill_circle(x, y, kRobotRadius);
 
-    // Draw solid inner core
-    pros::screen::set_pen(ROBOT_COLOR);
-    pros::screen::fill_circle(rx, ry, 5);
-
-    // Draw pointing heading line
-    double heading_rad = pose.theta * M_PI / 180.0;
-    int lx = rx + static_cast<int>(14 * std::cos(heading_rad));
-    int ly = ry - static_cast<int>(14 * std::sin(heading_rad));
-
-    pros::screen::set_pen(ROBOT_HEADING);
-    pros::screen::draw_line(rx, ry, lx, ly);
+    const double heading = pose.theta * std::numbers::pi / 180.0;
+    const int tip_x = x + static_cast<int>(kHeadingLength * std::sin(heading));
+    const int tip_y = y - static_cast<int>(kHeadingLength * std::cos(heading));
+    pros::screen::set_pen(kRobotHeading);
+    pros::screen::draw_line(x, y, tip_x, tip_y);
 }
 
-void Dashboard::print_stats(const std::optional<crimson::Pose2D>& pose, int tv, int tag_id) {
-    int text_x = kMapOffsetX + kMapSize + 25; // padding
-    
-    // Clear right side data panel
-    pros::screen::set_pen(BG_COLOR);
-    pros::screen::fill_rect(text_x, 30, 480, 240);
+void Dashboard::print_stats(const std::optional<crimson::Pose2D>& pose, int tag_count, int primary_tag_id) {
+    const int text_x = kMapOffsetX + kMapSize + 25;
 
-    // Status Indicator in Header
-    pros::screen::set_pen(HEADER_BG);
-    pros::screen::fill_rect(320, 0, 480, 30); // clear top right
-    
-    if (pose.has_value()) {
-        pros::screen::set_pen(ROBOT_COLOR);
-        pros::screen::print(pros::E_TEXT_MEDIUM, 340, 6, "STATUS: OK");
+    pros::screen::set_pen(kBackground);
+    pros::screen::fill_rect(text_x, kHeaderHeight, kScreenWidth, kScreenHeight);
+
+    if (pose) {
+        draw_status("STATUS: OK", kRobotColor);
     } else {
-        pros::screen::set_pen(GOAL_RED);
-        pros::screen::print(pros::E_TEXT_MEDIUM, 340, 6, "STATUS: LOST");
+        draw_status("STATUS: LOST", kGoalRed);
     }
 
-    // --- Coordinates Panel ---
-    pros::screen::set_pen(TEXT_ACCENT);
+    pros::screen::set_pen(kTextAccent);
     pros::screen::print(pros::E_TEXT_MEDIUM, text_x, 45, "Global Coordinates");
-    
-    pros::screen::set_pen(TEXT_WHITE);
-    char buf[64];
-    if (pose.has_value()) {
-        std::snprintf(buf, sizeof(buf), "X:  %5.0f mm", pose->x);
-        pros::screen::print(pros::E_TEXT_LARGE, text_x, 70, buf);
-        
-        std::snprintf(buf, sizeof(buf), "Y:  %5.0f mm", pose->y);
-        pros::screen::print(pros::E_TEXT_LARGE, text_x, 105, buf);
-        
-        std::snprintf(buf, sizeof(buf), "H:  %5.1f deg", pose->theta);
-        pros::screen::print(pros::E_TEXT_LARGE, text_x, 140, buf);
+
+    pros::screen::set_pen(kTextWhite);
+    if (pose) {
+        pros::screen::print(pros::E_TEXT_LARGE, text_x, 70, "X:  %5.0f mm", pose->x);
+        pros::screen::print(pros::E_TEXT_LARGE, text_x, 105, "Y:  %5.0f mm", pose->y);
+        pros::screen::print(pros::E_TEXT_LARGE, text_x, 140, "H:  %5.1f deg", pose->theta);
     } else {
         pros::screen::print(pros::E_TEXT_LARGE, text_x, 70, "X:  ---");
         pros::screen::print(pros::E_TEXT_LARGE, text_x, 105, "Y:  ---");
         pros::screen::print(pros::E_TEXT_LARGE, text_x, 140, "H:  ---");
     }
 
-    // --- Vision Details Panel ---
-    pros::screen::set_pen(TEXT_ACCENT);
+    pros::screen::set_pen(kTextAccent);
     pros::screen::print(pros::E_TEXT_MEDIUM, text_x, 185, "Sensor Diagnostics");
 
-    pros::screen::set_pen(TEXT_WHITE);
-    if (tv) {
-        std::snprintf(buf, sizeof(buf), "Tags: %d | Primary ID: %d", tv, tag_id);
-        pros::screen::print(pros::E_TEXT_MEDIUM, text_x, 210, buf);
+    pros::screen::set_pen(kTextWhite);
+    if (tag_count > 0) {
+        pros::screen::print(pros::E_TEXT_MEDIUM, text_x, 210, "Tags: %d | Primary ID: %d", tag_count, primary_tag_id);
     } else {
         pros::screen::print(pros::E_TEXT_MEDIUM, text_x, 210, "Tags: 0 | Primary ID: -");
     }
 }
 
-void Dashboard::update(const std::optional<crimson::Pose2D>& pose, int tv, int tag_id) {
-    // Wipe the old robot trail
-    if (last_pose_.has_value()) {
-        int old_rx = field_to_screen_x(last_pose_->x);
-        int old_ry = field_to_screen_y(last_pose_->y);
-        pros::screen::set_pen(FIELD_BG);
-        pros::screen::fill_circle(old_rx, old_ry, 16); 
-    }
-    
-    // Always refresh the map underneath to ensure the lines/goals remain crisp
-    draw_field();
-
-    if (pose.has_value()) {
-        draw_robot(*pose);
-    }
-
-    last_pose_ = pose;
-    print_stats(pose, tv, tag_id);
 }
-
-} // namespace display

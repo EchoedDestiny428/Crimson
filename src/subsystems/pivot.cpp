@@ -1,56 +1,51 @@
 #include "subsystems/pivot.hpp"
-#include "subsystems/elevator.hpp"
+#include "config/controls.hpp"
 #include "robotconfig.hpp"
-#include "pros/rtos.hpp"
+#include <atomic>
 
-namespace subsystems {
+namespace subsystems::pivot {
 
-constexpr double kPivotMacroDeg = 90.0;  // how far one press turns the pivot
-constexpr double kPivotGearRatio = 1.0;  // motor degrees per 1 degree of pivot arm
-                                         // e.g. 12T motor gear -> 60T arm gear = 5.0
-constexpr int kPivotMacroVelocity = 300; // rpm (blue cartridge max is 600)
-constexpr double kElevMacroRise = 150.0; // TODO: TUNE — how far the elevator rises on the A macro
-constexpr int kLoopDelayMs = 20;
+namespace {
 
-void pivot_init() {
-    pivot.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+constexpr double kGearRatio = 1.0;
+constexpr int kManualPower = 127;
+constexpr int kMacroVelocity = 300;
+
+std::atomic<bool> macro_active{false};
+std::atomic<double> macro_target{0.0};
+bool manual_active = false;
+
 }
 
-void pivot_loop() {
-    bool macro_active = false;
-    double macro_target = 0.0;
+void init() {
+    pivot_motor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+}
 
-    while (!pros::competition::is_disabled() && !pros::competition::is_autonomous())
-    {
-        const bool fwd = controller.get_digital(pros::E_CONTROLLER_DIGITAL_X);
-        const bool rev = controller.get_digital(pros::E_CONTROLLER_DIGITAL_B);
+void update() {
+    const bool forward = controller.get_digital(controls::kPivotForward);
+    const bool reverse = controller.get_digital(controls::kPivotReverse);
 
-        if (fwd || rev)
-        {
-            // Manual control always overrides the macro
-            macro_active = false;
-            pivot.move(fwd ? 127 : -127);
-        }
-        else if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A))
-        {
-            // Pivot: exactly +90 degrees
-            const double base = macro_active ? macro_target : pivot.get_position();
-            macro_target = base + kPivotMacroDeg * kPivotGearRatio;
-            macro_active = true;
-            pivot.move_absolute(macro_target, kPivotMacroVelocity);
-
-            // Elevator: rise by kElevMacroRise at the same time
-            subsystems::elev_goto(subsystems::elev_setpoint() + kElevMacroRise);
-        }
-        else if (!macro_active)
-        {
-            pivot.brake();
-        }
-
-        pros::delay(kLoopDelayMs);
+    if (forward || reverse) {
+        macro_active = false;
+        manual_active = true;
+        pivot_motor.move(forward ? kManualPower : -kManualPower);
+    } else if (manual_active) {
+        manual_active = false;
+        pivot_motor.brake();
     }
-
-    pivot.brake();
 }
 
-} // namespace subsystems
+void stop() {
+    manual_active = false;
+    macro_active = false;
+    pivot_motor.brake();
+}
+
+void rotate_by(double arm_deg) {
+    const double base = macro_active ? macro_target.load() : pivot_motor.get_position();
+    macro_target = base + arm_deg * kGearRatio;
+    macro_active = true;
+    pivot_motor.move_absolute(macro_target, kMacroVelocity);
+}
+
+}

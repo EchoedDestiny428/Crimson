@@ -1,23 +1,47 @@
 #include "vision/crimson.hpp"
 #include "constants/field_constants.hpp"
+#include "pros/error.h"
+#include "pros/rtos.hpp"
 #include <cmath>
-#include <algorithm>
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+#include <numbers>
 
 namespace crimson {
 
-static inline double deg2rad(double deg) { return deg * M_PI / 180.0; }
-static inline double rad2deg(double rad) { return rad * 180.0 / M_PI; }
+namespace {
 
-Crimson::Crimson(std::uint8_t port)
-    : sensor_(port), primary_target_{}, target_valid_(false), last_update_ms_(0) {
+constexpr double kMinTriangulationSin = 0.01;
+constexpr double kMinPitchTan = 0.01;
+
+double deg_to_rad(double deg) {
+    return deg * std::numbers::pi / 180.0;
 }
+
+double wrap_degrees(double deg) {
+    const double wrapped = std::fmod(deg, 360.0);
+    return wrapped < 0.0 ? wrapped + 360.0 : wrapped;
+}
+
+}
+
+Crimson::Crimson(std::uint8_t port) : sensor_(port) {}
 
 void Crimson::initialize() {
     sensor_.enable_detection_types(pros::AivisionModeType::tags);
+}
+
+void Crimson::update() {
+    tags_.clear();
+
+    const std::int32_t count = sensor_.get_object_count();
+    if (count > 0 && count != PROS_ERR) {
+        for (const auto& object : sensor_.get_all_objects()) {
+            if (pros::AIVision::is_type(object, pros::AivisionDetectType::tag)) {
+                tags_.push_back(object);
+            }
+        }
+    }
+
+    last_update_ms_ = pros::millis();
 }
 
 void Crimson::set_camera_mount_metrics(double height_mm, double pitch_deg) {
@@ -25,132 +49,104 @@ void Crimson::set_camera_mount_metrics(double height_mm, double pitch_deg) {
     camera_pitch_deg_ = pitch_deg;
 }
 
-void Crimson::update() {
-    tags_visible_.clear();
-    target_valid_ = false;
-
-    int obj_count = sensor_.get_object_count();
-    if (obj_count > 0) {
-        auto objects = sensor_.get_all_objects();
-        for (const auto& obj : objects) {
-            if (pros::AIVision::is_type(obj, pros::AivisionDetectType::tag)) {
-                tags_visible_.push_back(obj);
-            }
-        }
-    }
-
-    if (!tags_visible_.empty()) {
-        primary_target_ = tags_visible_.front();
-        target_valid_ = true;
-    }
-
-    last_update_ms_ = pros::millis();
+bool Crimson::has_target() const {
+    return !tags_.empty();
 }
 
-void Crimson::get_tag_center(const pros::AIVision::Object& tag, double& px, double& py) const {
-    px = (tag.object.tag.x0 + tag.object.tag.x1 + tag.object.tag.x2 + tag.object.tag.x3) / 4.0;
-    py = (tag.object.tag.y0 + tag.object.tag.y1 + tag.object.tag.y2 + tag.object.tag.y3) / 4.0;
+int Crimson::tag_count() const {
+    return static_cast<int>(tags_.size());
 }
 
-double Crimson::calc_tx(double px) const {
-    return (px - kCenterX) * (kFovHorizontalDeg / kFrameWidth);
+int Crimson::primary_tag_id() const {
+    return tags_.empty() ? -1 : tags_.front().id;
 }
-
-double Crimson::calc_ty(double py) const {
-    return (kCenterY - py) * (kFovVerticalDeg / kFrameHeight);
-}
-
-bool Crimson::has_target() const { return target_valid_; }
-int Crimson::get_tv() const { return target_valid_ ? 1 : 0; }
 
 double Crimson::get_tx() const {
-    if (!target_valid_) return 0.0;
-    double px, py;
-    get_tag_center(primary_target_, px, py);
-    return calc_tx(px);
+    return tags_.empty() ? 0.0 : calc_tx(tag_center(tags_.front()).x);
 }
 
 double Crimson::get_ty() const {
-    if (!target_valid_) return 0.0;
-    double px, py;
-    get_tag_center(primary_target_, px, py);
-    return calc_ty(py);
+    return tags_.empty() ? 0.0 : calc_ty(tag_center(tags_.front()).y);
 }
-
-double Crimson::get_ta() const { return 0.0; }
-double Crimson::get_ts() const { return 0.0; }
 
 std::uint32_t Crimson::get_data_age_ms() const {
-    if (last_update_ms_ == 0) return 0;
-    return pros::millis() - last_update_ms_;
+    return last_update_ms_ == 0 ? 0 : pros::millis() - last_update_ms_;
 }
 
-pros::AIVision::Object Crimson::get_raw_target() const { return primary_target_; }
-pros::AIVision &Crimson::sensor() { return sensor_; }
+Crimson::Pixel Crimson::tag_center(const pros::AIVision::Object& tag) {
+    const auto& corners = tag.object.tag;
+    return {(corners.x0 + corners.x1 + corners.x2 + corners.x3) / 4.0,
+            (corners.y0 + corners.y1 + corners.y2 + corners.y3) / 4.0};
+}
 
-// Note: To truly resolve ambiguous tags, we pick the one that gives the most reasonable distance.
-// For now, we assume the first valid mapping is correct, but ideally you pass in the last known robot pose to disambiguate.
-std::optional<Pose2D> Crimson::estimate_global_pose(double imu_heading_deg) {
-    if (tags_visible_.empty()) return std::nullopt;
+double Crimson::calc_tx(double px) {
+    return (px - kFrameWidth / 2.0) * (kFovHorizontalDeg / kFrameWidth);
+}
 
-    double heading_rad = deg2rad(imu_heading_deg);
+double Crimson::calc_ty(double py) {
+    return (kFrameHeight / 2.0 - py) * (kFovVerticalDeg / kFrameHeight);
+}
 
-    // --- TWO TAG TRIANGULATION ---
-    if (tags_visible_.size() >= 2) {
-        auto tag1 = tags_visible_[0];
-        auto tag2 = tags_visible_[1];
-        
-        auto locs1 = field::get_goal_locations_for_tag(tag1.id);
-        auto locs2 = field::get_goal_locations_for_tag(tag2.id);
+std::optional<Pose2D> Crimson::estimate_global_pose(double heading_deg) const {
+    if (tags_.empty()) {
+        return std::nullopt;
+    }
+    if (tags_.size() >= 2) {
+        if (const auto pose = triangulate(tags_[0], tags_[1], heading_deg)) {
+            return pose;
+        }
+    }
+    return from_single_tag(tags_.front(), heading_deg);
+}
 
-        if (!locs1.empty() && !locs2.empty()) {
-            double px1, py1, px2, py2;
-            get_tag_center(tag1, px1, py1);
-            get_tag_center(tag2, px2, py2);
+std::optional<Pose2D> Crimson::triangulate(const pros::AIVision::Object& first, const pros::AIVision::Object& second,
+                                           double heading_deg) {
+    const double bearing1 = deg_to_rad(heading_deg + calc_tx(tag_center(first).x));
+    const double bearing2 = deg_to_rad(heading_deg + calc_tx(tag_center(second).x));
+    const double det = std::sin(bearing1 - bearing2);
+    if (std::abs(det) < kMinTriangulationSin) {
+        return std::nullopt;
+    }
 
-            double tx1 = calc_tx(px1);
-            double tx2 = calc_tx(px2);
+    for (const auto& goal1 : field::get_goal_locations_for_tag(first.id)) {
+        for (const auto& goal2 : field::get_goal_locations_for_tag(second.id)) {
+            const double dx = goal2.pos.x - goal1.pos.x;
+            const double dy = goal2.pos.y - goal1.pos.y;
+            const double dist1 = (dy * std::sin(bearing2) - dx * std::cos(bearing2)) / det;
+            const double dist2 = (dy * std::sin(bearing1) - dx * std::cos(bearing1)) / det;
+            const field::Point2D robot{goal1.pos.x - dist1 * std::sin(bearing1),
+                                       goal1.pos.y - dist1 * std::cos(bearing1)};
 
-            double gamma1 = heading_rad + deg2rad(tx1);
-            double gamma2 = heading_rad + deg2rad(tx2);
-
-            // We pick the first possible location for each tag for simplicity.
-            // A more advanced version would test all combinations of ambiguous tags and pick the one that yields a realistic robot position.
-            field::Point2D p1 = locs1[0].pos;
-            field::Point2D p2 = locs2[0].pos;
-
-            double D = std::sin(gamma1 - gamma2);
-            if (std::abs(D) > 0.01) { // Ensure lines aren't parallel
-                double d1 = ((p2.x - p1.x) * std::sin(gamma2) - (p2.y - p1.y) * std::cos(gamma2)) / D;
-                double rx = p1.x - d1 * std::cos(gamma1);
-                double ry = p1.y - d1 * std::sin(gamma1);
-                return Pose2D{rx, ry, imu_heading_deg};
+            if (dist1 > 0.0 && dist2 > 0.0 && field::in_field(robot)) {
+                return Pose2D{robot.x, robot.y, wrap_degrees(heading_deg)};
             }
         }
     }
-
-    // --- SINGLE TAG FALLBACK ---
-    auto tag = tags_visible_.front();
-    auto locs = field::get_goal_locations_for_tag(tag.id);
-    if (!locs.empty()) {
-        double px, py;
-        get_tag_center(tag, px, py);
-        double ty = calc_ty(py);
-        double tx = calc_tx(px);
-
-        double total_pitch_rad = deg2rad(camera_pitch_deg_ + ty);
-        if (std::tan(total_pitch_rad) <= 0.01) return std::nullopt; // Protect against div by zero or negative pitch
-
-        double delta_h = locs[0].height - camera_height_mm_;
-        double distance_horizontal = delta_h / std::tan(total_pitch_rad);
-
-        double robot_x = locs[0].pos.x - distance_horizontal * std::cos(heading_rad + deg2rad(tx));
-        double robot_y = locs[0].pos.y - distance_horizontal * std::sin(heading_rad + deg2rad(tx));
-
-        return Pose2D{robot_x, robot_y, imu_heading_deg};
-    }
-
     return std::nullopt;
 }
 
-}  // namespace crimson
+std::optional<Pose2D> Crimson::from_single_tag(const pros::AIVision::Object& tag, double heading_deg) const {
+    const Pixel center = tag_center(tag);
+    const double pitch_tan = std::tan(deg_to_rad(camera_pitch_deg_ + calc_ty(center.y)));
+    if (std::abs(pitch_tan) < kMinPitchTan) {
+        return std::nullopt;
+    }
+
+    const double bearing = deg_to_rad(heading_deg + calc_tx(center.x));
+
+    for (const auto& goal : field::get_goal_locations_for_tag(tag.id)) {
+        const double distance = (goal.height - camera_height_mm_) / pitch_tan;
+        if (!std::isfinite(distance) || distance <= 0.0) {
+            continue;
+        }
+
+        const field::Point2D robot{goal.pos.x - distance * std::sin(bearing),
+                                   goal.pos.y - distance * std::cos(bearing)};
+        if (field::in_field(robot)) {
+            return Pose2D{robot.x, robot.y, wrap_degrees(heading_deg)};
+        }
+    }
+    return std::nullopt;
+}
+
+}

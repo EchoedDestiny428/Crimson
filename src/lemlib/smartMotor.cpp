@@ -1,170 +1,166 @@
-#include <math.h>
-#include <vector>
-#include "pros/motor_group.hpp"
-#include "pros/rotation.hpp"
-#include "pros/rtos.hpp"
 #include "lemlib/smartMotor.hpp"
-
-/**
- * @note TO ALL CONTRIBUTORS OF 1831-COMMON-CODEBASE
- *
- * TODO Disclaimer - this code is an extension of the existing Lemlib namespace, but is NOT an original feature. More testing may be required to verify the functionality of this feature. 
- */
+#include "lemlib/logger/logger.hpp"
+#include "pros/error.h"
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <vector>
 
 namespace lemlib {
-/**
- * @brief Constructor for ADI Encoder-based SmartMotor.
- */
-SmartMotor::SmartMotor(pros::MotorGroup* actuator, pros::adi::Encoder* sensor, PID controller)
-    : actuator(actuator), controller(controller), encoder(sensor) {}
 
-/**
- * @brief Constructor for V5 Rotation Sensor-based SmartMotor.
- */
-SmartMotor::SmartMotor(pros::MotorGroup* actuator, pros::Rotation* sensor, PID controller)
-    : actuator(actuator), controller(controller), rotation(sensor) {}
+namespace {
 
-/**
- * @brief Constructor for IME-based SmartMotor.
- */
-SmartMotor::SmartMotor(pros::MotorGroup* actuator, PID controller)
-    : actuator(actuator), controller(controller) {
-    this->ime = actuator; // Defaults to using integrated motor encoder (IME)
+constexpr std::uint32_t kPeriodMs = 10;
+constexpr std::uint32_t kLogEveryTicks = 10;
+constexpr float kMaxPower = 127.0f;
+constexpr float kInvalid = std::numeric_limits<float>::quiet_NaN();
+
 }
 
-/**
- * @brief Resets the absolute rotation/position of the motor.
- * 
- * Depending on the sensor type, this function resets the encoder, V5 rotation sensor, 
- * or IME-based motor group position back to zero.
- */
-int SmartMotor::reset() {
-    if (this->encoder != nullptr) this->encoder->reset();
-    if (this->rotation != nullptr) this->rotation->reset_position();
-    if (this->ime != nullptr) this->ime->tare_position_all();
-    return 0; // kept for future expandability
-}
+SmartMotor::SmartMotor(pros::MotorGroup* actuator, pros::adi::Encoder* encoder, PID controller, float settleRange,
+                       float feedforward)
+    : actuator(actuator),
+      encoder(encoder),
+      rotation(nullptr),
+      controller(controller),
+      settleRange(settleRange),
+      feedforward(feedforward) {}
 
-/**
- * @brief Returns the current position of the motor.
- * 
- * This function reads from the active sensor (ADI Encoder, V5 Rotation Sensor, or IME).
- */
-float SmartMotor::getRotation() {
-    if (this->encoder != nullptr) 
-        return (float(this->encoder->get_value()));
-    else if (this->rotation != nullptr) 
-        return (float(this->rotation->get_position()));
-    else if (this->ime != nullptr) {
-        std::vector<double> positions = this->ime->get_position_all();
-        std::vector<float> positions_float(positions.size());
-        std::transform(positions.begin(), positions.end(), positions_float.begin(), 
-               [](double val) { return static_cast<float>(val); });
-        return lemlib::avg(positions_float);
-    } 
-    return 0; // Default return value if no valid sensor is available.
-}
+SmartMotor::SmartMotor(pros::MotorGroup* actuator, pros::Rotation* rotation, PID controller, float settleRange,
+                       float feedforward)
+    : actuator(actuator),
+      encoder(nullptr),
+      rotation(rotation),
+      controller(controller),
+      settleRange(settleRange),
+      feedforward(feedforward) {}
 
-/**
- * @brief Returns the current target setpoint.
- * 
- * @return The motor's current target position in sensor units as a float.
- */
-float SmartMotor::getTarget() {
-    return this->target;
-}
+SmartMotor::SmartMotor(pros::MotorGroup* actuator, PID controller, float settleRange, float feedforward)
+    : actuator(actuator),
+      encoder(nullptr),
+      rotation(nullptr),
+      controller(controller),
+      settleRange(settleRange),
+      feedforward(feedforward) {}
 
-/**
- * @brief Moves the motor to a target position using a PID loop.
- * 
- * The motor moves to the target position using PID control. If `async` is true, the function
- * spawns a separate task to run the PID loop asynchronously.
- */
-int SmartMotor::movePID(float target, float timeout, float acceptableRange, bool async) {
-    if (async) {
-        // Store target setpoint
-        this->target = target;
-        
-        // Start an asynchronous task to run the PID loop.
-        pros::Task asynctask([=]() {
-            this->movePID(target, timeout, acceptableRange, false); // Call the synchronous version
-        });
-        pros::delay(10); // Delay to give the task time to start
-        return 2;                     // Indicate that async task has been started.
+void SmartMotor::start() {
+    if (task == nullptr) {
+        task = new pros::Task([this] { controlLoop(); }, "SmartMotor");
     }
-    
-    // Store target setpoint
-    this->target = target;
-    unsigned long start_time = pros::millis();
-
-    // Loop until the target is reached or the timeout occurs
-    while (true) {
-        // Get the current position from the system
-        float current_pos = this->getRotation();
-        float error = target - current_pos;
-
-        // If the error is within an acceptable range, exit the loop
-        if (fabs(error) < acceptableRange) break;
-
-        // Check if the timeout has expired
-        if (pros::millis() - start_time > timeout) break;
-
-        // Update the PID controller with the error to get the control signal
-        float control_signal = this->controller.update(error) / 200;
-
-        // Send the control signal to the movement system (motor/actuator)
-        this->actuator->move(control_signal);
-        
-        // Optionally, add a small delay to prevent too frequent updates (e.g., 10ms)
-        printf("PID-Signal: %f | Current: %f | Target: %f \n", control_signal, current_pos, target);
-        pros::delay(10);  // Adjust as needed based on your system's requirements
-    }
-    // After the loop ends (either target reached or timeout), stop the motor
-    this->actuator->brake();
-
-    // Return success status 
-    return (fabs(target - this->getRotation()) < 0.01) ? 1 : 0;  // Return 1 if target reached, 0 if timed out
 }
 
-void SmartMotor::startLogging(bool enabled) {
-    if (enabled && !logging_active) {
-        logging_active = true;
-        
-        // Capture current target at the time logging starts
-        float logged_target = this->target;
-        
-        // Spawn logging task
-        logging_task = new pros::Task([this, logged_target]() {
-            auto sink = lemlib::infoSink();
-            
-            while (logging_active) {
-                // Get real voltage (average across motor group) - returns std::vector<int16_t>
-                std::vector<long> voltages = this->actuator->get_voltage_all();
-                double avg_voltage = 0;
-                for (long v : voltages) {
-                    avg_voltage += v;
-                }
-                avg_voltage /= voltages.size();
-                
-                // Get current position
-                float current_pos = this->getRotation();
-                
-                // Log commanded target, current position, and real voltage
-                sink->info("SmartMotor | Target: {:.1f} | Current: {:.1f} | Voltage: {:.0f}mV", 
-                           logged_target, current_pos, avg_voltage);
-                
-                pros::delay(10);  // Log at 100Hz
-            }
-        });
-    } 
-    else if (!enabled && logging_active) {
-        logging_active = false;
-        
-        // Task will exit on its own when logging_active becomes false
-        if (logging_task != nullptr) {
-            delete logging_task;
-            logging_task = nullptr;
+void SmartMotor::reset() {
+    if (encoder != nullptr) {
+        encoder->reset();
+    } else if (rotation != nullptr) {
+        rotation->reset_position();
+    } else {
+        actuator->tare_position_all();
+    }
+    setTarget(0.0f);
+}
+
+float SmartMotor::getRotation() const {
+    if (encoder != nullptr) {
+        const std::int32_t value = encoder->get_value();
+        return value == PROS_ERR ? kInvalid : static_cast<float>(value);
+    }
+    if (rotation != nullptr) {
+        const std::int32_t value = rotation->get_position();
+        return value == PROS_ERR ? kInvalid : static_cast<float>(value);
+    }
+
+    float sum = 0.0f;
+    int count = 0;
+    for (const double position : actuator->get_position_all()) {
+        if (std::isfinite(position)) {
+            sum += static_cast<float>(position);
+            ++count;
         }
     }
+    return count > 0 ? sum / static_cast<float>(count) : kInvalid;
 }
-} // namespace lemlib
+
+float SmartMotor::getTarget() const {
+    return target;
+}
+
+bool SmartMotor::isSettled() const {
+    return !manual && std::fabs(target - getRotation()) < settleRange;
+}
+
+void SmartMotor::setTarget(float newTarget) {
+    if (!std::isfinite(newTarget)) {
+        return;
+    }
+    target = newTarget;
+    targetChanged = true;
+    manual = false;
+}
+
+void SmartMotor::setManual(int power) {
+    manualPower = power;
+    manual = true;
+}
+
+void SmartMotor::holdCurrent() {
+    setTarget(getRotation());
+}
+
+bool SmartMotor::waitUntilSettled(std::uint32_t timeout) {
+    const std::uint32_t start = pros::millis();
+    while (!isSettled()) {
+        if (pros::millis() - start >= timeout) {
+            return false;
+        }
+        pros::delay(kPeriodMs);
+    }
+    return true;
+}
+
+void SmartMotor::setLogging(bool enabled) {
+    logging = enabled;
+}
+
+void SmartMotor::controlLoop() {
+    std::uint32_t now = pros::millis();
+    std::uint32_t tick = 0;
+
+    while (true) {
+        const float goal = target;
+        const float position = getRotation();
+        const float error = goal - position;
+
+        if (targetChanged.exchange(false)) {
+            controller.reset();
+        }
+
+        if (manual) {
+            actuator->move(manualPower);
+        } else if (!std::isfinite(error) || std::fabs(error) < settleRange) {
+            controller.reset();
+            actuator->brake();
+        } else {
+            const float output = controller.update(error) + feedforward;
+            actuator->move(static_cast<std::int32_t>(std::clamp(output, -kMaxPower, kMaxPower)));
+        }
+
+        if (logging && ++tick % kLogEveryTicks == 0) {
+            log(goal, position);
+        }
+
+        pros::Task::delay_until(&now, kPeriodMs);
+    }
+}
+
+void SmartMotor::log(float goal, float position) const {
+    const std::vector<std::int32_t> voltages = actuator->get_voltage_all();
+    double total = 0.0;
+    for (const std::int32_t voltage : voltages) {
+        total += voltage;
+    }
+    const double average = voltages.empty() ? 0.0 : total / static_cast<double>(voltages.size());
+    infoSink()->info("SmartMotor | Target: {:.1f} | Current: {:.1f} | Voltage: {:.0f}mV", goal, position, average);
+}
+
+}

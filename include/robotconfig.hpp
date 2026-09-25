@@ -1,36 +1,20 @@
 #pragma once
 
-#include "display/dashboard.hpp"
-#include "vision/crimson.hpp"
-#include "lemlib/api.hpp"
-#include "main.h"
 #include "api.h"
+#include "display/dashboard.hpp"
+#include "lemlib/api.hpp"
+#include "vision/crimson.hpp"
 
-// --------------------------------------------------
-// I/O Devices
-// --------------------------------------------------
 extern pros::Controller controller;
-extern pros::Motor intake;
-extern crimson::Crimson crimson_cam;
 extern pros::Imu imu;
+extern crimson::Crimson crimson_cam;
 extern display::Dashboard dashboard;
 
-// --------------------------------------------------
-// Motor Groups
-// --------------------------------------------------
 extern pros::MotorGroup left_motors;
 extern pros::MotorGroup right_motors;
-extern pros::MotorGroup elevator;
-extern pros::Motor claw;
-extern pros::Motor pivot;
+extern pros::MotorGroup elevator_motors;
+extern pros::Motor intake_motor;
+extern pros::Motor claw_motor;
+extern pros::Motor pivot_motor;
 
-// --------------------------------------------------
-// LemLib Configuration
-// --------------------------------------------------
-extern lemlib::Drivetrain drivetrain;
-extern lemlib::ControllerSettings linearController;
-extern lemlib::ControllerSettings angularController;
-extern lemlib::OdomSensors sensors;
-extern lemlib::ExpoDriveCurve throttleCurve;
-extern lemlib::ExpoDriveCurve steerCurve;
 extern lemlib::Chassis chassis;
