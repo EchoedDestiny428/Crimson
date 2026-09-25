@@ -19,8 +19,10 @@ void run() {
         crimson_cam.update();
 
         if (++tick % kDashboardEveryTicks == 0) {
-            const auto pose = crimson_cam.estimate_global_pose(chassis.getPose().theta);
-            dashboard.update(pose, crimson_cam.tag_count(), crimson_cam.primary_tag_id());
+            const lemlib::Pose odom = chassis.getPose();
+            const auto vision = crimson_cam.estimate_global_pose(odom.theta);
+            dashboard.update({odom.x, odom.y, odom.theta}, vision, crimson_cam.tag_count(),
+                             crimson_cam.primary_tag_id());
         }
 
         pros::Task::delay_until(&now, kCameraPeriodMs);

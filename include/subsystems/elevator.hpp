@@ -5,15 +5,14 @@
 namespace subsystems::elevator {
 
 inline constexpr double kBootup = 0.0;
-inline constexpr double kHome = 200.0;
+inline constexpr double kHome = 150.0;
 inline constexpr double kFlipOut = 500.0;
-inline constexpr double kStage1 = 750.0;
-inline constexpr double kStage2 = 1000.0;
-inline constexpr double kStage3 = 1500.0;
-inline constexpr double kStage4 = 2500.0;
-inline constexpr double kStage5 = 3500.0;
-inline constexpr double kStage6 = 4500.0;
-inline constexpr double kMax = 4550.0;
+inline constexpr double kStage1 = 900.0;
+inline constexpr double kStage2 = 1700.0;
+inline constexpr double kStage3 = 2500.0;
+inline constexpr double kStage4 = 3300.0;
+inline constexpr double kStage5 = 3750.0;
+inline constexpr double kMax = 3850.0;
 
 
 void init();

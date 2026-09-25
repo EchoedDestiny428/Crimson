@@ -33,8 +33,14 @@ inline constexpr Point2D kRedGoalBottom{587.1, 587.1};
 inline constexpr Point2D kBlueGoalTop{2979.3, 2979.3};
 inline constexpr Point2D kBlueGoalBottom{2979.3, 587.1};
 
+inline constexpr double kMmPerInch = 25.4;
+
 inline constexpr bool in_field(const Point2D& point) {
     return point.x >= 0.0 && point.x <= kFieldLength && point.y >= 0.0 && point.y <= kFieldWidth;
+}
+
+inline constexpr Point2D to_lemlib_inches(const Point2D& field_mm) {
+    return {(field_mm.x - kFieldLength / 2.0) / kMmPerInch, (field_mm.y - kFieldWidth / 2.0) / kMmPerInch};
 }
 
 inline std::vector<GoalInfo> get_goal_locations_for_tag(int tag_id) {

@@ -2,23 +2,22 @@
 #include "constants/field_constants.hpp"
 #include "pros/error.h"
 #include "pros/rtos.hpp"
+#include "util/angle.hpp"
 #include <cmath>
-#include <numbers>
 
 namespace crimson {
+
+using util::deg_to_rad;
+using util::wrap_degrees;
 
 namespace {
 
 constexpr double kMinTriangulationSin = 0.01;
 constexpr double kMinPitchTan = 0.01;
 
-double deg_to_rad(double deg) {
-    return deg * std::numbers::pi / 180.0;
-}
-
-double wrap_degrees(double deg) {
-    const double wrapped = std::fmod(deg, 360.0);
-    return wrapped < 0.0 ? wrapped + 360.0 : wrapped;
+Pose2D to_lemlib_pose(const field::Point2D& robot_mm, double heading_deg) {
+    const field::Point2D robot_in = field::to_lemlib_inches(robot_mm);
+    return {robot_in.x, robot_in.y, wrap_degrees(heading_deg)};
 }
 
 }
@@ -118,7 +117,7 @@ std::optional<Pose2D> Crimson::triangulate(const pros::AIVision::Object& first, 
                                        goal1.pos.y - dist1 * std::cos(bearing1)};
 
             if (dist1 > 0.0 && dist2 > 0.0 && field::in_field(robot)) {
-                return Pose2D{robot.x, robot.y, wrap_degrees(heading_deg)};
+                return to_lemlib_pose(robot, heading_deg);
             }
         }
     }
@@ -143,7 +142,7 @@ std::optional<Pose2D> Crimson::from_single_tag(const pros::AIVision::Object& tag
         const field::Point2D robot{goal.pos.x - distance * std::sin(bearing),
                                    goal.pos.y - distance * std::cos(bearing)};
         if (field::in_field(robot)) {
-            return Pose2D{robot.x, robot.y, wrap_degrees(heading_deg)};
+            return to_lemlib_pose(robot, heading_deg);
         }
     }
     return std::nullopt;
