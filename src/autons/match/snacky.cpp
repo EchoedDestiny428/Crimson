@@ -10,7 +10,7 @@ void run() {
     chassis.setPose(7.8, -63.4, 180);
 
     parallel({
-        [] { macros::flip_out(10, 800); },
+        [] { macros::flip_out(10, 950); },
         [] {
             chassis.moveToPoint(7.8, -62, 500, {.forwards = false, .minSpeed = 127});
             chassis.turnToPoint(24, -48, 500, {.forwards = false});
@@ -25,7 +25,7 @@ void run() {
     parallel({
         [] { macros::flip_out(elevator::kFlipOut, pivot::kFlippedMotorDeg); },
         [] {
-            chassis.donut(-180, 5000, {.forwards = false, .fastSpeed = 127, .slowSpeed = 60});
+            chassis.donut(-180, 5000, {.forwards = false, .fastSpeed = 127, .slowSpeed = 30});
             chassis.waitUntilDone();
         },
     });

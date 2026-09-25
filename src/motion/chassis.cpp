@@ -1,14 +1,16 @@
 #include "motion/chassis.hpp"
 #include "pros/rtos.hpp"
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <optional>
 
 namespace crimson {
 
 namespace {
 
 constexpr std::uint32_t kPeriodMs = 10;
-constexpr float kPassedTargetJumpDeg = 180.0f;
+constexpr float kSettleWindowDeg = 90.0f;
 
 }
 
@@ -26,34 +28,45 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
     }
 
     const float start_heading = getPose().theta;
-    const float initial_error = lemlib::angleError(theta, start_heading, false, params.direction);
-    const bool clockwise = initial_error >= 0;
-    const lemlib::AngularDirection direction =
-        clockwise ? lemlib::AngularDirection::CW_CLOCKWISE : lemlib::AngularDirection::CCW_COUNTERCLOCKWISE;
+    const lemlib::AngularDirection direction = lemlib::angleError(theta, start_heading, false, params.direction) >= 0
+                                                   ? lemlib::AngularDirection::CW_CLOCKWISE
+                                                   : lemlib::AngularDirection::CCW_COUNTERCLOCKWISE;
 
-    const int travel = params.forwards ? 1 : -1;
-    const bool left_is_fast = (travel > 0) == clockwise;
-    const int fast_power = travel * params.fastSpeed;
-    const int slow_power = -travel * params.slowSpeed;
-    const int left_power = left_is_fast ? fast_power : slow_power;
-    const int right_power = left_is_fast ? slow_power : fast_power;
+    const float travel = params.forwards ? 1.0f : -1.0f;
+    const float push = travel * static_cast<float>(params.fastSpeed - params.slowSpeed) / 2.0f;
+    const float max_spin = static_cast<float>(params.fastSpeed + params.slowSpeed) / 2.0f;
+
+    angularPID.reset();
+    angularLargeExit.reset();
+    angularSmallExit.reset();
 
     const std::uint32_t start_time = pros::millis();
-    float previous_error = std::fabs(initial_error);
+    std::optional<float> previous_raw_error;
+    bool settling = false;
     distTraveled = 0;
 
-    while (motionRunning && pros::millis() - start_time < static_cast<std::uint32_t>(timeout)) {
+    while (motionRunning && pros::millis() - start_time < static_cast<std::uint32_t>(timeout) &&
+           !angularLargeExit.getExit() && !angularSmallExit.getExit()) {
         const float heading = getPose().theta;
-        const float error = std::fabs(lemlib::angleError(theta, heading, false, direction));
         distTraveled = std::fabs(heading - start_heading);
 
-        if (error <= params.earlyExitRange || error > previous_error + kPassedTargetJumpDeg) {
+        const float raw_error = lemlib::angleError(theta, heading, false);
+        if (previous_raw_error && std::fabs(raw_error) < kSettleWindowDeg &&
+            (raw_error > 0) != (*previous_raw_error > 0)) {
+            settling = true;
+        }
+        previous_raw_error = raw_error;
+
+        const float error = settling ? raw_error : lemlib::angleError(theta, heading, false, direction);
+        angularLargeExit.update(error);
+        angularSmallExit.update(error);
+        if (params.earlyExitRange > 0 && std::fabs(error) < params.earlyExitRange) {
             break;
         }
-        previous_error = error;
 
-        drivetrain.leftMotors->move(left_power);
-        drivetrain.rightMotors->move(right_power);
+        const float spin = std::clamp(angularPID.update(error), -max_spin, max_spin);
+        drivetrain.leftMotors->move(static_cast<std::int32_t>(std::lround(push + spin)));
+        drivetrain.rightMotors->move(static_cast<std::int32_t>(std::lround(push - spin)));
         pros::delay(kPeriodMs);
     }
 
