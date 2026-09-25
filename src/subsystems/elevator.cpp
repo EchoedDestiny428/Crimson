@@ -11,7 +11,7 @@ namespace subsystems::elevator {
 
 namespace {
 
-constexpr float kP = 0.3f;
+constexpr float kP = 1.0f;
 constexpr float kI = 0.0f;
 constexpr float kD = 1.0f;
 constexpr float kFeedforward = 0.0f;
