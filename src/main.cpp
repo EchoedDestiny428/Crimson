@@ -35,16 +35,7 @@ void update_dashboard()
     dashboard.update(pose, crimson_cam.get_tv(), tag_id);
 }
 
-// --------------------------------------------------
-// Mechanism Task Helper
-// --------------------------------------------------
-// Runs a two-button motor (hold fwd = +127, hold rev = -127, else brake)
-// in its own loop. Templated so it works with pros::Motor or pros::MotorGroup.
-//
-// The loop exits on its own when the robot leaves driver control. PROS kills
-// opcontrol() when the competition state changes, but NOT the tasks it
-// spawned, so without this check they'd keep running during autonomous and
-// stack up duplicates every time opcontrol() restarts.
+
 template <typename MotorT>
 static void mechanism_loop(MotorT& motor,
                            pros::controller_digital_e_t fwd_btn,
