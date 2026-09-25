@@ -4,8 +4,7 @@ namespace autons {
 
 namespace match {
 
-void left_side();
-void right_side();
+void test();
 
 }
 
