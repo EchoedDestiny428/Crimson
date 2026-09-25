@@ -11,21 +11,18 @@ namespace subsystems::elevator {
 
 namespace {
 
-constexpr float kP = 1.0f;
-constexpr float kI = 0.0f;
-constexpr float kD = 1.0f;
-constexpr float kFeedforward = 0.0f;
+constexpr std::int32_t kMaxVelocity = 600;
 constexpr float kSettleRange = 5.0f;
 
 constexpr double kSnapDownFraction = 0.6;
 
 constexpr auto kStages = [] {
-    std::array stages{kFlipOut, kStage1, kStage2, kStage3, kStage4, kStage5, kStage6};
+    std::array stages{kFlipOut, kStage1, kStage2, kStage3, kStage4, kStage5};
     std::sort(stages.begin(), stages.end());
     return stages;
 }();
 
-lemlib::SmartMotor motor(&elevator_motors, lemlib::PID(kP, kI, kD), kSettleRange, kFeedforward);
+lemlib::SmartMotor motor(&elevator_motors, kMaxVelocity, kSettleRange);
 std::atomic<bool> left_bootup{false};
 
 double min_height() {
@@ -81,17 +78,27 @@ void set_manual(int power) {
     }
 }
 
-void snap_to_stage() {
+double snap_to_stage() {
     const double current = height();
-    if (std::isfinite(current)) {
-        set_target(nearest_stage(current));
-    } else {
+    if (!std::isfinite(current)) {
         hold();
+        return current;
     }
+    const double stage = nearest_stage(current);
+    set_target(stage);
+    return stage;
+}
+
+double top_stage() {
+    return kStages.back();
 }
 
 double height() {
     return motor.getRotation();
+}
+
+double target() {
+    return motor.getTarget();
 }
 
 bool wait_until_settled(std::uint32_t timeout_ms) {

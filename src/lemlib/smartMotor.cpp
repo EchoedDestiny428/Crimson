@@ -35,13 +35,18 @@ SmartMotor::SmartMotor(pros::MotorGroup* actuator, pros::Rotation* rotation, PID
       settleRange(settleRange),
       feedforward(feedforward) {}
 
-SmartMotor::SmartMotor(pros::MotorGroup* actuator, PID controller, float settleRange, float feedforward)
+SmartMotor::SmartMotor(pros::MotorGroup* actuator, std::int32_t maxVelocity, float settleRange)
     : actuator(actuator),
       encoder(nullptr),
       rotation(nullptr),
-      controller(controller),
+      controller(0, 0, 0),
       settleRange(settleRange),
-      feedforward(feedforward) {}
+      feedforward(0.0f),
+      maxVelocity(maxVelocity) {}
+
+bool SmartMotor::usesMotorEncoders() const {
+    return encoder == nullptr && rotation == nullptr;
+}
 
 void SmartMotor::start() {
     if (task == nullptr) {
@@ -130,24 +135,23 @@ void SmartMotor::setLogging(bool enabled) {
 void SmartMotor::controlLoop() {
     std::uint32_t now = pros::millis();
     std::uint32_t tick = 0;
+    bool positionCommanded = false;
 
     while (true) {
         const float goal = target;
         const float position = getRotation();
-        const float error = goal - position;
-
-        if (targetChanged.exchange(false)) {
-            controller.reset();
-        }
+        const bool newTarget = targetChanged.exchange(false);
 
         if (manual) {
+            positionCommanded = false;
             actuator->move(manualPower);
-        } else if (!std::isfinite(error) || std::fabs(error) < settleRange) {
-            controller.reset();
-            actuator->brake();
+        } else if (usesMotorEncoders()) {
+            if (newTarget || !positionCommanded) {
+                actuator->move_absolute(goal, maxVelocity);
+                positionCommanded = true;
+            }
         } else {
-            const float output = controller.update(error) + feedforward;
-            actuator->move(static_cast<std::int32_t>(std::clamp(output, -kMaxPower, kMaxPower)));
+            runPid(goal, position, newTarget);
         }
 
         if (logging && ++tick % kLogEveryTicks == 0) {
@@ -156,6 +160,22 @@ void SmartMotor::controlLoop() {
 
         pros::Task::delay_until(&now, kPeriodMs);
     }
+}
+
+void SmartMotor::runPid(float goal, float position, bool newTarget) {
+    const float error = goal - position;
+    if (newTarget) {
+        controller.reset();
+    }
+
+    if (!std::isfinite(error) || std::fabs(error) < settleRange) {
+        controller.reset();
+        actuator->brake();
+        return;
+    }
+
+    const float output = controller.update(error) + feedforward;
+    actuator->move(static_cast<std::int32_t>(std::clamp(output, -kMaxPower, kMaxPower)));
 }
 
 void SmartMotor::log(float goal, float position) const {

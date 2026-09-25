@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cmath>
 
+extern "C" const char* const _PROS_COMPILE_TIMESTAMP;
+
 namespace display {
 
 namespace {
@@ -20,6 +22,7 @@ constexpr std::uint32_t kGoalBlue = 0x3B82F6;
 constexpr std::uint32_t kGoalNeutral = 0xFBBF24;
 constexpr std::uint32_t kTextWhite = 0xF8F9FA;
 constexpr std::uint32_t kTextAccent = 0xA5B4FC;
+constexpr std::uint32_t kTextDim = 0x9CA3AF;
 
 constexpr int kScreenWidth = 480;
 constexpr int kScreenHeight = 240;
@@ -175,6 +178,9 @@ void Dashboard::print_stats(const crimson::Pose2D& odom, const std::optional<cri
     } else {
         pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, 190, "Offset ---");
     }
+
+    pros::screen::set_pen(kTextDim);
+    pros::screen::print(pros::E_TEXT_SMALL, kPanelX, 220, "Build %s", _PROS_COMPILE_TIMESTAMP);
 }
 
 }

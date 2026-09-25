@@ -16,7 +16,7 @@ public:
                float feedforward = 0.0f);
     SmartMotor(pros::MotorGroup* actuator, pros::Rotation* rotation, PID controller, float settleRange = 5.0f,
                float feedforward = 0.0f);
-    SmartMotor(pros::MotorGroup* actuator, PID controller, float settleRange = 5.0f, float feedforward = 0.0f);
+    SmartMotor(pros::MotorGroup* actuator, std::int32_t maxVelocity, float settleRange = 5.0f);
 
     void start();
     void reset();
@@ -32,7 +32,9 @@ public:
     void setLogging(bool enabled);
 
 private:
+    bool usesMotorEncoders() const;
     void controlLoop();
+    void runPid(float goal, float position, bool newTarget);
     void log(float goal, float position) const;
 
     pros::MotorGroup* actuator;
@@ -41,6 +43,7 @@ private:
     PID controller;
     float settleRange;
     float feedforward;
+    std::int32_t maxVelocity = 0;
 
     std::atomic<float> target{0.0f};
     std::atomic<bool> targetChanged{false};
