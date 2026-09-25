@@ -1,4 +1,5 @@
 #include "main.h"
+#include "display/controller_hud.hpp"
 #include "macros.hpp"
 #include "robotconfig.hpp"
 #include "subsystems/claw.hpp"
@@ -19,6 +20,7 @@ void initialize() {
     claw::init();
     pivot::init();
     elevator::init();
+    macros::home();
 
     vision::start();
 }
@@ -36,6 +38,7 @@ void opcontrol() {
     util::start_driver_task("Claw", claw::update, claw::stop);
     util::start_driver_task("Pivot", pivot::update, pivot::stop);
     util::start_driver_task("Macros", macros::update, macros::stop);
+    util::start_driver_task("HUD", display::controller_hud::update);
 
     drive::reset();
     std::uint32_t now = pros::millis();

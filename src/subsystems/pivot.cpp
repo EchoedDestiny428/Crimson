@@ -6,7 +6,6 @@ namespace subsystems::pivot {
 
 namespace {
 
-constexpr double kGearRatio = 1.0;
 constexpr int kManualPower = 127;
 constexpr int kMoveVelocity = 300;
 
@@ -37,8 +36,8 @@ void stop() {
     pivot_motor.brake();
 }
 
-void move_to(double arm_deg) {
-    pivot_motor.move_absolute(arm_deg * kGearRatio, kMoveVelocity);
+void move_to(double motor_deg) {
+    pivot_motor.move_absolute(motor_deg, kMoveVelocity);
 }
 
 }

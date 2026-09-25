@@ -11,10 +11,9 @@ namespace pivot = subsystems::pivot;
 
 namespace {
 
-enum class Mode { Stowed, FlippingOut, Deployed };
+enum class Mode { Stowed, Deployed };
 
 constexpr int kManualPower = 127;
-constexpr double kArrivalTolerance = 10.0;
 
 Mode mode = Mode::Stowed;
 bool manual_active = false;
@@ -22,16 +21,16 @@ bool manual_active = false;
 }
 
 void flip_out() {
-    mode = Mode::FlippingOut;
+    mode = Mode::Deployed;
     manual_active = false;
-    pivot::move_to(pivot::kFlippedDeg);
+    pivot::move_to(pivot::kFlippedMotorDeg);
     elevator::set_target(elevator::kFlipOut);
 }
 
 void home() {
     mode = Mode::Stowed;
     manual_active = false;
-    pivot::move_to(pivot::kHomeDeg);
+    pivot::move_to(pivot::kHomeMotorDeg);
     elevator::set_target(elevator::kHome);
 }
 
@@ -39,7 +38,6 @@ void update() {
     const bool up = controller.get_digital(controls::kElevatorUp);
     const bool down = controller.get_digital(controls::kElevatorDown);
     const bool down_pressed = controller.get_digital_new_press(controls::kElevatorDown);
-    const double height = elevator::height();
 
     if (mode == Mode::Stowed) {
         if (up) {
@@ -50,16 +48,9 @@ void update() {
         return;
     }
 
-    if (down && height < elevator::kFlipOut) {
+    if (down && elevator::height() < elevator::kFlipOut) {
         home();
         return;
-    }
-
-    if (mode == Mode::FlippingOut) {
-        if (height < elevator::kFlipOut - kArrivalTolerance) {
-            return;
-        }
-        mode = Mode::Deployed;
     }
 
     if (up || down) {

@@ -3,6 +3,7 @@
 #include "robotconfig.hpp"
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 
@@ -16,8 +17,6 @@ constexpr float kD = 1.0f;
 constexpr float kFeedforward = 0.0f;
 constexpr float kSettleRange = 5.0f;
 
-constexpr double kMin = kBootup;
-constexpr double kMax = 2000.0;
 constexpr double kSnapDownFraction = 0.6;
 
 constexpr auto kStages = [] {
@@ -27,6 +26,11 @@ constexpr auto kStages = [] {
 }();
 
 lemlib::SmartMotor motor(&elevator_motors, lemlib::PID(kP, kI, kD), kSettleRange, kFeedforward);
+std::atomic<bool> left_bootup{false};
+
+double min_height() {
+    return left_bootup ? kHome : kBootup;
+}
 
 double nearest_stage(double current) {
     if (current <= kStages.front()) {
@@ -52,16 +56,24 @@ void init() {
 }
 
 void hold() {
-    motor.holdCurrent();
+    const double current = height();
+    if (std::isfinite(current)) {
+        set_target(current);
+    } else {
+        motor.holdCurrent();
+    }
 }
 
 void set_target(double target) {
-    motor.setTarget(static_cast<float>(std::clamp(target, kMin, kMax)));
+    if (target >= kHome) {
+        left_bootup = true;
+    }
+    motor.setTarget(static_cast<float>(std::clamp(target, min_height(), kMax)));
 }
 
 void set_manual(int power) {
     const double current = height();
-    const bool at_limit = (power > 0 && current >= kMax) || (power < 0 && current <= kMin);
+    const bool at_limit = (power > 0 && current >= kMax) || (power < 0 && current <= min_height());
     if (at_limit) {
         hold();
     } else {
