@@ -71,6 +71,9 @@ void set_target(double target) {
 }
 
 void set_target_below_home(double target) {
+    if (target >= kHome) {
+        left_bootup = true;
+    }
     motor.setTarget(static_cast<float>(std::clamp(target, kBootup, kMax)));
 }
 

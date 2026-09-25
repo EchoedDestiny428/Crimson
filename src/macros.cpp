@@ -67,11 +67,11 @@ void untilt_pivot() {
     }
 }
 
-void start_flip_out(double height) {
+void start_flip_out(double height, double pivot_motor_deg) {
     mode = Mode::Deployed;
     tilted = false;
-    pivot::move_to(pivot::kFlippedMotorDeg);
-    elevator::set_target(std::max(height, elevator::kFlipOut));
+    pivot::move_to(pivot_motor_deg);
+    elevator::set_target_below_home(std::max(height, elevator::kFlipOutMin));
 }
 
 void start_home() {
@@ -81,11 +81,11 @@ void start_home() {
     elevator::set_target(elevator::kHome);
 }
 
-void finish_motion(const Run& run) {
+void finish_motion(const Run& run, bool auto_tilt = true) {
     if (!run.wait_for(elevator::is_settled, kElevatorTimeoutMs)) {
         return;
     }
-    if (mode == Mode::Deployed) {
+    if (auto_tilt && mode == Mode::Deployed) {
         tilt_if_at_top();
     }
     run.wait_for(pivot::is_settled, kPivotTimeoutMs);
@@ -93,14 +93,14 @@ void finish_motion(const Run& run) {
 
 }
 
-void flip_out(double height) {
+void flip_out(double height, double pivot_motor_deg) {
     const Run run;
-    start_flip_out(height);
-    finish_motion(run);
+    start_flip_out(height, pivot_motor_deg);
+    finish_motion(run, pivot_motor_deg == pivot::kFlippedMotorDeg);
 }
 
 void go_to(double height) {
-    if (height < elevator::kFlipOut) {
+    if (height <= elevator::kHome) {
         home();
         return;
     }
@@ -155,7 +155,7 @@ void update() {
 
     if (mode == Mode::Stowed) {
         if (up) {
-            start_flip_out(elevator::kFlipOut);
+            start_flip_out(elevator::kFlipOut, pivot::kFlippedMotorDeg);
         } else if (down_pressed) {
             start_home();
         }

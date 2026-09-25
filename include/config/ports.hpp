@@ -23,5 +23,6 @@ inline constexpr std::int8_t kVerticalOdom = 17;
 inline constexpr std::int8_t kHorizontalOdom = 21;
 
 inline constexpr char kIntakeLift = 'A';
+inline constexpr char kPullToggle = 'B';
 
 }

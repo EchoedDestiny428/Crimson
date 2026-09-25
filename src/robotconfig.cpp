@@ -14,6 +14,7 @@ pros::Motor claw_motor(ports::kClaw, pros::MotorGears::green);
 pros::Motor pivot_motor(ports::kPivot, pros::MotorGears::green);
 
 pros::adi::Pneumatics intake_lift(ports::kIntakeLift, false);
+pros::adi::Pneumatics pull_toggle(ports::kPullToggle, false);
 
 namespace {
 
@@ -44,4 +45,4 @@ lemlib::ExpoDriveCurve steer_curve(2, 2.5, 1.0);
 
 }
 
-lemlib::Chassis chassis(drivetrain, linear_controller, angular_controller, sensors, &throttle_curve, &steer_curve);
+crimson::Chassis chassis(drivetrain, linear_controller, angular_controller, sensors, &throttle_curve, &steer_curve);

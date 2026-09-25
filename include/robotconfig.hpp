@@ -3,6 +3,7 @@
 #include "api.h"
 #include "display/dashboard.hpp"
 #include "lemlib/api.hpp"
+#include "motion/chassis.hpp"
 #include "vision/crimson.hpp"
 
 extern pros::Controller controller;
@@ -18,5 +19,6 @@ extern pros::Motor claw_motor;
 extern pros::Motor pivot_motor;
 
 extern pros::adi::Pneumatics intake_lift;
+extern pros::adi::Pneumatics pull_toggle;
 
-extern lemlib::Chassis chassis;
+extern crimson::Chassis chassis;

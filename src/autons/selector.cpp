@@ -4,10 +4,13 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 namespace autons {
 
 namespace {
+
+constexpr std::string_view kDefaultRoutine = "Snacky";
 
 struct Routine {
     const char* name;
@@ -22,9 +25,21 @@ constexpr std::array kRoutines{
     Routine{"None", nullptr, nullptr},
 };
 
+constexpr std::size_t index_of(std::string_view name) {
+    for (std::size_t i = 0; i < kRoutines.size(); ++i) {
+        if (kRoutines[i].name == name) {
+            return i;
+        }
+    }
+    return kRoutines.size();
+}
+
+constexpr std::size_t kDefaultIndex = index_of(kDefaultRoutine);
+static_assert(kDefaultIndex < kRoutines.size(), "kDefaultRoutine must match a name in kRoutines");
+
 constexpr std::uint32_t kPollMs = 20;
 
-std::size_t selected = 0;
+std::size_t selected = kDefaultIndex;
 bool prepared = false;
 bool auton_ran = false;
 

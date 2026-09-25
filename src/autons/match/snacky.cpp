@@ -10,15 +10,25 @@ void run() {
     chassis.setPose(7.8, -63.4, 180);
 
     parallel({
-        [] { macros::flip_out(500); },
+        [] { macros::flip_out(10, 800); },
         [] {
-            chassis.moveToPoint(7.8, -58, 1000, {.forwards = false, .minSpeed = 127, .earlyExitRange = 1.5});
-            chassis.moveToPoint(24, -48, 1000, {.forwards = false});
+            chassis.moveToPoint(7.8, -62, 500, {.forwards = false, .minSpeed = 127});
+            chassis.turnToPoint(24, -48, 500, {.forwards = false});
+            chassis.moveToPoint(24, -48, 800, {.forwards = false, .maxSpeed = 60});
             chassis.waitUntilDone();
         },
     });
 
-    intake::spin(-127);
+    claw::spin(-127);
+    pros::delay(400);
+
+    parallel({
+        [] { macros::flip_out(elevator::kFlipOut, pivot::kFlippedMotorDeg); },
+        [] {
+            chassis.donut(-180, 5000, {.forwards = false, .fastSpeed = 127, .slowSpeed = 60});
+            chassis.waitUntilDone();
+        },
+    });
 
 }
 
