@@ -4,6 +4,8 @@
 #include "subsystems/claw.hpp"
 #include "subsystems/pivot.hpp"
 #include <algorithm>
+#include <atomic>
+#include <cstdint>
 
 namespace macros {
 
@@ -18,14 +20,41 @@ enum class Mode { Stowed, Deployed };
 constexpr int kManualPower = 127;
 constexpr double kTopArrivalTolerance = 50.0;
 
-constexpr std::uint32_t kElevatorTimeoutMs = 1500;
+constexpr std::uint32_t kElevatorTimeoutMs = 2000;
 constexpr std::uint32_t kPivotTimeoutMs = 1000;
 constexpr std::uint32_t kDualPickupDwellMs = 200;
 constexpr int kDualPickupClawPower = 127;
+constexpr std::uint32_t kPollMs = 10;
 
-Mode mode = Mode::Stowed;
+std::atomic<Mode> mode{Mode::Stowed};
+std::atomic<bool> tilted{false};
+std::atomic<std::uint32_t> generation{0};
 bool manual_active = false;
-bool tilted = false;
+
+class Run {
+public:
+    Run() : generation_(generation) {}
+
+    bool active() const {
+        return generation == generation_;
+    }
+
+    template <typename Done>
+    bool wait_for(Done done, std::uint32_t timeout_ms) const {
+        const std::uint32_t start = pros::millis();
+        while (active() && !done() && pros::millis() - start < timeout_ms) {
+            pros::delay(kPollMs);
+        }
+        return active();
+    }
+
+    bool pause(std::uint32_t ms) const {
+        return wait_for([] { return false; }, ms);
+    }
+
+private:
+    std::uint32_t generation_;
+};
 
 void tilt_if_at_top() {
     if (!tilted && elevator::height() >= elevator::top_stage() - kTopArrivalTolerance) {
@@ -41,14 +70,36 @@ void untilt_pivot() {
     }
 }
 
-}
-
-void flip_out(double height) {
+void start_flip_out(double height) {
     mode = Mode::Deployed;
-    manual_active = false;
     tilted = false;
     pivot::move_to(pivot::kFlippedMotorDeg);
     elevator::set_target(std::max(height, elevator::kFlipOut));
+}
+
+void start_home() {
+    mode = Mode::Stowed;
+    tilted = false;
+    pivot::move_to(pivot::kHomeMotorDeg);
+    elevator::set_target(elevator::kHome);
+}
+
+void finish_motion(const Run& run) {
+    if (!run.wait_for(elevator::is_settled, kElevatorTimeoutMs)) {
+        return;
+    }
+    if (mode == Mode::Deployed) {
+        tilt_if_at_top();
+    }
+    run.wait_for(pivot::is_settled, kPivotTimeoutMs);
+}
+
+}
+
+void flip_out(double height) {
+    const Run run;
+    start_flip_out(height);
+    finish_motion(run);
 }
 
 void go_to(double height) {
@@ -60,52 +111,46 @@ void go_to(double height) {
         flip_out(height);
         return;
     }
-    manual_active = false;
+
+    const Run run;
     if (height < elevator::top_stage()) {
         untilt_pivot();
     }
     elevator::set_target(height);
+    finish_motion(run);
 }
 
 void home() {
-    mode = Mode::Stowed;
-    manual_active = false;
-    tilted = false;
-    pivot::move_to(pivot::kHomeMotorDeg);
-    elevator::set_target(elevator::kHome);
-}
-
-bool wait_until_done(std::uint32_t timeout_ms) {
-    const std::uint32_t start = pros::millis();
-    const bool elevator_done = elevator::wait_until_settled(timeout_ms);
-    if (mode == Mode::Deployed) {
-        tilt_if_at_top();
-    }
-
-    const std::uint32_t elapsed = pros::millis() - start;
-    const std::uint32_t remaining = elapsed < timeout_ms ? timeout_ms - elapsed : 0;
-    const bool pivot_done = pivot::wait_until_settled(remaining);
-    return elevator_done && pivot_done;
+    const Run run;
+    start_home();
+    finish_motion(run);
 }
 
 void dual_setup() {
+    const Run run;
     mode = Mode::Deployed;
-    manual_active = false;
     tilted = false;
-    elevator::set_target(elevator::kDualSetup);
-    elevator::wait_until_settled(kElevatorTimeoutMs);
+    elevator::set_target_below_home(elevator::kDualSetup);
+    if (!run.wait_for(elevator::is_settled, kElevatorTimeoutMs)) {
+        return;
+    }
     pivot::move_to(pivot::kDualSetupDeg);
-    pivot::wait_until_settled(kPivotTimeoutMs);
+    run.wait_for(pivot::is_settled, kPivotTimeoutMs);
 }
 
 void dual_pickup() {
+    const Run run;
     claw::spin(kDualPickupClawPower);
     pivot::move_to(pivot::kDualPickupDeg);
-    pivot::wait_until_settled(kPivotTimeoutMs);
-    pros::delay(kDualPickupDwellMs);
-    pivot::move_to(pivot::kFlippedMotorDeg);
-    pivot::wait_until_settled(kPivotTimeoutMs);
+    if (run.wait_for(pivot::is_settled, kPivotTimeoutMs) && run.pause(kDualPickupDwellMs)) {
+        pivot::move_to(pivot::kFlippedMotorDeg);
+        run.wait_for(pivot::is_settled, kPivotTimeoutMs);
+    }
     claw::stop();
+}
+
+void cancel() {
+    ++generation;
 }
 
 void update() {
@@ -115,15 +160,16 @@ void update() {
 
     if (mode == Mode::Stowed) {
         if (up) {
-            flip_out();
+            start_flip_out(elevator::kFlipOut);
         } else if (down_pressed) {
-            home();
+            start_home();
         }
         return;
     }
 
     if (down && elevator::height() < elevator::kFlipOut) {
-        home();
+        manual_active = false;
+        start_home();
         return;
     }
 

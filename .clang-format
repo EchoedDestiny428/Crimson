@@ -14,6 +14,7 @@ AllowShortLoopsOnASingleLine: false
 AllowShortLambdasOnASingleLine: All
 AlignAfterOpenBracket: Align
 BreakConstructorInitializers: BeforeColon
+BreakTemplateDeclarations: Yes
 PackConstructorInitializers: CurrentLine
 InsertBraces: true
 KeepEmptyLinesAtTheStartOfBlocks: false

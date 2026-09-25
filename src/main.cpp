@@ -22,7 +22,7 @@ void initialize() {
     claw::init();
     pivot::init();
     elevator::init();
-    macros::home();
+    pros::Task startup_home(macros::home, "Startup home");
 
     vision::start();
 }
@@ -32,15 +32,16 @@ void disabled() {
     autons::select();
 }
 
-void competition_initialize() {
-    
-}
+void competition_initialize() {}
 
 void autonomous() {
     autons::run_selected();
 }
 
 void opcontrol() {
+    macros::cancel();
+    chassis.cancelAllMotions();
+
     util::start_driver_task("Intake", intake::update, intake::stop);
     util::start_driver_task("Claw", claw::update, claw::stop);
     util::start_driver_task("Pivot", pivot::update, pivot::stop);

@@ -54,10 +54,12 @@ void init() {
 
 void hold() {
     const double current = height();
-    if (std::isfinite(current)) {
-        set_target(current);
-    } else {
+    if (!std::isfinite(current)) {
         motor.holdCurrent();
+    } else if (target() < kHome) {
+        set_target_below_home(current);
+    } else {
+        set_target(current);
     }
 }
 
@@ -66,6 +68,10 @@ void set_target(double target) {
         left_bootup = true;
     }
     motor.setTarget(static_cast<float>(std::clamp(target, min_height(), kMax)));
+}
+
+void set_target_below_home(double target) {
+    motor.setTarget(static_cast<float>(std::clamp(target, kBootup, kMax)));
 }
 
 void set_manual(int power) {
@@ -99,6 +105,10 @@ double height() {
 
 double target() {
     return motor.getTarget();
+}
+
+bool is_settled() {
+    return motor.isSettled();
 }
 
 bool wait_until_settled(std::uint32_t timeout_ms) {

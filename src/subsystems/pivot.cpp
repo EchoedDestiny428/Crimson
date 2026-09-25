@@ -43,9 +43,13 @@ void move_to(double motor_deg) {
     pivot_motor.move_absolute(motor_deg, kMoveVelocity);
 }
 
+bool is_settled() {
+    return std::fabs(pivot_motor.get_target_position() - pivot_motor.get_position()) <= kSettleMotorDeg;
+}
+
 bool wait_until_settled(std::uint32_t timeout_ms) {
     const std::uint32_t start = pros::millis();
-    while (std::fabs(pivot_motor.get_target_position() - pivot_motor.get_position()) > kSettleMotorDeg) {
+    while (!is_settled()) {
         if (pros::millis() - start >= timeout_ms) {
             return false;
         }

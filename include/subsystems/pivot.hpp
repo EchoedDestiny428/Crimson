@@ -14,6 +14,7 @@ void init();
 void update();
 void stop();
 void move_to(double motor_deg);
+bool is_settled();
 bool wait_until_settled(std::uint32_t timeout_ms);
 
 }

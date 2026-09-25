@@ -7,6 +7,7 @@
 #include "subsystems/elevator.hpp"
 #include "subsystems/intake.hpp"
 #include "subsystems/pivot.hpp"
+#include "util/parallel.hpp"
 
 namespace autons {
 
@@ -14,5 +15,7 @@ namespace claw = subsystems::claw;
 namespace elevator = subsystems::elevator;
 namespace intake = subsystems::intake;
 namespace pivot = subsystems::pivot;
+
+using util::parallel;
 
 }
