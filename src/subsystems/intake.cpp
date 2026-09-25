@@ -17,4 +17,12 @@ void spin(int power) {
     intake_motor.move(power);
 }
 
+void lift() {
+    intake_lift.retract();
+}
+
+void drop() {
+    intake_lift.extend();
+}
+
 }

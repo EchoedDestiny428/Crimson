@@ -2,15 +2,24 @@
 
 namespace autons {
 
-namespace match {
+namespace match::test {
 
-void test();
+void setup();
+void run();
 
 }
 
-namespace skills {
+namespace match::snacky {
 
-void v1();
+void setup();
+void run();
+
+}
+
+namespace skills::v1 {
+
+void setup();
+void run();
 
 }
 

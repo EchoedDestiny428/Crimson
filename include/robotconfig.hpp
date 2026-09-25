@@ -17,4 +17,6 @@ extern pros::Motor intake_motor;
 extern pros::Motor claw_motor;
 extern pros::Motor pivot_motor;
 
+extern pros::adi::Pneumatics intake_lift;
+
 extern lemlib::Chassis chassis;

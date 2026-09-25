@@ -11,41 +11,64 @@ namespace {
 
 struct Routine {
     const char* name;
+    void (*setup)();
     void (*run)();
 };
 
 constexpr std::array kRoutines{
-    Routine{"Test", match::test},
-    Routine{"SkillsV1", skills::v1},
-    Routine{"None", nullptr},
+    Routine{"Test", match::test::setup, match::test::run},
+    Routine{"Snacky", match::snacky::setup, match::snacky::run},
+    Routine{"SkillsV1", skills::v1::setup, skills::v1::run},
+    Routine{"None", nullptr, nullptr},
 };
 
 constexpr std::uint32_t kPollMs = 20;
 
 std::size_t selected = 0;
+bool prepared = false;
+bool auton_ran = false;
 
 void show_selected() {
     controller.print(2, 0, "Auton: %-8s", kRoutines[selected].name);
+}
+
+void prepare() {
+    if (kRoutines[selected].setup != nullptr) {
+        kRoutines[selected].setup();
+    }
+    prepared = true;
+}
+
+void change_selection(std::size_t index) {
+    selected = index;
+    show_selected();
+    prepare();
 }
 
 }
 
 void select() {
     show_selected();
+    if (!prepared && !auton_ran) {
+        prepare();
+    }
+
     while (pros::competition::is_disabled()) {
         if (controller.get_digital_new_press(controls::kAutonNext)) {
-            selected = (selected + 1) % kRoutines.size();
-            show_selected();
+            change_selection((selected + 1) % kRoutines.size());
         }
         if (controller.get_digital_new_press(controls::kAutonPrevious)) {
-            selected = (selected + kRoutines.size() - 1) % kRoutines.size();
-            show_selected();
+            change_selection((selected + kRoutines.size() - 1) % kRoutines.size());
         }
         pros::delay(kPollMs);
     }
 }
 
 void run_selected() {
+    prepare();
+    prepared = false;
+    auton_ran = true;
+
     if (kRoutines[selected].run != nullptr) {
         kRoutines[selected].run();
     }

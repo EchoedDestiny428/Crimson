@@ -1,8 +1,10 @@
 #include "autons/routine.hpp"
 
-namespace autons::skills {
+namespace autons::skills::v1 {
 
-void v1() {
+void setup() {}
+
+void run() {
     chassis.setPose(0, 0, 0);
 }
 

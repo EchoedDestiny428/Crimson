@@ -13,6 +13,8 @@ pros::Motor intake_motor(ports::kIntake, pros::MotorGears::blue);
 pros::Motor claw_motor(ports::kClaw, pros::MotorGears::green);
 pros::Motor pivot_motor(ports::kPivot, pros::MotorGears::green);
 
+pros::adi::Pneumatics intake_lift(ports::kIntakeLift, false);
+
 namespace {
 
 constexpr float kTrackWidthIn = 12.5f;
