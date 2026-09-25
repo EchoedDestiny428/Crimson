@@ -20,6 +20,7 @@ public:
 
     void start();
     void reset();
+    void setPosition(float position);
 
     float getRotation() const;
     float getTarget() const;
@@ -45,6 +46,7 @@ private:
     float feedforward;
     std::int32_t maxVelocity = 0;
 
+    std::atomic<float> encoderOffset{0.0f};
     std::atomic<float> target{0.0f};
     std::atomic<bool> targetChanged{false};
     std::atomic<bool> manual{false};

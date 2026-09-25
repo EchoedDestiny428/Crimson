@@ -18,11 +18,15 @@ void spin(int power) {
 }
 
 void lift() {
-    intake_lift.retract();
+    intake_lift.set_value(HIGH);
 }
 
 void drop() {
-    intake_lift.extend();
+    intake_lift.set_value(LOW);
+}
+
+void set_pos(double motor_deg) {
+    intake_motor.set_zero_position(motor_deg);
 }
 
 }

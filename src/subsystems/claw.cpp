@@ -76,4 +76,8 @@ void automatic() {
     overridden = false;
 }
 
+void set_pos(double motor_deg) {
+    claw_motor.set_zero_position(motor_deg);
+}
+
 }

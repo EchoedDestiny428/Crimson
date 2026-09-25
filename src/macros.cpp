@@ -18,7 +18,7 @@ enum class Mode { Stowed, Deployed };
 constexpr int kManualPower = 127;
 constexpr double kTopArrivalTolerance = 50.0;
 
-constexpr std::uint32_t kElevatorTimeoutMs = 2000;
+constexpr std::uint32_t kElevatorTimeoutMs = 1000;
 constexpr std::uint32_t kPivotTimeoutMs = 1000;
 constexpr std::uint32_t kDualPickupDwellMs = 200;
 constexpr std::uint32_t kPollMs = 10;
