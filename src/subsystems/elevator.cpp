@@ -107,6 +107,10 @@ double target() {
     return motor.getTarget();
 }
 
+bool has_left_bootup() {
+    return left_bootup;
+}
+
 bool is_settled() {
     return motor.isSettled();
 }

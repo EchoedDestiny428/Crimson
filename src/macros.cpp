@@ -1,7 +1,6 @@
 #include "macros.hpp"
 #include "config/controls.hpp"
 #include "robotconfig.hpp"
-#include "subsystems/claw.hpp"
 #include "subsystems/pivot.hpp"
 #include <algorithm>
 #include <atomic>
@@ -9,7 +8,6 @@
 
 namespace macros {
 
-namespace claw = subsystems::claw;
 namespace elevator = subsystems::elevator;
 namespace pivot = subsystems::pivot;
 
@@ -23,7 +21,6 @@ constexpr double kTopArrivalTolerance = 50.0;
 constexpr std::uint32_t kElevatorTimeoutMs = 2000;
 constexpr std::uint32_t kPivotTimeoutMs = 1000;
 constexpr std::uint32_t kDualPickupDwellMs = 200;
-constexpr int kDualPickupClawPower = 127;
 constexpr std::uint32_t kPollMs = 10;
 
 std::atomic<Mode> mode{Mode::Stowed};
@@ -140,13 +137,11 @@ void dual_setup() {
 
 void dual_pickup() {
     const Run run;
-    claw::spin(kDualPickupClawPower);
     pivot::move_to(pivot::kDualPickupDeg);
     if (run.wait_for(pivot::is_settled, kPivotTimeoutMs) && run.pause(kDualPickupDwellMs)) {
         pivot::move_to(pivot::kFlippedMotorDeg);
         run.wait_for(pivot::is_settled, kPivotTimeoutMs);
     }
-    claw::stop();
 }
 
 void cancel() {

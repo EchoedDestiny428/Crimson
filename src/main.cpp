@@ -41,9 +41,10 @@ void autonomous() {
 void opcontrol() {
     macros::cancel();
     chassis.cancelAllMotions();
+    claw::automatic();
 
     util::start_driver_task("Intake", intake::update, intake::stop);
-    util::start_driver_task("Claw", claw::update, claw::stop);
+    util::start_driver_task("Claw", claw::update, claw::automatic);
     util::start_driver_task("Pivot", pivot::update, pivot::stop);
     util::start_driver_task("Macros", macros::update, macros::stop);
     util::start_driver_task("HUD", display::controller_hud::update);
