@@ -6,7 +6,7 @@ namespace ports {
 
 inline constexpr std::int8_t kIntake = 2;
 inline constexpr std::int8_t kVision = 16; // temp
-inline constexpr std::int8_t kImu = 16; // temp
+inline constexpr std::int8_t kImu = 10;
 
 inline constexpr std::int8_t kLeftDriveA = 1;
 inline constexpr std::int8_t kLeftDriveB = -18;

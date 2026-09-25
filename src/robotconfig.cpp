@@ -10,8 +10,8 @@ pros::MotorGroup left_motors({ports::kLeftDriveA, ports::kLeftDriveB}, pros::Mot
 pros::MotorGroup right_motors({ports::kRightDriveA, ports::kRightDriveB}, pros::MotorGears::blue);
 pros::MotorGroup elevator_motors({ports::kElevatorA, ports::kElevatorB}, pros::MotorGears::blue);
 pros::Motor intake_motor(ports::kIntake, pros::MotorGears::blue);
-pros::Motor claw_motor(ports::kClaw, pros::MotorGears::blue);
-pros::Motor pivot_motor(ports::kPivot, pros::MotorGears::blue);
+pros::Motor claw_motor(ports::kClaw, pros::MotorGears::green);
+pros::Motor pivot_motor(ports::kPivot, pros::MotorGears::green);
 
 namespace {
 
@@ -19,9 +19,9 @@ constexpr float kTrackWidthIn = 12.5f;
 constexpr float kDriveRpm = 360.0f;
 constexpr float kHorizontalDrift = 2.0f;
 
-constexpr float kTrackingWheelDiameterIn = lemlib::Omniwheel::NEW_2;
-constexpr float kVerticalWheelOffsetIn = 0.0f;
-constexpr float kHorizontalWheelOffsetIn = 0.0f;
+constexpr float kTrackingWheelDiameterIn = 2.0f;
+constexpr float kVerticalWheelOffsetIn = 0.5f;
+constexpr float kHorizontalWheelOffsetIn = -0.7f;
 
 lemlib::Drivetrain drivetrain(&left_motors, &right_motors, kTrackWidthIn, lemlib::Omniwheel::NEW_325, kDriveRpm,
                               kHorizontalDrift);

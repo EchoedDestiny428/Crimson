@@ -7,7 +7,7 @@ namespace subsystems::pivot {
 namespace {
 
 constexpr int kManualPower = 127;
-constexpr int kMoveVelocity = 300;
+constexpr int kMoveVelocity = 200;
 
 bool manual_active = false;
 
