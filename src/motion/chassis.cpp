@@ -33,8 +33,10 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
 
     const int travel = params.forwards ? 1 : -1;
     const bool left_is_fast = (travel > 0) == clockwise;
-    const int left_power = travel * (left_is_fast ? params.fastSpeed : params.slowSpeed);
-    const int right_power = travel * (left_is_fast ? params.slowSpeed : params.fastSpeed);
+    const int fast_power = travel * params.fastSpeed;
+    const int slow_power = -travel * params.slowSpeed;
+    const int left_power = left_is_fast ? fast_power : slow_power;
+    const int right_power = left_is_fast ? slow_power : fast_power;
 
     const std::uint32_t start_time = pros::millis();
     float previous_error = std::fabs(initial_error);
