@@ -24,7 +24,7 @@ void initialize() {
 }
 
 void disabled() {
-    elevator::stop();
+    elevator::hold();
 }
 
 void competition_initialize() {}
@@ -35,8 +35,7 @@ void opcontrol() {
     util::start_driver_task("Intake", intake::update, intake::stop);
     util::start_driver_task("Claw", claw::update, claw::stop);
     util::start_driver_task("Pivot", pivot::update, pivot::stop);
-    util::start_driver_task("Elevator", elevator::update, elevator::stop);
-    util::start_driver_task("Macros", macros::update);
+    util::start_driver_task("Macros", macros::update, macros::stop);
 
     drive::reset();
     std::uint32_t now = pros::millis();

@@ -21,10 +21,5 @@ inline constexpr Button kPivotReverse = pros::E_CONTROLLER_DIGITAL_B;
 
 inline constexpr Button kElevatorUp = pros::E_CONTROLLER_DIGITAL_L1;
 inline constexpr Button kElevatorDown = pros::E_CONTROLLER_DIGITAL_L2;
-inline constexpr Button kElevatorStepUp = pros::E_CONTROLLER_DIGITAL_RIGHT;
-inline constexpr Button kElevatorStepDown = pros::E_CONTROLLER_DIGITAL_LEFT;
-inline constexpr Button kElevatorHome = pros::E_CONTROLLER_DIGITAL_Y;
-
-inline constexpr Button kPivotAndRaise = pros::E_CONTROLLER_DIGITAL_A;
 
 }

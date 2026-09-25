@@ -1,9 +1,10 @@
 #include "subsystems/elevator.hpp"
-#include "config/controls.hpp"
 #include "lemlib/smartMotor.hpp"
 #include "robotconfig.hpp"
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <cstddef>
 
 namespace subsystems::elevator {
 
@@ -14,38 +15,31 @@ constexpr float kI = 0.0f;
 constexpr float kD = 1.0f;
 constexpr float kFeedforward = 0.0f;
 constexpr float kSettleRange = 5.0f;
-constexpr int kManualPower = 127;
 
-constexpr double kMin = 0.0;
+constexpr double kMin = kBootup;
 constexpr double kMax = 2000.0;
+constexpr double kSnapDownFraction = 0.6;
 
-constexpr double kDown = 0.0;
-constexpr double kLoader = 250.0;
-constexpr double kAlliance = 400.0;
-constexpr double kShort = 700.0;
-constexpr double kTall = 1000.0;
-constexpr std::array kPresets{kDown, kLoader, kAlliance, kShort, kTall};
-constexpr double kPresetTolerance = 1.0;
+constexpr auto kStages = [] {
+    std::array stages{kFlipOut, kStage1, kStage2, kStage3, kStage4, kStage5, kStage6};
+    std::sort(stages.begin(), stages.end());
+    return stages;
+}();
 
 lemlib::SmartMotor motor(&elevator_motors, lemlib::PID(kP, kI, kD), kSettleRange, kFeedforward);
-bool manual_active = false;
 
-double preset_above(double height) {
-    for (const double preset : kPresets) {
-        if (preset > height + kPresetTolerance) {
-            return preset;
+double nearest_stage(double current) {
+    if (current <= kStages.front()) {
+        return kStages.front();
+    }
+    for (std::size_t i = 1; i < kStages.size(); ++i) {
+        const double lower = kStages[i - 1];
+        const double upper = kStages[i];
+        if (current < upper) {
+            return current <= lower + kSnapDownFraction * (upper - lower) ? lower : upper;
         }
     }
-    return kPresets.back();
-}
-
-double preset_below(double height) {
-    for (auto it = kPresets.rbegin(); it != kPresets.rend(); ++it) {
-        if (*it < height - kPresetTolerance) {
-            return *it;
-        }
-    }
-    return kPresets.front();
+    return kStages.back();
 }
 
 }
@@ -57,52 +51,35 @@ void init() {
     motor.start();
 }
 
-void update() {
-    const bool up = controller.get_digital(controls::kElevatorUp);
-    const bool down = controller.get_digital(controls::kElevatorDown);
-    const bool step_up = controller.get_digital_new_press(controls::kElevatorStepUp);
-    const bool step_down = controller.get_digital_new_press(controls::kElevatorStepDown);
-    const bool home = controller.get_digital_new_press(controls::kElevatorHome);
-
-    const int direction = up ? 1 : down ? -1 : 0;
-    const double height = motor.getRotation();
-    const bool at_limit = (direction > 0 && height >= kMax) || (direction < 0 && height <= kMin);
-
-    if (direction != 0 && !at_limit) {
-        motor.setManual(direction * kManualPower);
-        manual_active = true;
-        return;
-    }
-
-    if (manual_active) {
-        manual_active = false;
-        motor.holdCurrent();
-    }
-
-    if (step_up) {
-        set_target(preset_above(target()));
-    } else if (step_down) {
-        set_target(preset_below(target()));
-    } else if (home) {
-        set_target(kDown);
-    }
-}
-
-void stop() {
-    manual_active = false;
+void hold() {
     motor.holdCurrent();
 }
 
-void set_target(double height) {
-    motor.setTarget(static_cast<float>(std::clamp(height, kMin, kMax)));
+void set_target(double target) {
+    motor.setTarget(static_cast<float>(std::clamp(target, kMin, kMax)));
 }
 
-void raise_by(double delta) {
-    set_target(target() + delta);
+void set_manual(int power) {
+    const double current = height();
+    const bool at_limit = (power > 0 && current >= kMax) || (power < 0 && current <= kMin);
+    if (at_limit) {
+        hold();
+    } else {
+        motor.setManual(power);
+    }
 }
 
-double target() {
-    return motor.getTarget();
+void snap_to_stage() {
+    const double current = height();
+    if (std::isfinite(current)) {
+        set_target(nearest_stage(current));
+    } else {
+        hold();
+    }
+}
+
+double height() {
+    return motor.getRotation();
 }
 
 bool wait_until_settled(std::uint32_t timeout_ms) {

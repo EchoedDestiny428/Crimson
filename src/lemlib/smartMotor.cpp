@@ -104,7 +104,12 @@ void SmartMotor::setManual(int power) {
 }
 
 void SmartMotor::holdCurrent() {
-    setTarget(getRotation());
+    const float position = getRotation();
+    if (std::isfinite(position)) {
+        setTarget(position);
+    } else {
+        manual = false;
+    }
 }
 
 bool SmartMotor::waitUntilSettled(std::uint32_t timeout) {

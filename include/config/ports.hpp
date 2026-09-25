@@ -19,8 +19,7 @@ inline constexpr std::int8_t kElevatorB = -20;
 inline constexpr std::int8_t kPivot = 5;
 inline constexpr std::int8_t kClaw = 8;
 
-
-//17 vert
-//21 horz
+inline constexpr std::int8_t kVerticalOdom = 17;
+inline constexpr std::int8_t kHorizontalOdom = 21;
 
 }

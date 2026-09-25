@@ -2,7 +2,9 @@
 
 namespace macros {
 
-void pivot_and_raise();
+void flip_out();
+void home();
 void update();
+void stop();
 
 }

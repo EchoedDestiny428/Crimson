@@ -19,13 +19,23 @@ constexpr float kTrackWidthIn = 12.5f;
 constexpr float kDriveRpm = 360.0f;
 constexpr float kHorizontalDrift = 2.0f;
 
+constexpr float kTrackingWheelDiameterIn = lemlib::Omniwheel::NEW_2;
+constexpr float kVerticalWheelOffsetIn = 0.0f;
+constexpr float kHorizontalWheelOffsetIn = 0.0f;
+
 lemlib::Drivetrain drivetrain(&left_motors, &right_motors, kTrackWidthIn, lemlib::Omniwheel::NEW_325, kDriveRpm,
                               kHorizontalDrift);
 
 lemlib::ControllerSettings linear_controller(10, 0, 12, 1, 0.2, 100, 1, 500, 40);
 lemlib::ControllerSettings angular_controller(5.5, 0, 40, 3, 1, 50, 3, 300, 0);
 
-lemlib::OdomSensors sensors(nullptr, nullptr, nullptr, nullptr, &imu);
+pros::Rotation vertical_odom(ports::kVerticalOdom);
+pros::Rotation horizontal_odom(ports::kHorizontalOdom);
+
+lemlib::TrackingWheel vertical_tracking_wheel(&vertical_odom, kTrackingWheelDiameterIn, kVerticalWheelOffsetIn);
+lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_odom, kTrackingWheelDiameterIn, kHorizontalWheelOffsetIn);
+
+lemlib::OdomSensors sensors(&vertical_tracking_wheel, nullptr, &horizontal_tracking_wheel, nullptr, &imu);
 
 lemlib::ExpoDriveCurve throttle_curve(2, 2.5, 1.019);
 lemlib::ExpoDriveCurve steer_curve(2, 2.5, 1.0);
