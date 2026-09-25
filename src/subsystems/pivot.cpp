@@ -1,6 +1,7 @@
 #include "subsystems/pivot.hpp"
 #include "config/controls.hpp"
 #include "robotconfig.hpp"
+#include <cmath>
 
 namespace subsystems::pivot {
 
@@ -8,6 +9,8 @@ namespace {
 
 constexpr int kManualPower = 127;
 constexpr int kMoveVelocity = 200;
+constexpr double kSettleMotorDeg = 10.0;
+constexpr std::uint32_t kWaitPollMs = 10;
 
 bool manual_active = false;
 
@@ -38,6 +41,17 @@ void stop() {
 
 void move_to(double motor_deg) {
     pivot_motor.move_absolute(motor_deg, kMoveVelocity);
+}
+
+bool wait_until_settled(std::uint32_t timeout_ms) {
+    const std::uint32_t start = pros::millis();
+    while (std::fabs(pivot_motor.get_target_position() - pivot_motor.get_position()) > kSettleMotorDeg) {
+        if (pros::millis() - start >= timeout_ms) {
+            return false;
+        }
+        pros::delay(kWaitPollMs);
+    }
+    return true;
 }
 
 }

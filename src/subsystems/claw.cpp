@@ -17,4 +17,8 @@ void stop() {
     claw_motor.brake();
 }
 
+void spin(int power) {
+    claw_motor.move(power);
+}
+
 }

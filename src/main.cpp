@@ -1,4 +1,5 @@
 #include "main.h"
+#include "autons/autons.hpp"
 #include "display/controller_hud.hpp"
 #include "macros.hpp"
 #include "robotconfig.hpp"
@@ -13,6 +14,7 @@
 using namespace subsystems;
 
 void initialize() {
+    controller.clear();
     vision::init();
     dashboard.show_status("CALIBRATING");
 
@@ -27,11 +29,16 @@ void initialize() {
 
 void disabled() {
     elevator::hold();
+    autons::select();
 }
 
-void competition_initialize() {}
+void competition_initialize() {
+    
+}
 
-void autonomous() {}
+void autonomous() {
+    autons::run_selected();
+}
 
 void opcontrol() {
     util::start_driver_task("Intake", intake::update, intake::stop);

@@ -13,4 +13,8 @@ void stop() {
     intake_motor.brake();
 }
 
+void spin(int power) {
+    intake_motor.move(power);
+}
+
 }
