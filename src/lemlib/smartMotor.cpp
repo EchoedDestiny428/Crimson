@@ -55,20 +55,27 @@ void SmartMotor::start() {
 }
 
 void SmartMotor::reset() {
+    setPosition(0.0f);
+}
+
+void SmartMotor::setPosition(float position) {
+    manualPower = 0;
+    manual = true;
     if (encoder != nullptr) {
         encoder->reset();
+        encoderOffset = position;
     } else if (rotation != nullptr) {
-        rotation->reset_position();
+        rotation->set_position(static_cast<std::int32_t>(position));
     } else {
-        actuator->tare_position_all();
+        actuator->set_zero_position_all(position);
     }
-    setTarget(0.0f);
+    setTarget(position);
 }
 
 float SmartMotor::getRotation() const {
     if (encoder != nullptr) {
         const std::int32_t value = encoder->get_value();
-        return value == PROS_ERR ? kInvalid : static_cast<float>(value);
+        return value == PROS_ERR ? kInvalid : static_cast<float>(value) + encoderOffset;
     }
     if (rotation != nullptr) {
         const std::int32_t value = rotation->get_position();

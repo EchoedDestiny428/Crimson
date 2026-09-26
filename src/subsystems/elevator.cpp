@@ -52,6 +52,13 @@ void init() {
     motor.start();
 }
 
+void set_pos(double height) {
+    if (height >= kHome) {
+        left_bootup = true;
+    }
+    motor.setPosition(static_cast<float>(height));
+}
+
 void hold() {
     const double current = height();
     if (!std::isfinite(current)) {

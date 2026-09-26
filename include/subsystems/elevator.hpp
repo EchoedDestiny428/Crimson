@@ -17,6 +17,7 @@ inline constexpr double kStage5 = 3500.0;
 inline constexpr double kMax = 3500.0;
 
 void init();
+void set_pos(double height);
 void hold();
 void set_target(double height);
 void set_target_below_home(double height);

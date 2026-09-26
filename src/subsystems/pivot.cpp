@@ -44,6 +44,10 @@ void stop() {
     pivot_motor.brake();
 }
 
+void set_pos(double motor_deg) {
+    pivot_motor.set_zero_position(motor_deg);
+}
+
 void move_to(double motor_deg) {
     pivot_motor.move_absolute(motor_deg, kMoveVelocity);
 }
