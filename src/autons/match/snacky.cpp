@@ -93,7 +93,7 @@ void run() {
             macros::dual_pickup();
         },
         [] {
-            chassis.moveToPoint(42.2, -52.0, 800, {.forwards = false});
+            chassis.moveToPoint(42.6, -52.5, 800, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
