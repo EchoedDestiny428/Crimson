@@ -10,6 +10,7 @@
 #include "subsystems/pivot.hpp"
 #include "subsystems/vision.hpp"
 #include "util/driver_task.hpp"
+#include "util/system_check.hpp"
 
 using namespace subsystems;
 
@@ -43,6 +44,7 @@ void opcontrol() {
     chassis.cancelAllMotions();
     claw::automatic();
 
+    util::start_driver_task("System check", util::system_check::update, util::system_check::stop);
     util::start_driver_task("Intake", intake::update, intake::stop);
     util::start_driver_task("Claw", claw::update, claw::automatic);
     util::start_driver_task("Pivot", pivot::update, pivot::stop);

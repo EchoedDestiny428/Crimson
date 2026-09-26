@@ -1,6 +1,7 @@
 #include "subsystems/pivot.hpp"
 #include "config/controls.hpp"
 #include "robotconfig.hpp"
+#include "util/system_check.hpp"
 #include <cmath>
 
 namespace subsystems::pivot {
@@ -22,6 +23,10 @@ void init() {
 }
 
 void update() {
+    if (util::system_check::running()) {
+        manual_active = false;
+        return;
+    }
     const bool forward = controller.get_digital(controls::kPivotForward);
     const bool reverse = controller.get_digital(controls::kPivotReverse);
 

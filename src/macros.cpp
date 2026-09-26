@@ -2,6 +2,7 @@
 #include "config/controls.hpp"
 #include "robotconfig.hpp"
 #include "subsystems/pivot.hpp"
+#include "util/system_check.hpp"
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
@@ -148,11 +149,7 @@ void cancel() {
     ++generation;
 }
 
-void update() {
-    const bool up = controller.get_digital(controls::kElevatorUp);
-    const bool down = controller.get_digital(controls::kElevatorDown);
-    const bool down_pressed = controller.get_digital_new_press(controls::kElevatorDown);
-
+void press(bool up, bool down, bool down_pressed) {
     if (mode == Mode::Stowed) {
         if (up) {
             start_flip_out(elevator::kFlipOut, pivot::kFlippedMotorDeg);
@@ -182,6 +179,14 @@ void update() {
     if (!down) {
         tilt_if_at_top();
     }
+}
+
+void update() {
+    if (util::system_check::running()) {
+        return;
+    }
+    press(controller.get_digital(controls::kElevatorUp), controller.get_digital(controls::kElevatorDown),
+          controller.get_digital_new_press(controls::kElevatorDown));
 }
 
 void stop() {

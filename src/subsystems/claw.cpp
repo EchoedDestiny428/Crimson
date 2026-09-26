@@ -2,6 +2,7 @@
 #include "config/controls.hpp"
 #include "robotconfig.hpp"
 #include "subsystems/elevator.hpp"
+#include "util/system_check.hpp"
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -57,6 +58,9 @@ void init() {
 }
 
 void update() {
+    if (util::system_check::running()) {
+        return;
+    }
     const bool forward = controller.get_digital(controls::kClawForward);
     const bool reverse = controller.get_digital(controls::kClawReverse);
     driver_power = forward ? kManualPower : reverse ? -kManualPower : 0;

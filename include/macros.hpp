@@ -13,6 +13,7 @@ void dual_setup();
 void dual_pickup();
 void cancel();
 
+void press(bool up, bool down, bool down_pressed);
 void update();
 void stop();
 

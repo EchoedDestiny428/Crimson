@@ -2,10 +2,14 @@
 #include "config/controls.hpp"
 #include "robotconfig.hpp"
 #include "util/motor_utils.hpp"
+#include "util/system_check.hpp"
 
 namespace subsystems::intake {
 
 void update() {
+    if (util::system_check::running()) {
+        return;
+    }
     util::two_button(intake_motor, controls::kIntakeIn, controls::kIntakeOut);
 }
 
