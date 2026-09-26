@@ -1,4 +1,5 @@
 #include "autons/routine.hpp"
+#include "subsystems/pivot.hpp"
 
 namespace autons::match::snacky {
 
@@ -13,7 +14,7 @@ void run() {
         [] { macros::flip_out(10, 950); },
         [] {
             chassis.moveToPoint(7.8, -62.0, 500, {.forwards = false, .minSpeed = 127});
-            chassis.turnToPoint(24, -48, 500, {.forwards = false});
+            chassis.turnToPoint(24, -48, 400, {.forwards = false});
             chassis.moveToPoint(24, -48, 400, {.forwards = false, .minSpeed = 60});
             chassis.moveToPoint(24, -48, 200, {.forwards = false, .maxSpeed = 30});
             chassis.waitUntilDone();
@@ -46,7 +47,7 @@ void run() {
             intake::spin(127);
             claw::spin(127);
             chassis.moveToPoint(24, -62, 800);
-            chassis.moveToPoint(24, -58, 400, {.forwards = false});
+            chassis.moveToPoint(24, -57, 500, {.forwards = false});
             pros::delay(150);
             intake::drop();
             chassis.waitUntilDone();
@@ -65,7 +66,7 @@ void run() {
             macros::flip_out(560, pivot::kFlippedMotorDeg);
         },
         [] {
-            pros::delay(300);
+            pros::delay(100);
             chassis.moveToPoint(24, -54, 500, {.forwards = false, .maxSpeed = 50});
             chassis.donut(135, 1200, {.forwards = false, .fastSpeed = 127, .slowSpeed = 30});
             pros::delay(200);
@@ -81,7 +82,7 @@ void run() {
         },
         [] {
             chassis.moveToPoint(35, -59, 700);
-            chassis.turnToHeading(-135, 450);
+            chassis.turnToHeading(-138, 450);
             chassis.waitUntilDone();
         },
     });
@@ -93,7 +94,7 @@ void run() {
             macros::dual_pickup();
         },
         [] {
-            chassis.moveToPoint(42.6, -52.5, 800, {.forwards = false});
+            chassis.moveToPoint(42.9, -52.9, 800, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
@@ -103,16 +104,37 @@ void run() {
             macros::flip_out(600, pivot::kFlippedMotorDeg);
         },
         [] {
-            chassis.moveToPoint(48.5, -24, 450, {.forwards = false});
-            chassis.moveToPoint(48.5, -24, 450, {.forwards = false, .maxSpeed = 40});
+            chassis.moveToPoint(47, -24, 600, {.forwards = false});
+            chassis.moveToPoint(47, -24, 300, {.forwards = false, .maxSpeed = 40});
             chassis.waitUntilDone();
         },
     });
 
-    pros::delay(400);
+    
+    pros::delay(100);
     claw::spin(-127);
-    pros::delay(400);
-    macros::flip_out(800, pivot::kFlippedMotorDeg + 200);
+    pros::delay(200);
+
+    parallel({
+        [] {
+            pivot::move_to(pivot::kFlippedMotorDeg + 450);
+            pros::delay(200);
+            macros::dual_setup();
+        },
+        [] {
+            pros::delay(200);
+            chassis.moveToPoint(48, -36, 600);
+            chassis.turnToPoint(30, -26.5, 450, {.forwards = false});
+            chassis.waitUntilDone();
+        },
+    });
+
+// third pin pickup
+    chassis.moveToPoint(30, -26.5, 1000, {.forwards = false});
+    claw::spin(127);
+    chassis.waitUntilDone();
+    macros::dual_pickup();
+
 }
 
 }
