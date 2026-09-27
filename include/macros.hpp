@@ -11,6 +11,7 @@ void go_to(double height);
 void home();
 void dual_setup();
 void dual_pickup();
+void dual_pickup_height(double height);
 void cancel();
 
 void press(bool up, bool down, bool down_pressed);

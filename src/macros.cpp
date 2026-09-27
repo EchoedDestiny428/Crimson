@@ -19,8 +19,9 @@ enum class Mode { Stowed, Deployed };
 constexpr int kManualPower = 127;
 constexpr double kTopArrivalTolerance = 50.0;
 
-constexpr std::uint32_t kElevatorTimeoutMs = 750;
+constexpr std::uint32_t kElevatorTimeoutMs = 650;
 constexpr std::uint32_t kPivotTimeoutMs = 500;
+constexpr std::uint32_t kDualPivotEndTimeoutMs = 500;
 constexpr std::uint32_t kDualPickupDwellMs = 250;
 constexpr std::uint32_t kPollMs = 10;
 
@@ -141,7 +142,16 @@ void dual_pickup() {
     pivot::move_to(pivot::kDualPickupDeg);
     if (run.wait_for(pivot::is_settled, kPivotTimeoutMs) && run.pause(kDualPickupDwellMs)) {
         pivot::move_to(pivot::kFlippedMotorDeg);
-        run.wait_for(pivot::is_settled, kPivotTimeoutMs);
+        run.wait_for(pivot::is_settled, kDualPivotEndTimeoutMs);
+    }
+}
+
+void dual_pickup_height(double height) {
+    const Run run;
+    pivot::move_to(pivot::kDualPickupDeg);
+    if (run.wait_for(pivot::is_settled, kPivotTimeoutMs) && run.pause(kDualPickupDwellMs)) {
+        start_flip_out(height, pivot::kFlippedMotorDeg);
+        finish_motion(run);
     }
 }
 
