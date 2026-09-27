@@ -3,9 +3,7 @@
 
 namespace autons::match::snacky {
 
-void setup() {
-
-}
+void setup() {}
 
 void run() {
     chassis.setPose(7.8, -63.4, 180);
@@ -21,12 +19,10 @@ void run() {
         },
     });
 
-    
     parallel({
-        [] { 
+        [] {
             pros::delay(500);
             claw::spin(-127);
-             
         },
         [] {
             chassis.donut(-180, 1500, {.forwards = false, .fastSpeed = 127, .slowSpeed = 30});
@@ -34,11 +30,11 @@ void run() {
         },
     });
 
-    //at this point the bot should be at 24, -54 ish
+    // at this point the bot should be at 24, -54 ish
     chassis.setPose(24, -54, 180);
 
     parallel({
-        [] { 
+        [] {
             pros::delay(200);
             macros::home();
         },
@@ -48,8 +44,11 @@ void run() {
             claw::spin(127);
             chassis.moveToPoint(24, -62, 800);
             chassis.moveToPoint(24, -57, 500, {.forwards = false});
+            intake::stop();
             pros::delay(150);
             intake::drop();
+            pros::delay(100);
+            intake::spin(127);
             chassis.waitUntilDone();
         },
     });
@@ -57,14 +56,12 @@ void run() {
     pros::delay(500);
 
     chassis.moveToPoint(24, -60, 500, {.minSpeed = 50});
-    
+
     chassis.waitUntilDone();
     pros::delay(500);
 
     parallel({
-        [] {
-            macros::flip_out(560, pivot::kFlippedMotorDeg);
-        },
+        [] { macros::flip_out(560, pivot::kFlippedMotorDeg); },
         [] {
             pros::delay(100);
             chassis.moveToPoint(24, -54, 500, {.forwards = false, .maxSpeed = 50});
@@ -76,13 +73,13 @@ void run() {
     });
 
     parallel({
-        [] {  
+        [] {
             macros::flip_out(700, pivot::kFlippedMotorDeg + 200);
             macros::dual_setup();
         },
         [] {
-            chassis.moveToPoint(35, -59, 700);
-            chassis.turnToHeading(-138, 450);
+            chassis.moveToPoint(35, -59, 600);
+            chassis.turnToHeading(-138, 550);
             chassis.waitUntilDone();
         },
     });
@@ -94,24 +91,21 @@ void run() {
             macros::dual_pickup();
         },
         [] {
-            chassis.moveToPoint(42.9, -52.9, 800, {.forwards = false});
+            chassis.moveToPoint(42.4, -51.3, 800, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
 
     parallel({
+        [] { macros::flip_out(600, pivot::kFlippedMotorDeg); },
         [] {
-            macros::flip_out(600, pivot::kFlippedMotorDeg);
-        },
-        [] {
-            chassis.moveToPoint(47, -24, 600, {.forwards = false});
-            chassis.moveToPoint(47, -24, 300, {.forwards = false, .maxSpeed = 40});
+            chassis.moveToPoint(48, -24, 600, {.forwards = false});
+            chassis.moveToPoint(48, -24, 300, {.forwards = false, .maxSpeed = 40});
             chassis.waitUntilDone();
         },
     });
 
-    
-    pros::delay(100);
+    pros::delay(300);
     claw::spin(-127);
     pros::delay(200);
 
@@ -124,17 +118,17 @@ void run() {
         [] {
             pros::delay(200);
             chassis.moveToPoint(48, -36, 600);
-            chassis.turnToPoint(30, -26.5, 450, {.forwards = false});
+            chassis.turnToHeading(110, 450);
             chassis.waitUntilDone();
         },
     });
 
-// third pin pickup
-    chassis.moveToPoint(30, -26.5, 1000, {.forwards = false});
+    // third pin pickup
     claw::spin(127);
+    chassis.moveToPose(27, -27.0, 135, 800, {.forwards = false, .minSpeed = 127});
+    chassis.moveToPose(27, -27.0, 135, 500, {.forwards = false});
     chassis.waitUntilDone();
     macros::dual_pickup();
-
 }
 
 }
