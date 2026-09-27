@@ -5,7 +5,7 @@
     "target": "v5",
     "templates": {
       "kernel": {
-        "location": "/Users/zacha/Library/Application Support/PROS/templates/kernel@4.2.2",
+        "location": "/Users/royboy/Library/Application Support/PROS/templates/kernel@4.2.2",
         "metadata": {
           "origin": "pros-mainline",
           "cold_addr": "58720256",
@@ -81,7 +81,7 @@
         "version": "4.2.2"
       },
       "liblvgl": {
-        "location": "/Users/zacha/Library/Application Support/PROS/templates/liblvgl@9.2.0",
+        "location": "/Users/royboy/Library/Application Support/PROS/templates/liblvgl@9.2.0",
         "metadata": {
           "origin": "pros-mainline"
         },
@@ -591,7 +591,7 @@
         "version": "9.2.0"
       },
       "lemlib": {
-        "location": "/Users/zacha/Library/Application Support/PROS/templates/lemlib@0.5.6",
+        "location": "/Users/royboy/Library/Application Support/PROS/templates/lemlib@0.5.6",
         "metadata": {
           "origin": "local"
         },
@@ -625,7 +625,7 @@
         "version": "0.5.6"
       },
       "hot-cold-asset": {
-        "location": "/Users/zacha/Library/Application Support/PROS/templates/hot-cold-asset@1.0.2",
+        "location": "/Users/royboy/Library/Application Support/PROS/templates/hot-cold-asset@1.0.2",
         "metadata": {
           "origin": "hot-cold-asset"
         },
