@@ -159,6 +159,17 @@ void cancel() {
     ++generation;
 }
 
+void outtakeForScore(bool outtake) {
+    if (outtake && elevator::height() >= elevator::kFlipOut) {
+        const Run run;
+        pivot::move_to(pivot::kFlippedMotorDeg);
+        if (run.wait_for(pivot::is_settled, kPivotTimeoutMs) && run.pause(kDualPickupDwellMs)) {
+            pivot::move_to(pivot::kScoredMotorDeg);
+            run.wait_for(pivot::is_settled, kDualPivotEndTimeoutMs);
+        }
+    }
+}
+
 void press(bool up, bool down, bool down_pressed) {
     if (mode == Mode::Stowed) {
         if (up) {
@@ -197,6 +208,7 @@ void update() {
     }
     press(controller.get_digital(controls::kElevatorUp), controller.get_digital(controls::kElevatorDown),
           controller.get_digital_new_press(controls::kElevatorDown));
+    outtakeForScore(controller.get_digital(controls::kIntakeOut));
 }
 
 void stop() {
