@@ -17,7 +17,9 @@ inline constexpr Button kClawForward = pros::E_CONTROLLER_DIGITAL_R1;
 inline constexpr Button kClawReverse = pros::E_CONTROLLER_DIGITAL_R2;
 
 inline constexpr Button kPivotForward = pros::E_CONTROLLER_DIGITAL_X;
-inline constexpr Button kPivotReverse = pros::E_CONTROLLER_DIGITAL_B;
+inline constexpr Button kPivotReverse = pros::E_CONTROLLER_DIGITAL_A;
+
+inline constexpr Button kHome = pros::E_CONTROLLER_DIGITAL_B;
 
 inline constexpr Button kElevatorUp = pros::E_CONTROLLER_DIGITAL_L1;
 inline constexpr Button kElevatorDown = pros::E_CONTROLLER_DIGITAL_L2;

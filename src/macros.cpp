@@ -27,7 +27,7 @@ constexpr std::uint32_t kPollMs = 10;
 
 std::atomic<Mode> mode{Mode::Stowed};
 std::atomic<bool> tilted{false};
-std::atomic<bool> offset_on{false};
+std::atomic<bool> offset_on{true};
 std::atomic<std::uint32_t> generation{0};
 bool manual_active = false;
 
@@ -229,6 +229,10 @@ void update() {
     press(controller.get_digital(controls::kElevatorUp), controller.get_digital(controls::kElevatorDown),
           controller.get_digital_new_press(controls::kElevatorDown), controller.get_digital_new_press(controls::kElevatorOffset));
     outtake_for_score(controller.get_digital(controls::kIntakeOut));
+    if (controller.get_digital_new_press(controls::kHome)) {
+        manual_active = false;
+        start_home();
+    }
 }
 
 void stop() {
