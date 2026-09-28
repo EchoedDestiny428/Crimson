@@ -11,6 +11,7 @@
 #include "subsystems/vision.hpp"
 #include "util/driver_task.hpp"
 #include "util/system_check.hpp"
+#include "util/motor_utils.hpp"
 
 using namespace subsystems;
 
@@ -55,6 +56,7 @@ void opcontrol() {
     std::uint32_t now = pros::millis();
     while (true) {
         drive::update();
+        util::two_button(elevator_motors, pros::E_CONTROLLER_DIGITAL_UP, pros::E_CONTROLLER_DIGITAL_DOWN);
         pros::Task::delay_until(&now, util::kLoopMs);
     }
 }
