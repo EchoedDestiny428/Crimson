@@ -173,7 +173,7 @@ void outtake_for_score(bool pressed) {
             busy = false;
             return;
         }
-        if (!run.pause(300)) {
+        if (!run.pause(120)) {
             busy = false;
             return;
         }
