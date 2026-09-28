@@ -5,7 +5,7 @@
 namespace subsystems::pivot {
 
 inline constexpr double kHomeMotorDeg = 0.0;
-inline constexpr double kFlippedMotorDeg = 900;
+inline constexpr double kFlippedMotorDeg = 870.0;
 inline constexpr double kTopMotorDeg = 1100.0;
 inline constexpr double kDualSetupDeg = 1500.0;
 inline constexpr double kDualPickupDeg = 600.0;

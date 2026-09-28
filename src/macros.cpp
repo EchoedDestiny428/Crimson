@@ -173,7 +173,7 @@ void outtake_for_score(bool pressed) {
             pivot::move_to(pivot::kScoredMotorDeg);
             elevator::set_target(elevator::height() + elevator::kOffset);
         }
-        if (run.pause(800)) {
+        if (run.pause(2000)) {
             pivot::move_to(pivot::kFlippedMotorDeg);
             elevator::snap_to_stage();
         }
