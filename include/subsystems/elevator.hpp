@@ -13,7 +13,7 @@ inline constexpr double kFlipOut = 100.0;
 inline constexpr double kStage1 = 650.0;
 inline constexpr double kStage2 = 1200.0;
 inline constexpr double kStage3 = 1750.0;
-inline constexpr double kStage4 = 2350.0;
+inline constexpr double kStage4 = 2450.0;
 inline constexpr double kStage5 = 2850.0;
 inline constexpr double kMax = 3500.0;
 
