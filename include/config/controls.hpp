@@ -13,8 +13,8 @@ inline constexpr Axis kTurn = pros::E_CONTROLLER_ANALOG_RIGHT_X;
 inline constexpr Button kIntakeIn = pros::E_CONTROLLER_DIGITAL_R1;
 inline constexpr Button kIntakeOut = pros::E_CONTROLLER_DIGITAL_R2;
 
-inline constexpr Button kClawForward = pros::E_CONTROLLER_DIGITAL_UP;
-inline constexpr Button kClawReverse = pros::E_CONTROLLER_DIGITAL_DOWN;
+inline constexpr Button kClawForward = pros::E_CONTROLLER_DIGITAL_R1;
+inline constexpr Button kClawReverse = pros::E_CONTROLLER_DIGITAL_R2;
 
 inline constexpr Button kPivotForward = pros::E_CONTROLLER_DIGITAL_X;
 inline constexpr Button kPivotReverse = pros::E_CONTROLLER_DIGITAL_B;

@@ -13,6 +13,7 @@ namespace {
 
 constexpr int kManualPower = 127;
 constexpr int kAutoSpinPower = 127;
+
 constexpr double kHomeTolerance = 30.0;
 constexpr std::uint32_t kLoopMs = 20;
 
