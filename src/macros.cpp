@@ -78,6 +78,7 @@ void start_flip_out(double height, double pivot_motor_deg) {
 }
 
 void start_home() {
+    ++generation;
     mode = Mode::Stowed;
     tilted = false;
     pivot::move_to(pivot::kHomeMotorDeg);
@@ -121,8 +122,8 @@ void go_to(double height) {
 }
 
 void home() {
-    const Run run;
     start_home();
+    const Run run;
     finish_motion(run);
 }
 
@@ -168,14 +169,19 @@ void outtake_for_score(bool pressed) {
     pros::Task([] {
         const Run run;
         pivot::move_to(pivot::kFlippedMotorDeg);
-        run.wait_for(pivot::is_settled, kPivotTimeoutMs);
-        if (run.pause(300)) {
-            pivot::move_to(pivot::kScoredMotorDeg);
-            elevator::set_target(elevator::height() + elevator::kOffset);
+        if (!run.wait_for(pivot::is_settled, kPivotTimeoutMs)) {
+            busy = false;
+            return;
         }
-        if (run.pause(2000)) {
-            pivot::move_to(pivot::kFlippedMotorDeg);
-            elevator::snap_to_stage();
+        if (!run.pause(300)) {
+            busy = false;
+            return;
+        }
+        pivot::move_to(pivot::kScoredMotorDeg);
+        elevator::set_target(elevator::height() + elevator::kOffset);
+        if (!run.pause(2000)) {
+            busy = false;
+            return;
         }
         pivot::move_to(pivot::kFlippedMotorDeg);
         elevator::snap_to_stage();
