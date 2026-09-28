@@ -169,11 +169,11 @@ void outtake_for_score(bool pressed) {
     pros::Task([] {
         const Run run;
         pivot::move_to(pivot::kFlippedMotorDeg);
-        if (!run.wait_for(pivot::is_settled, kPivotTimeoutMs)) {
+        if (!run.wait_for(pivot::is_settled, 100)) {
             busy = false;
             return;
         }
-        if (!run.pause(120)) {
+        if (!run.pause(250)) {
             busy = false;
             return;
         }
