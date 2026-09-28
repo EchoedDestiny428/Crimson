@@ -94,14 +94,14 @@ void set_manual(int power) {
     }
 }
 
-double snap_to_stage() {
+double snap_to_stage(bool offset) {
     const double current = height();
     if (!std::isfinite(current)) {
         hold();
         return current;
     }
     const double stage = nearest_stage(current);
-    set_target(stage);
+    set_target(stage+ (offset ? kOffset : 0.0));
     return stage;
 }
 

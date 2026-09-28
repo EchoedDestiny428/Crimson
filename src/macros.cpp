@@ -158,19 +158,30 @@ void dual_pickup_height(double height) {
 void cancel() {
     ++generation;
 }
-
-void outtakeForScore(bool outtake) {
-    if (outtake && elevator::height() >= elevator::kFlipOut) {
+void outtake_for_score(bool pressed) {
+    static bool busy = false;
+    if (!pressed || busy || mode != Mode::Deployed) {
+        return;
+    }
+    busy = true;
+    pros::Task([] {
         const Run run;
         pivot::move_to(pivot::kFlippedMotorDeg);
-        if (run.wait_for(pivot::is_settled, kPivotTimeoutMs) && run.pause(kDualPickupDwellMs)) {
+        run.wait_for(pivot::is_settled, kPivotTimeoutMs);
+        if (run.pause(300)) {
             pivot::move_to(pivot::kScoredMotorDeg);
-            run.wait_for(pivot::is_settled, kDualPivotEndTimeoutMs);
+            elevator::set_target(elevator::height() + elevator::kOffset);
         }
-    }
+        if (run.pause(800)) {
+            pivot::move_to(pivot::kFlippedMotorDeg);
+            elevator::snap_to_stage();
+        }
+        busy = false;
+    });
 }
 
-void press(bool up, bool down, bool down_pressed) {
+
+void press(bool up, bool down, bool down_pressed, bool offset_button) {
     if (mode == Mode::Stowed) {
         if (up) {
             start_flip_out(elevator::kFlipOut, pivot::kFlippedMotorDeg);
@@ -194,7 +205,11 @@ void press(bool up, bool down, bool down_pressed) {
         elevator::set_manual(up ? kManualPower : -kManualPower);
     } else if (manual_active) {
         manual_active = false;
-        elevator::snap_to_stage();
+        if (offset_button) {
+            elevator::snap_to_stage(true);
+        } else {
+            elevator::snap_to_stage(false);
+        }
     }
 
     if (!down) {
@@ -207,8 +222,8 @@ void update() {
         return;
     }
     press(controller.get_digital(controls::kElevatorUp), controller.get_digital(controls::kElevatorDown),
-          controller.get_digital_new_press(controls::kElevatorDown));
-    outtakeForScore(controller.get_digital(controls::kIntakeOut));
+          controller.get_digital_new_press(controls::kElevatorDown), controller.get_digital(controls::kElevatorOffset));
+    outtake_for_score(controller.get_digital(controls::kIntakeOut));
 }
 
 void stop() {

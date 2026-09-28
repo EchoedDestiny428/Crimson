@@ -23,7 +23,7 @@ void hold();
 void set_target(double height);
 void set_target_below_home(double height);
 void set_manual(int power);
-double snap_to_stage();
+double snap_to_stage(bool offset = false);
 double top_stage();
 double height();
 double target();

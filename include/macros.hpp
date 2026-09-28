@@ -14,7 +14,7 @@ void dual_pickup();
 void dual_pickup_height(double height);
 void cancel();
 
-void press(bool up, bool down, bool down_pressed);
+void press(bool up, bool down, bool down_pressed, bool offset_button);
 void update();
 void stop();
 

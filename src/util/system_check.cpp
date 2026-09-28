@@ -60,7 +60,7 @@ bool at_home() {
 bool hold(bool up, bool down, bool down_pressed, bool (*done)()) {
     const std::uint32_t start = pros::millis();
     while (driver_control_active() && pros::millis() - start < kTravelTimeoutMs) {
-        macros::press(up, down, down_pressed);
+        macros::press(up, down, down_pressed, false);
         down_pressed = false;
         if (done()) {
             return true;
@@ -85,7 +85,7 @@ void run() {
 
     subsystems::claw::automatic();
     if (hold(true, false, false, at_top)) {
-        macros::press(false, false, false);
+        macros::press(false, false, false, false);
     }
     if (!driver_control_active()) {
         return;
