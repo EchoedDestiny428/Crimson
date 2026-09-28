@@ -160,6 +160,19 @@ void cancel() {
 }
 
 void press(bool up, bool down, bool down_pressed) {
+    // Elevator macros disabled for now: the elevator is driven manually by util::two_button in opcontrol.
+    // L1 only deploys the pivot horizontally and never touches elevator height.
+    (void)down;
+    (void)down_pressed;
+    static bool was_up = false;
+    if (up && !was_up) {
+        mode = Mode::Deployed;
+        tilted = false;
+        pivot::move_to(pivot::kFlippedMotorDeg);
+    }
+    was_up = up;
+
+    /*
     if (mode == Mode::Stowed) {
         if (up) {
             start_flip_out(elevator::kFlipOut, pivot::kFlippedMotorDeg);
@@ -189,6 +202,7 @@ void press(bool up, bool down, bool down_pressed) {
     if (!down) {
         tilt_if_at_top();
     }
+    */
 }
 
 void update() {
@@ -201,7 +215,7 @@ void update() {
 
 void stop() {
     manual_active = false;
-    elevator::hold();
+    // elevator::hold();
 }
 
 }

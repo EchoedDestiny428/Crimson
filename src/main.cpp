@@ -24,7 +24,7 @@ void initialize() {
     claw::init();
     pivot::init();
     elevator::init();
-    pros::Task startup_home(macros::home, "Startup home");
+    // pros::Task startup_home(macros::home, "Startup home");
 
     vision::start();
 }
