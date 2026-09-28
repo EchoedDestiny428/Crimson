@@ -27,6 +27,7 @@ constexpr std::uint32_t kPollMs = 10;
 
 std::atomic<Mode> mode{Mode::Stowed};
 std::atomic<bool> tilted{false};
+std::atomic<bool> offset_on{false};
 std::atomic<std::uint32_t> generation{0};
 bool manual_active = false;
 
@@ -176,12 +177,20 @@ void outtake_for_score(bool pressed) {
             pivot::move_to(pivot::kFlippedMotorDeg);
             elevator::snap_to_stage();
         }
+        pivot::move_to(pivot::kFlippedMotorDeg);
+        elevator::snap_to_stage();
         busy = false;
     });
 }
 
 
 void press(bool up, bool down, bool down_pressed, bool offset_button) {
+    if (offset_button) {
+        offset_on = !offset_on;
+        if (mode == Mode::Deployed) {
+            elevator::set_target(elevator::target() + (offset_on ? elevator::kOffset : -elevator::kOffset));
+        }
+    }
     if (mode == Mode::Stowed) {
         if (up) {
             start_flip_out(elevator::kFlipOut, pivot::kFlippedMotorDeg);
@@ -205,11 +214,7 @@ void press(bool up, bool down, bool down_pressed, bool offset_button) {
         elevator::set_manual(up ? kManualPower : -kManualPower);
     } else if (manual_active) {
         manual_active = false;
-        if (offset_button) {
-            elevator::snap_to_stage(true);
-        } else {
-            elevator::snap_to_stage(false);
-        }
+        elevator::snap_to_stage(offset_on);
     }
 
     if (!down) {
@@ -222,7 +227,7 @@ void update() {
         return;
     }
     press(controller.get_digital(controls::kElevatorUp), controller.get_digital(controls::kElevatorDown),
-          controller.get_digital_new_press(controls::kElevatorDown), controller.get_digital(controls::kElevatorOffset));
+          controller.get_digital_new_press(controls::kElevatorDown), controller.get_digital_new_press(controls::kElevatorOffset));
     outtake_for_score(controller.get_digital(controls::kIntakeOut));
 }
 
