@@ -12,6 +12,7 @@ pros::MotorGroup elevator_motors({ports::kElevatorA, ports::kElevatorB}, pros::M
 pros::Motor intake_motor(ports::kIntake, pros::MotorGears::blue);
 pros::Motor claw_motor(ports::kClaw, pros::MotorGears::green);
 pros::Motor pivot_motor(ports::kPivot, pros::MotorGears::green);
+telemetry::Logger logger;
 
 pros::adi::Pneumatics intake_lift(ports::kIntakeLift, false);
 pros::adi::Pneumatics pull_toggle(ports::kPullToggle, false);

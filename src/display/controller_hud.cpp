@@ -14,6 +14,10 @@ std::uint32_t tick = 0;
 }
 
 void update() {
+    if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_UP) &&
+        controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {
+        logger.dump();
+    }
     if (++tick % kPrintEveryTicks != 0) {
         return;
     }

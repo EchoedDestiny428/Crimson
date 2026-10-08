@@ -30,6 +30,7 @@ public:
     void setManual(int power);
     void holdCurrent();
     bool waitUntilSettled(std::uint32_t timeout);
+    /** Enable or disable SmartMotor diagnostics through the configured info sink. */
     void setLogging(bool enabled);
 
 private:

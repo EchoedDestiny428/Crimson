@@ -24,6 +24,13 @@ void initialize() {
     claw::init();
     pivot::init();
     elevator::init();
+    logger.attach(&left_motors);
+    logger.attach(&right_motors);
+    logger.attach(&elevator_motors);
+    logger.attach(&intake_motor);
+    logger.attach(&claw_motor);
+    logger.attach(&pivot_motor);
+    logger.start();
     pros::Task startup_home(macros::home, "Startup home");
 
     vision::start();
