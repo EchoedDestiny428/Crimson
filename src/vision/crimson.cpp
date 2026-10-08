@@ -29,6 +29,7 @@ void Crimson::initialize() {
 }
 
 void Crimson::update() {
+    mutex_.take();
     tags_.clear();
 
     const std::int32_t count = sensor_.get_object_count();
@@ -41,35 +42,56 @@ void Crimson::update() {
     }
 
     last_update_ms_ = pros::millis();
+    mutex_.give();
 }
 
 void Crimson::set_camera_mount_metrics(double height_mm, double pitch_deg) {
+    mutex_.take();
     camera_height_mm_ = height_mm;
     camera_pitch_deg_ = pitch_deg;
+    mutex_.give();
 }
 
 bool Crimson::has_target() const {
-    return !tags_.empty();
+    mutex_.take();
+    const bool result = !tags_.empty();
+    mutex_.give();
+    return result;
 }
 
 int Crimson::tag_count() const {
-    return static_cast<int>(tags_.size());
+    mutex_.take();
+    const int result = static_cast<int>(tags_.size());
+    mutex_.give();
+    return result;
 }
 
 int Crimson::primary_tag_id() const {
-    return tags_.empty() ? -1 : tags_.front().id;
+    mutex_.take();
+    const int result = tags_.empty() ? -1 : tags_.front().id;
+    mutex_.give();
+    return result;
 }
 
 double Crimson::get_tx() const {
-    return tags_.empty() ? 0.0 : calc_tx(tag_center(tags_.front()).x);
+    mutex_.take();
+    const double result = tags_.empty() ? 0.0 : calc_tx(tag_center(tags_.front()).x);
+    mutex_.give();
+    return result;
 }
 
 double Crimson::get_ty() const {
-    return tags_.empty() ? 0.0 : calc_ty(tag_center(tags_.front()).y);
+    mutex_.take();
+    const double result = tags_.empty() ? 0.0 : calc_ty(tag_center(tags_.front()).y);
+    mutex_.give();
+    return result;
 }
 
 std::uint32_t Crimson::get_data_age_ms() const {
-    return last_update_ms_ == 0 ? 0 : pros::millis() - last_update_ms_;
+    mutex_.take();
+    const std::uint32_t result = last_update_ms_ == 0 ? 0 : pros::millis() - last_update_ms_;
+    mutex_.give();
+    return result;
 }
 
 Crimson::Pixel Crimson::tag_center(const pros::AIVision::Object& tag) {
@@ -87,15 +109,23 @@ double Crimson::calc_ty(double py) {
 }
 
 std::optional<Pose2D> Crimson::estimate_global_pose(double heading_deg) const {
+    mutex_.take();
+    std::optional<Pose2D> result;
     if (tags_.empty()) {
+        mutex_.give();
         return std::nullopt;
     }
     if (tags_.size() >= 2) {
         if (const auto pose = triangulate(tags_[0], tags_[1], heading_deg)) {
-            return pose;
+            result = pose;
+        } else {
+            result = from_single_tag(tags_.front(), heading_deg);
         }
+    } else {
+        result = from_single_tag(tags_.front(), heading_deg);
     }
-    return from_single_tag(tags_.front(), heading_deg);
+    mutex_.give();
+    return result;
 }
 
 std::optional<Pose2D> Crimson::triangulate(const pros::AIVision::Object& first, const pros::AIVision::Object& second,

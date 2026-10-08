@@ -13,6 +13,8 @@ pros::Motor intake_motor(ports::kIntake, pros::MotorGears::blue);
 pros::Motor claw_motor(ports::kClaw, pros::MotorGears::green);
 pros::Motor pivot_motor(ports::kPivot, pros::MotorGears::green);
 telemetry::Logger logger;
+pros::Rotation vertical_odom(ports::kVerticalOdom);
+pros::Rotation horizontal_odom(ports::kHorizontalOdom);
 
 pros::adi::Pneumatics intake_lift(ports::kIntakeLift, false);
 pros::adi::Pneumatics pull_toggle(ports::kPullToggle, false);
@@ -32,9 +34,6 @@ lemlib::Drivetrain drivetrain(&left_motors, &right_motors, kTrackWidthIn, lemlib
 
 lemlib::ControllerSettings linear_controller(10, 0, 12, 1, 0.2, 100, 1, 500, 40);
 lemlib::ControllerSettings angular_controller(5.5, 0, 40, 3, 1, 50, 3, 300, 0);
-
-pros::Rotation vertical_odom(ports::kVerticalOdom);
-pros::Rotation horizontal_odom(ports::kHorizontalOdom);
 
 lemlib::TrackingWheel vertical_tracking_wheel(&vertical_odom, kTrackingWheelDiameterIn, kVerticalWheelOffsetIn);
 lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_odom, kTrackingWheelDiameterIn, kHorizontalWheelOffsetIn);

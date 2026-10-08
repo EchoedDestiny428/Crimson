@@ -1,6 +1,8 @@
 #include "telemetry/logger.hpp"
 #include "lemlib/logger/logger.hpp"
+#include "pros/error.h"
 #include "pros/misc.hpp"
+#include <cmath>
 #include <cstring>
 #include <cstdio>
 
@@ -18,6 +20,19 @@ bool Logger::attach(pros::AbstractMotor* motor) {
         }
     }
     motors[motorCount++] = motor;
+    return true;
+}
+
+bool Logger::register_field(const char* name, FieldCallback callback, const void* context) {
+    if (name == nullptr || callback == nullptr || fieldCount >= fields.size()) {
+        return false;
+    }
+    for (std::size_t i = 0; i < fieldCount; ++i) {
+        if (std::strcmp(fields[i].name, name) == 0) {
+            return false;
+        }
+    }
+    fields[fieldCount++] = {name, callback, context};
     return true;
 }
 
@@ -141,8 +156,15 @@ bool Logger::writeHeader(std::FILE* file) {
         return false;
     }
     for (std::size_t i = 0; i < motorCount; ++i) {
-        if (std::fprintf(file, ",motor%zu_position,motor%zu_velocity,motor%zu_voltage_mV,motor%zu_temperature_C", i,
-                         i, i, i) < 0) {
+        if (std::fprintf(file,
+                         ",motor%zu_position,motor%zu_velocity,motor%zu_voltage_mV,motor%zu_temperature_C"
+                         ",motor%zu_current_mA,motor%zu_target_position,motor%zu_target_velocity",
+                         i, i, i, i, i, i, i) < 0) {
+            return false;
+        }
+    }
+    for (std::size_t i = 0; i < fieldCount; ++i) {
+        if (std::fprintf(file, ",%s", fields[i].name) < 0) {
             return false;
         }
     }
@@ -163,8 +185,25 @@ bool Logger::writeSample(std::FILE* file) {
     }
     for (std::size_t i = 0; i < motorCount; ++i) {
         pros::AbstractMotor* motor = motors[i];
-        if (std::fprintf(file, ",%.3f,%.3f,%d,%.3f", motor->get_position(), motor->get_actual_velocity(),
-                         motor->get_voltage(), motor->get_temperature()) < 0) {
+        const auto writeDouble = [file](double value) {
+            return std::isfinite(value) ? std::fprintf(file, "%.3f", value) : std::fprintf(file, "nan");
+        };
+        const auto writeInteger = [file](std::int32_t value) {
+            return value == PROS_ERR ? std::fprintf(file, "nan") : std::fprintf(file, "%d", value);
+        };
+
+        if (std::fputc(',', file) == EOF || writeDouble(motor->get_position()) < 0 ||
+            std::fputc(',', file) == EOF || writeDouble(motor->get_actual_velocity()) < 0 ||
+            std::fputc(',', file) == EOF || writeInteger(motor->get_voltage()) < 0 ||
+            std::fputc(',', file) == EOF || writeDouble(motor->get_temperature()) < 0 ||
+            std::fputc(',', file) == EOF || writeInteger(motor->get_current_draw()) < 0 ||
+            std::fputc(',', file) == EOF || writeDouble(motor->get_target_position()) < 0 ||
+            std::fputc(',', file) == EOF || writeInteger(motor->get_target_velocity()) < 0) {
+            return false;
+        }
+    }
+    for (std::size_t i = 0; i < fieldCount; ++i) {
+        if (std::fprintf(file, ",%.6f", fields[i].callback(fields[i].context)) < 0) {
             return false;
         }
     }
