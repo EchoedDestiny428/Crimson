@@ -56,13 +56,14 @@ void opcontrol() {
     util::start_driver_task("Intake", intake::update, intake::stop);
     util::start_driver_task("Claw", claw::update, claw::automatic);
     util::start_driver_task("Pivot", pivot::update, pivot::stop);
-    util::start_driver_task("Macros", macros::update, macros::stop);
+    // util::start_driver_task("Macros", macros::update, macros::stop);
     util::start_driver_task("HUD", display::controller_hud::update);
 
     drive::reset();
     std::uint32_t now = pros::millis();
     while (true) {
         drive::update();
+        util::two_button(elevator_motors, controls::kElevatorUp, controls::kElevatorDown);
         pros::Task::delay_until(&now, util::kLoopMs);
     }
 }
