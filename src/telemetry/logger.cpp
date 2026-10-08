@@ -94,6 +94,11 @@ void Logger::run() {
         return;
     }
 
+    if (!reserveSession()) {
+        lemlib::infoSink()->warn("Telemetry: unable to reserve a session number");
+        return;
+    }
+
     std::FILE* file = nullptr;
     if (!openFile(file)) {
         lemlib::infoSink()->warn("Telemetry: unable to open {}", filePath);
@@ -121,14 +126,53 @@ void Logger::run() {
 }
 
 bool Logger::openFile(std::FILE*& file) {
-    const int length =
-        std::snprintf(filePath, sizeof(filePath), "%s/telemetry_%lu.csv", directory,
-                      static_cast<unsigned long>(pros::millis()));
-    if (length < 0 || static_cast<std::size_t>(length) >= sizeof(filePath)) {
+    for (std::uint32_t suffix = 0; suffix < 1000000; ++suffix) {
+        const int length = suffix == 0
+                               ? std::snprintf(filePath, sizeof(filePath), "%s/telemetry_%06lu.csv", directory,
+                                               static_cast<unsigned long>(sessionId))
+                               : std::snprintf(filePath, sizeof(filePath), "%s/telemetry_%06lu_%u.csv", directory,
+                                               static_cast<unsigned long>(sessionId), suffix);
+        if (length < 0 || static_cast<std::size_t>(length) >= sizeof(filePath)) {
+            return false;
+        }
+
+        std::FILE* existing = std::fopen(filePath, "r");
+        if (existing != nullptr) {
+            std::fclose(existing);
+            continue;
+        }
+
+        file = std::fopen(filePath, "w");
+        return file != nullptr;
+    }
+    return false;
+}
+
+bool Logger::reserveSession() {
+    char counterPath[64] {};
+    const int pathLength = std::snprintf(counterPath, sizeof(counterPath), "%s/telemetry_session.txt", directory);
+    if (pathLength < 0 || static_cast<std::size_t>(pathLength) >= sizeof(counterPath)) {
         return false;
     }
-    file = std::fopen(filePath, "w");
-    return file != nullptr;
+
+    std::uint32_t previous = 0;
+    std::FILE* counter = std::fopen(counterPath, "r");
+    if (counter != nullptr) {
+        const int result = std::fscanf(counter, "%u", &previous);
+        std::fclose(counter);
+        if (result != 1) {
+            return false;
+        }
+    }
+
+    sessionId = previous + 1;
+    counter = std::fopen(counterPath, "w");
+    if (counter == nullptr) {
+        return false;
+    }
+    const bool written = std::fprintf(counter, "%u\n", sessionId) >= 0;
+    std::fclose(counter);
+    return written;
 }
 
 bool Logger::writeMetadata(std::FILE* file) {
@@ -139,14 +183,15 @@ bool Logger::writeMetadata(std::FILE* file) {
     const bool disabled = pros::competition::is_disabled();
     const bool inMatch = fieldControl || competitionSwitch;
 
-    return std::fprintf(file, "# start_time_ms,%lu\n"
+    return std::fprintf(file, "# session_id,%u\n"
+                              "# start_time_ms,%lu\n"
                               "# competition_controller_connected,%d\n"
                               "# field_control,%d\n"
                               "# competition_switch,%d\n"
                               "# autonomous,%d\n"
                               "# disabled,%d\n"
                               "# in_match,%d\n",
-                        static_cast<unsigned long>(pros::millis()), controllerConnected, fieldControl,
+                        sessionId, static_cast<unsigned long>(pros::millis()), controllerConnected, fieldControl,
                         competitionSwitch, autonomous, disabled, inMatch) >= 0;
 }
 

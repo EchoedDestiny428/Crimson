@@ -31,6 +31,7 @@ private:
     };
 
     void run();
+    bool reserveSession();
     bool openFile(std::FILE*& file);
     bool writeMetadata(std::FILE* file);
     bool writeHeader(std::FILE* file);
@@ -38,6 +39,7 @@ private:
 
     const char* directory;
     std::uint32_t period;
+    std::uint32_t sessionId = 0;
     char filePath[64] {};
     std::array<pros::AbstractMotor*, kMaxMotors> motors {};
     std::size_t motorCount = 0;

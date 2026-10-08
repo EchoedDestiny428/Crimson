@@ -4,14 +4,14 @@
 
 namespace ports {
 
-inline constexpr std::int8_t kIntake = 2;
+inline constexpr std::int8_t kIntake = 12;
 inline constexpr std::int8_t kVision = 16; // temp
-inline constexpr std::int8_t kImu = 10;
+inline constexpr std::int8_t kImu = 16;
 
-inline constexpr std::int8_t kLeftDriveA = 2;
+inline constexpr std::int8_t kLeftDriveA = 1;
 inline constexpr std::int8_t kLeftDriveB = -19;
-inline constexpr std::int8_t kRightDriveA = 15;
-inline constexpr std::int8_t kRightDriveB = -18;
+inline constexpr std::int8_t kRightDriveA = -11;
+inline constexpr std::int8_t kRightDriveB = 18;
 
 inline constexpr std::int8_t kElevatorA = -10;
 inline constexpr std::int8_t kElevatorB = 8;
