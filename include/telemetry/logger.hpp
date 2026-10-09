@@ -21,13 +21,19 @@ public:
     void dump();
 
 private:
-    static constexpr std::size_t kMaxMotors = 21;
+    static constexpr std::size_t kMaxPorts = 21;
     static constexpr std::size_t kMaxFields = 64;
 
     struct Field {
         const char* name;
         FieldCallback callback;
         const void* context;
+    };
+
+    struct MotorPort {
+        pros::AbstractMotor* motor;
+        std::uint8_t index;
+        std::int8_t port;
     };
 
     void run();
@@ -41,8 +47,8 @@ private:
     std::uint32_t period;
     std::uint32_t sessionId = 0;
     char filePath[64] {};
-    std::array<pros::AbstractMotor*, kMaxMotors> motors {};
-    std::size_t motorCount = 0;
+    std::array<MotorPort, kMaxPorts> motorPorts {};
+    std::size_t motorPortCount = 0;
     std::array<Field, kMaxFields> fields {};
     std::size_t fieldCount = 0;
     pros::Task* task = nullptr;

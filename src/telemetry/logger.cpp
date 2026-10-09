@@ -11,16 +11,31 @@ namespace telemetry {
 Logger::Logger(const char* directory, std::uint32_t period) : directory(directory), period(period) {}
 
 bool Logger::attach(pros::AbstractMotor* motor) {
-    if (motor == nullptr || motorCount >= motors.size()) {
+    if (motor == nullptr) {
         return false;
     }
-    for (std::size_t i = 0; i < motorCount; ++i) {
-        if (motors[i] == motor) {
-            return false;
+    bool attached = false;
+    const std::vector<std::int8_t> ports = motor->get_port_all();
+    for (std::size_t index = 0; index < ports.size(); ++index) {
+        if (motorPortCount >= motorPorts.size()) {
+            break;
+        }
+        const std::int8_t port = ports[index];
+        bool duplicate = false;
+        for (std::size_t i = 0; i < motorPortCount; ++i) {
+            const int existingPort = motorPorts[i].port < 0 ? -motorPorts[i].port : motorPorts[i].port;
+            const int currentPort = port < 0 ? -port : port;
+            if (existingPort == currentPort) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (!duplicate) {
+            motorPorts[motorPortCount++] = {motor, static_cast<std::uint8_t>(index), port};
+            attached = true;
         }
     }
-    motors[motorCount++] = motor;
-    return true;
+    return attached;
 }
 
 bool Logger::register_field(const char* name, FieldCallback callback, const void* context) {
@@ -200,11 +215,12 @@ bool Logger::writeHeader(std::FILE* file) {
                            "autonomous,disabled,in_match") < 0) {
         return false;
     }
-    for (std::size_t i = 0; i < motorCount; ++i) {
+    for (std::size_t i = 0; i < motorPortCount; ++i) {
+        const int port = motorPorts[i].port < 0 ? -motorPorts[i].port : motorPorts[i].port;
         if (std::fprintf(file,
-                         ",motor%zu_position,motor%zu_velocity,motor%zu_voltage_mV,motor%zu_temperature_C"
-                         ",motor%zu_current_mA,motor%zu_target_position,motor%zu_target_velocity",
-                         i, i, i, i, i, i, i) < 0) {
+                         ",port_%d_position,port_%d_velocity,port_%d_voltage_mV,port_%d_temperature_C"
+                         ",port_%d_current_mA,port_%d_target_position,port_%d_target_velocity",
+                         port, port, port, port, port, port, port) < 0) {
             return false;
         }
     }
@@ -228,8 +244,10 @@ bool Logger::writeSample(std::FILE* file) {
                      fieldControl, competitionSwitch, autonomous, disabled, inMatch) < 0) {
         return false;
     }
-    for (std::size_t i = 0; i < motorCount; ++i) {
-        pros::AbstractMotor* motor = motors[i];
+    for (std::size_t i = 0; i < motorPortCount; ++i) {
+        const MotorPort& motorPort = motorPorts[i];
+        pros::AbstractMotor* motor = motorPort.motor;
+        const std::uint8_t index = motorPort.index;
         const auto writeDouble = [file](double value) {
             return std::isfinite(value) ? std::fprintf(file, "%.3f", value) : std::fprintf(file, "nan");
         };
@@ -237,13 +255,13 @@ bool Logger::writeSample(std::FILE* file) {
             return value == PROS_ERR ? std::fprintf(file, "nan") : std::fprintf(file, "%d", value);
         };
 
-        if (std::fputc(',', file) == EOF || writeDouble(motor->get_position()) < 0 ||
-            std::fputc(',', file) == EOF || writeDouble(motor->get_actual_velocity()) < 0 ||
-            std::fputc(',', file) == EOF || writeInteger(motor->get_voltage()) < 0 ||
-            std::fputc(',', file) == EOF || writeDouble(motor->get_temperature()) < 0 ||
-            std::fputc(',', file) == EOF || writeInteger(motor->get_current_draw()) < 0 ||
-            std::fputc(',', file) == EOF || writeDouble(motor->get_target_position()) < 0 ||
-            std::fputc(',', file) == EOF || writeInteger(motor->get_target_velocity()) < 0) {
+        if (std::fputc(',', file) == EOF || writeDouble(motor->get_position(index)) < 0 ||
+            std::fputc(',', file) == EOF || writeDouble(motor->get_actual_velocity(index)) < 0 ||
+            std::fputc(',', file) == EOF || writeInteger(motor->get_voltage(index)) < 0 ||
+            std::fputc(',', file) == EOF || writeDouble(motor->get_temperature(index)) < 0 ||
+            std::fputc(',', file) == EOF || writeInteger(motor->get_current_draw(index)) < 0 ||
+            std::fputc(',', file) == EOF || writeDouble(motor->get_target_position(index)) < 0 ||
+            std::fputc(',', file) == EOF || writeInteger(motor->get_target_velocity(index)) < 0) {
             return false;
         }
     }
