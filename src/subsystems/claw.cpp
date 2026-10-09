@@ -26,7 +26,7 @@ bool elevator_away_from_home() {
         return false;
     }
     const double height = elevator::height();
-    return std::isfinite(height) && std::fabs(height - elevator::kHome) > kHomeTolerance;
+    return std::isfinite(height) && height > elevator::kHome + kHomeTolerance;
 }
 
 void apply(int power) {
