@@ -47,6 +47,17 @@ void draw_box(int center_x, int center_y, std::uint32_t color, bool filled) {
     }
 }
 
+std::uint32_t goal_color(field::GoalType type) {
+    switch (type) {
+    case field::GoalType::Red:
+        return kGoalRed;
+    case field::GoalType::Blue:
+        return kGoalBlue;
+    default:
+        return kGoalNeutral;
+    }
+}
+
 }
 
 void Dashboard::initialize() {
@@ -100,28 +111,11 @@ void Dashboard::draw_field() {
     pros::screen::set_pen(kFieldLine);
     pros::screen::draw_rect(kMapOffsetX, kMapOffsetY, kMapOffsetX + kMapSize, kMapOffsetY + kMapSize);
 
-    const auto draw_line = [](const field::Point2D& from_mm, const field::Point2D& to_mm) {
-        const field::Point2D from = field::to_lemlib_inches(from_mm);
-        const field::Point2D to = field::to_lemlib_inches(to_mm);
-        pros::screen::draw_line(to_screen_x(from.x), to_screen_y(from.y), to_screen_x(to.x), to_screen_y(to.y));
-    };
-    draw_line(field::kNeutralGoalTopLeft, field::kNeutralGoalBottomRight);
-    draw_line(field::kNeutralGoalBottomLeft, field::kNeutralGoalTopRight);
-
-    const auto draw_goal = [](const field::Point2D& goal_mm, std::uint32_t color) {
-        const field::Point2D goal = field::to_lemlib_inches(goal_mm);
-        pros::screen::set_pen(color);
-        pros::screen::fill_circle(to_screen_x(goal.x), to_screen_y(goal.y), kGoalRadius);
-    };
-    draw_goal(field::kCenterGoal, kGoalNeutral);
-    draw_goal(field::kNeutralGoalTopLeft, kGoalNeutral);
-    draw_goal(field::kNeutralGoalBottomLeft, kGoalNeutral);
-    draw_goal(field::kNeutralGoalTopRight, kGoalNeutral);
-    draw_goal(field::kNeutralGoalBottomRight, kGoalNeutral);
-    draw_goal(field::kRedGoalTop, kGoalRed);
-    draw_goal(field::kRedGoalBottom, kGoalRed);
-    draw_goal(field::kBlueGoalTop, kGoalBlue);
-    draw_goal(field::kBlueGoalBottom, kGoalBlue);
+    for (const field::Goal& goal : field::kGoals) {
+        const field::Point2D pos = field::to_lemlib_inches(goal.pos);
+        pros::screen::set_pen(goal_color(goal.type));
+        pros::screen::fill_circle(to_screen_x(pos.x), to_screen_y(pos.y), kGoalRadius);
+    }
 }
 
 void Dashboard::draw_pose(const crimson::Pose2D& pose, std::uint32_t color, bool filled) {
