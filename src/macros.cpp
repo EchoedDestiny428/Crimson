@@ -40,20 +40,16 @@ public:
     }
 
     template <typename Done>
-    bool wait_for(Done done, std::uint32_t timeout_ms, bool stop_on_timeout = true) const {
+    bool wait_for(Done done, std::uint32_t timeout_ms) const {
         const std::uint32_t start = pros::millis();
         while (active() && !done() && pros::millis() - start < timeout_ms) {
             pros::delay(kPollMs);
         }
-        if (active() && !done() && stop_on_timeout) {
-            elevator::stop();
-            pivot::stop();
-        }
-        return active() && done();
+        return active();
     }
 
     bool pause(std::uint32_t ms) const {
-        return wait_for([] { return false; }, ms, false);
+        return wait_for([] { return false; }, ms);
     }
 
 private:
@@ -86,7 +82,7 @@ void start_home() {
     mode = Mode::Stowed;
     tilted = false;
     pivot::move_to(pivot::kHomeMotorDeg);
-    elevator::set_target(elevator::kHome, kElevatorTimeoutMs);
+    elevator::set_target(elevator::kHome);
 }
 
 void finish_motion(const Run& run, bool auto_tilt = true) {
@@ -121,7 +117,7 @@ void go_to(double height) {
     if (height < elevator::top_stage()) {
         untilt_pivot();
     }
-    elevator::set_target(height, kElevatorTimeoutMs);
+    elevator::set_target(height);
     finish_motion(run);
 }
 
@@ -135,7 +131,7 @@ void dual_setup() {
     const Run run;
     mode = Mode::Deployed;
     tilted = false;
-    elevator::set_target_below_home(elevator::kDualSetup, kElevatorTimeoutMs);
+    elevator::set_target_below_home(elevator::kDualSetup);
     if (!run.wait_for(elevator::is_settled, kElevatorTimeoutMs)) {
         return;
     }
@@ -173,10 +169,7 @@ void outtake_for_score(bool pressed) {
     pros::Task([] {
         const Run run;
         pivot::move_to(pivot::kFlippedMotorDeg);
-        if (!run.wait_for(pivot::is_settled, 100)) {
-            busy = false;
-            return;
-        }
+        run.wait_for(pivot::is_settled, 100);
         if (!run.pause(125)) {
             busy = false;
             return;

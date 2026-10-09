@@ -71,18 +71,18 @@ void hold() {
     }
 }
 
-void set_target(double target, std::uint32_t timeout_ms) {
+void set_target(double target) {
     if (target >= kHome) {
         left_bootup = true;
     }
-    motor.setTarget(static_cast<float>(std::clamp(target, min_height(), kMax)), timeout_ms);
+    motor.setTarget(static_cast<float>(std::clamp(target, min_height(), kMax)));
 }
 
-void set_target_below_home(double target, std::uint32_t timeout_ms) {
+void set_target_below_home(double target) {
     if (target >= kHome) {
         left_bootup = true;
     }
-    motor.setTarget(static_cast<float>(std::clamp(target, kBootup, kMax)), timeout_ms);
+    motor.setTarget(static_cast<float>(std::clamp(target, kBootup, kMax)));
 }
 
 void set_manual(int power) {
@@ -93,10 +93,6 @@ void set_manual(int power) {
     } else {
         motor.setManual(power);
     }
-}
-
-void stop() {
-    motor.stop();
 }
 
 double snap_to_stage(bool offset) {

@@ -27,10 +27,9 @@ public:
     float getTarget() const;
     bool isSettled() const;
 
-    void setTarget(float newTarget, std::uint32_t timeout = 0);
+    void setTarget(float newTarget);
     void setDecelerationDistance(float distance);
     void setManual(int power);
-    void stop();
     void holdCurrent();
     bool waitUntilSettled(std::uint32_t timeout);
     /** Enable or disable SmartMotor diagnostics through the configured info sink. */
@@ -53,7 +52,6 @@ private:
 
     std::atomic<float> encoderOffset{0.0f};
     std::atomic<float> target{0.0f};
-    std::atomic<std::uint32_t> targetDeadline{0};
     std::atomic<bool> targetChanged{false};
     std::atomic<bool> manual{false};
     std::atomic<int> manualPower{0};

@@ -104,12 +104,11 @@ bool SmartMotor::isSettled() const {
     return !manual && std::fabs(target - getRotation()) < settleRange;
 }
 
-void SmartMotor::setTarget(float newTarget, std::uint32_t timeout) {
+void SmartMotor::setTarget(float newTarget) {
     if (!std::isfinite(newTarget)) {
         return;
     }
     target = newTarget;
-    targetDeadline = timeout == 0 ? 0 : pros::millis() + timeout;
     targetChanged = true;
     manual = false;
 }
@@ -119,16 +118,8 @@ void SmartMotor::setDecelerationDistance(float distance) {
 }
 
 void SmartMotor::setManual(int power) {
-    targetDeadline = 0;
     manualPower = power;
     manual = true;
-}
-
-void SmartMotor::stop() {
-    targetDeadline = 0;
-    manual = false;
-    targetChanged = false;
-    actuator->brake();
 }
 
 void SmartMotor::holdCurrent() {
@@ -164,16 +155,6 @@ void SmartMotor::controlLoop() {
         const float goal = target;
         const float position = getRotation();
         const bool newTarget = targetChanged.exchange(false);
-        const std::uint32_t deadline = targetDeadline;
-
-        if (deadline != 0 && static_cast<std::int32_t>(pros::millis() - deadline) >= 0) {
-            targetDeadline = 0;
-            manual = false;
-            actuator->brake();
-            pros::Task::delay_until(&now, kPeriodMs);
-            continue;
-        }
-
         if (manual) {
             positionCommanded = false;
             actuator->move(manualPower);
