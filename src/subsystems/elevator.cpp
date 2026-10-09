@@ -13,6 +13,7 @@ namespace {
 
 constexpr std::int32_t kMaxVelocity = 600;
 constexpr float kSettleRange = 5.0f;
+constexpr float kDecelerationDistance = 300.0f;
 
 constexpr double kSnapDownFraction = 0.6;
 
@@ -22,7 +23,7 @@ constexpr auto kStages = [] {
     return stages;
 }();
 
-lemlib::SmartMotor motor(&elevator_motors, kMaxVelocity, kSettleRange);
+lemlib::SmartMotor motor(&elevator_motors, kMaxVelocity, kSettleRange, kDecelerationDistance);
 std::atomic<bool> left_bootup{false};
 
 double min_height() {
