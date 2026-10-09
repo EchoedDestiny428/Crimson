@@ -5,14 +5,62 @@ namespace autons::skills::v1 {
 void setup() {}
 
 void run() {
-    chassis.setPose(20.25, 8, 90);
+    chassis.setPose(-39, -63.4, 180);
+    parallel({
+        [] { macros::flip_out(10, 950); },
+        [] {
+            chassis.moveToPoint(-39, -48, 1000, {.forwards = false});
+            chassis.turnToHeading(-90, 1000);
+            chassis.moveToPoint(-30, -48, 1000, {.forwards = false});
+            chassis.waitUntilDone();
+        },
+    });
+    claw::spin(-127);
+    pros::delay(125);
     parallel({
         [] {
-            macros::flip_out(10, 950);
+            chassis.moveToPoint(-47.25, -48, 1000);
+            chassis.turnToHeading(180, 1000);
+            chassis.moveToPoint(-47.75, -63.4, 1000);
+            chassis.waitUntilDone();
         },
         [] {
-            chassis.moveToPoint(20.25, 24, 500, {.forwards = false, .minSpeed = 127});
-            chassis.turnToPoint(48, 24, 400, {.forwards = false});
+            pivot::move_to(pivot::kScoredMotorDeg);
+            elevator::set_target(elevator::height() + elevator::kOffset);
+            pros::delay(500);
+            macros::go_to(subsystems::elevator::kHome);
+        },
+    });
+    pros::delay(150);
+    claw::spin(127);
+    intake::spin(127);
+    pros::delay(1800);
+    parallel({
+        [] {
+            intake::stop();
+            macros::go_to(subsystems::elevator::kStage1+subsystems::elevator::kOffset);
+        },
+        [] {
+            chassis.moveToPoint(-47.75, -47.75, 1000, {.forwards = false});
+            chassis.turnToHeading(-90, 1000);
+            chassis.moveToPoint(-30, -48, 1000, {.forwards = false});
+            chassis.waitUntilDone();
+        },
+    });
+    claw::spin(-127);
+    pros::delay(125);
+    parallel({
+        [] {
+            chassis.moveToPoint(-47.25, -48, 1000);
+            chassis.turnToHeading(180, 1000);
+            chassis.moveToPoint(-47.75, -63.4, 1000);
+            chassis.waitUntilDone();
+        },
+        [] {
+            pivot::move_to(pivot::kScoredMotorDeg);
+            elevator::set_target(elevator::height() + elevator::kOffset);
+            pros::delay(500);
+            macros::go_to(subsystems::elevator::kHome);
         },
     });
 }

@@ -190,14 +190,13 @@ void opcontrol() {
     macros::cancel();
     chassis.cancelAllMotions();
     claw::automatic();
-
     util::start_driver_task("System check", util::system_check::update, util::system_check::stop);
     util::start_driver_task("Intake", intake::update, intake::stop);
     util::start_driver_task("Claw", claw::update, claw::automatic);
     util::start_driver_task("Pivot", pivot::update, pivot::stop);
     util::start_driver_task("Macros", macros::update, macros::stop);
     util::start_driver_task("HUD", display::controller_hud::update);
-
+    
     drive::reset();
     std::uint32_t now = pros::millis();
     while (true) {
