@@ -166,21 +166,115 @@ void run() {
 
     //ends on intake cycle for some reason should be score last one i think, but elevator kept breaking so I left stages for now
     //middle intake
-    chassis.setPose(-31.5,-48,-90);
-    chassis.moveToPoint(-35.5,-48,500);
-    chassis.setBrakeMode(pros::motor_brake_mode_e::E_MOTOR_BRAKE_HOLD);
-    parallel({
+    chassis.setPose(-31, -48, -90);
+    pivot::set_pos(pivot::kFlippedMotorDeg);
+    
+
+    intake::spin(127);
+    chassis.moveToPoint(-33.5, -48, 800, {.maxSpeed = 60, .minSpeed = 60});
+
+    parallel ({
         [] {
-        chassis.swingToPoint(-24,-28,lemlib::DriveSide::RIGHT,800);
-        chassis.moveToPoint(-24,-28,800);
-        chassis.waitUntilDone();
-        chassis.moveToPoint(0,-48,800);
+            claw::spin(127);
+            macros::home();
         },
         [] {
-            macros::go_to(subsystems::elevator::kHome);
-            intake::spin(127);
+            chassis.turnToHeading(30, 500);
+            chassis.moveToPoint(-25.5, -33, 1400, {.maxSpeed = 60});
+            chassis.turnToHeading(100, 500);
+        },
+    });
+    
+    chassis.moveToPoint(0, -48, 1200);
+    chassis.turnToHeading(180, 500);
+    chassis.moveToPoint(0, -72, 800);
+
+    parallel ({
+        [] {
+            macros::flip_out(10, 950);
+        },
+        [] {
+            chassis.moveToPoint(0, -60, 500, {.minSpeed = 127});
+            chassis.moveToPoint(0, -72, 500, {.minSpeed = 127});
+            chassis.turnToPoint(24, -48, 500, {.forwards = false});
+            chassis.moveToPoint(24, -48, 1100, {.forwards = false, .maxSpeed = 80});
+        },
+    });
+
+    chassis.waitUntilDone();
+
+    claw::spin(-127);
+    pros::delay(500);
+
+    parallel ({
+        [] {
+            macros::dual_setup();
+            claw::spin(127);
+        },
+        [] {
+            chassis.moveToPoint(0, -48, 1000);
+            chassis.turnToPoint(24, -24, 500, {.forwards = false});
+            chassis.moveToPoint(16.5, -31.0, 1000, {.forwards = false});
+            chassis.waitUntilDone();
         }
-    }); 
-}
+    });
+
+
+    parallel ({
+        [] {
+            macros::dual_pickup_height(700);
+        },
+        [] {
+            pros::delay(800);
+            chassis.turnToPoint(24, -48, 800, {.forwards = false});
+        },
+    });
+
+    chassis.moveToPoint(24, -48, 800, {.forwards = false, .maxSpeed = 60});
+    chassis.waitUntilDone();
+
+    claw::spin(-127);
+    pros::delay(300);
+    pivot::move_to(pivot::kFlippedMotorDeg + 450);
+    pros::delay(400);
+
+    chassis.moveToPoint(24, -27, 1000);
+    claw::spin(127);
+
+    parallel ({
+        [] {
+            macros::dual_setup();
+        },
+        [] {
+            chassis.turnToPoint(49, -51, 500, {.forwards = false});
+            chassis.moveToPoint(43.5, -45.5, 1200, {.forwards = false});
+        }
+    });
+
+    chassis.waitUntilDone();
+
+    parallel ({
+        [] {
+            macros::dual_pickup_height(1300);
+        },
+        [] {
+            pros::delay(800);
+            chassis.turnToPoint(24, -50, 800, {.forwards = false});
+            chassis.moveToPoint(24, -50, 1000, {.forwards = false, .maxSpeed = 60}); 
+        },
+    });
+
+    
+
+    chassis.waitUntilDone();
+    claw::spin(-127);
+    pros::delay(300);
+    pivot::move_to(pivot::kFlippedMotorDeg + 450);
+    pros::delay(400);
+
+    chassis.moveToPoint(47, -52, 1000);
+    chassis.turnToPoint(47, -72, 500);
+    chassis.moveToPoint(47, -72, 1000);
+    chassis.waitUntilDone();
 
 }
