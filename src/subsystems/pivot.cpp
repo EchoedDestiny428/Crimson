@@ -67,4 +67,8 @@ bool wait_until_settled(std::uint32_t timeout_ms) {
     return true;
 }
 
+double get_pos() {
+    return pivot_motor.get_position();
+}
+
 }
