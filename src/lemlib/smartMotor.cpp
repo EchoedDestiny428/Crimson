@@ -13,6 +13,7 @@ namespace {
 constexpr std::uint32_t kPeriodMs = 10;
 constexpr std::uint32_t kLogEveryTicks = 10;
 constexpr float kMaxPower = 127.0f;
+constexpr float kMinimumProfilePower = 20.0f;
 constexpr float kInvalid = std::numeric_limits<float>::quiet_NaN();
 
 }
@@ -35,14 +36,16 @@ SmartMotor::SmartMotor(pros::MotorGroup* actuator, pros::Rotation* rotation, PID
       settleRange(settleRange),
       feedforward(feedforward) {}
 
-SmartMotor::SmartMotor(pros::MotorGroup* actuator, std::int32_t maxVelocity, float settleRange)
+SmartMotor::SmartMotor(pros::MotorGroup* actuator, std::int32_t maxVelocity, float settleRange,
+                       float decelerationDistance)
     : actuator(actuator),
       encoder(nullptr),
       rotation(nullptr),
       controller(0, 0, 0),
       settleRange(settleRange),
       feedforward(0.0f),
-      maxVelocity(maxVelocity) {}
+      maxVelocity(maxVelocity),
+      decelerationDistance(std::max(0.0f, decelerationDistance)) {}
 
 bool SmartMotor::usesMotorEncoders() const {
     return encoder == nullptr && rotation == nullptr;
@@ -110,6 +113,10 @@ void SmartMotor::setTarget(float newTarget) {
     manual = false;
 }
 
+void SmartMotor::setDecelerationDistance(float distance) {
+    decelerationDistance = std::max(0.0f, distance);
+}
+
 void SmartMotor::setManual(int power) {
     manualPower = power;
     manual = true;
@@ -148,12 +155,25 @@ void SmartMotor::controlLoop() {
         const float goal = target;
         const float position = getRotation();
         const bool newTarget = targetChanged.exchange(false);
-
         if (manual) {
             positionCommanded = false;
             actuator->move(manualPower);
         } else if (usesMotorEncoders()) {
-            if (newTarget || !positionCommanded) {
+            const float distance = decelerationDistance;
+            if (distance > settleRange) {
+                const float error = goal - position;
+                if (!std::isfinite(error) || std::fabs(error) < settleRange) {
+                    actuator->brake();
+                    positionCommanded = true;
+                } else {
+                    const float power =
+                        std::max(kMinimumProfilePower, std::clamp(std::fabs(error) / distance, 0.0f, 1.0f) *
+                                                            kMaxPower);
+                    const auto output = static_cast<std::int32_t>(std::copysign(power, error));
+                    actuator->move(output);
+                    positionCommanded = true;
+                }
+            } else if (newTarget || !positionCommanded) {
                 actuator->move_absolute(goal, maxVelocity);
                 positionCommanded = true;
             }

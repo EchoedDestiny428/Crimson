@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pros/ai_vision.hpp"
+#include "pros/rtos.hpp"
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -49,6 +50,7 @@ private:
 
     pros::AIVision sensor_;
     std::vector<pros::AIVision::Object> tags_;
+    mutable pros::Mutex mutex_;
     std::uint32_t last_update_ms_ = 0;
     double camera_height_mm_ = 100.0;
     double camera_pitch_deg_ = 0.0;

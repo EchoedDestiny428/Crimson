@@ -16,7 +16,8 @@ public:
                float feedforward = 0.0f);
     SmartMotor(pros::MotorGroup* actuator, pros::Rotation* rotation, PID controller, float settleRange = 5.0f,
                float feedforward = 0.0f);
-    SmartMotor(pros::MotorGroup* actuator, std::int32_t maxVelocity, float settleRange = 5.0f);
+    SmartMotor(pros::MotorGroup* actuator, std::int32_t maxVelocity, float settleRange = 5.0f,
+               float decelerationDistance = 0.0f);
 
     void start();
     void reset();
@@ -27,9 +28,11 @@ public:
     bool isSettled() const;
 
     void setTarget(float newTarget);
+    void setDecelerationDistance(float distance);
     void setManual(int power);
     void holdCurrent();
     bool waitUntilSettled(std::uint32_t timeout);
+    /** Enable or disable SmartMotor diagnostics through the configured info sink. */
     void setLogging(bool enabled);
 
 private:
@@ -45,6 +48,7 @@ private:
     float settleRange;
     float feedforward;
     std::int32_t maxVelocity = 0;
+    std::atomic<float> decelerationDistance{0.0f};
 
     std::atomic<float> encoderOffset{0.0f};
     std::atomic<float> target{0.0f};
