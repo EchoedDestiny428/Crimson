@@ -12,11 +12,18 @@ struct DonutParams {
     float earlyExitRange = 0;
 };
 
+struct GoalPoseParams {
+    bool forwards = false;
+    float distance = 7.5;
+    float maxCorrection = 6;
+};
+
 class Chassis : public lemlib::Chassis {
 public:
     using lemlib::Chassis::Chassis;
 
     void donut(float theta, int timeout, DonutParams params = {}, bool async = true);
+    bool setPoseFromGoal(float goalX, float goalY, GoalPoseParams params = {});
 };
 
 }

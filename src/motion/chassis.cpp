@@ -76,4 +76,17 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
     endMotion();
 }
 
+bool Chassis::setPoseFromGoal(float goalX, float goalY, GoalPoseParams params) {
+    const lemlib::Pose now = getPose();
+    const float heading = lemlib::degToRad(now.theta);
+    const float side = params.forwards ? -1.0f : 1.0f;
+    const float x = goalX + side * params.distance * std::sin(heading);
+    const float y = goalY + side * params.distance * std::cos(heading);
+    if (std::hypot(x - now.x, y - now.y) > params.maxCorrection) {
+        return false;
+    }
+    setPose(x, y, now.theta);
+    return true;
+}
+
 }
