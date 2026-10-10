@@ -8,13 +8,13 @@ inline constexpr double kBootup = 0.0;
 inline constexpr double kFlipOutMin = 10.0;
 inline constexpr double kHome = 150.0;
 inline constexpr double kDualSetup = 20.0;
-inline constexpr double kOffset = 140.0;
+inline constexpr double kOffset = 230.0;
 inline constexpr double kFlipOut = 100.0;
 inline constexpr double kStage1 = 650.0;
-inline constexpr double kStage2 = 1250.0;
-inline constexpr double kStage3 = 1850.0;
-inline constexpr double kStage4 = 2450.0;
-inline constexpr double kStage5 = 2950.0;
+inline constexpr double kStage2 = 1300.0;
+inline constexpr double kStage3 = 2000.0;
+inline constexpr double kStage4 = 2700.0;
+inline constexpr double kStage5 = 3400.0;
 inline constexpr double kMax = 3500.0;
 
 void init();
