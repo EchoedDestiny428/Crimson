@@ -149,7 +149,7 @@ void run() {
     pivot::move_to(pivot::kFlippedMotorDeg + 450);
     pros::delay(400);
 
-    chassis.moveToPoint(36, -36, 1000);
+    chassis.moveToPoint(24, -24, 1000);
     claw::spin(127);
 
     parallel({
