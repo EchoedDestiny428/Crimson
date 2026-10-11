@@ -22,63 +22,63 @@ void curve(float initialX, float initialY, float finalX, float finalY, float exi
 }
 
 void run() {
-    chassis.setPose(-38, -63.4, 180);
-    parallel({
-        [] { macros::flip_out(10, 950); },
-        [] {
-            chassis.moveToPoint(-24, -48, 1000, {.forwards = false, .maxSpeed = 80});
-            chassis.waitUntilDone();
-        },
-    });
+    // chassis.setPose(-38, -63.4, 180);
+    // parallel({
+    //     [] { macros::flip_out(10, 950); },
+    //     [] {
+    //         chassis.moveToPoint(-24, -48, 1000, {.forwards = false, .maxSpeed = 80});
+    //         chassis.waitUntilDone();
+    //     },
+    // });
 
-    claw::spin(-127);
-    pros::delay(300);
+    // claw::spin(-127);
+    // pros::delay(300);
 
-    chassis.setPoseFromGoal(-24, -48);
-    // ----------------------------------
+    // chassis.setPoseFromGoal(-24, -48);
+    // // ----------------------------------
 
-    for (const double stage : {subsystems::elevator::kStage1, subsystems::elevator::kStage2, subsystems::elevator::kStage3, subsystems::elevator::kStage4}) {
-        parallel({
-            [] {
-                chassis.moveToPoint(-56, -48, 1200, {.maxSpeed = 100});
-                chassis.turnToPoint(-58, -72, 600);
-                chassis.moveToPoint(-58, -72, 400);
-                chassis.moveToPoint(-58, -72, 1000, {.maxSpeed = 50}); // this is the loading timeout
-                chassis.waitUntilDone();
-            },
-            [] {
-                pivot::move_to(pivot::kScoredMotorDeg);
-                elevator::set_target(elevator::height() + elevator::kOffset);
+    // for (const double stage : {subsystems::elevator::kStage1, subsystems::elevator::kStage2, subsystems::elevator::kStage3, subsystems::elevator::kStage4}) {
+    //     parallel({
+    //         [] {
+    //             chassis.moveToPoint(-56, -48, 1200, {.maxSpeed = 100});
+    //             chassis.turnToPoint(-58, -72, 600);
+    //             chassis.moveToPoint(-58, -72, 400);
+    //             chassis.moveToPoint(-58, -72, 1000, {.maxSpeed = 50}); // this is the loading timeout
+    //             chassis.waitUntilDone();
+    //         },
+    //         [] {
+    //             pivot::move_to(pivot::kScoredMotorDeg);
+    //             elevator::set_target(elevator::height() + elevator::kOffset);
 
-                pros::delay(500);
-                macros::home();
-                claw::spin(127);
-                intake::spin(127);
-            },
-        });
+    //             pros::delay(500);
+    //             macros::home();
+    //             claw::spin(127);
+    //             intake::spin(127);
+    //         },
+    //     });
 
-        chassis.waitUntilDone();
+    //     chassis.waitUntilDone();
 
-        parallel({
-            [stage] {
-                intake::stop();
-                macros::flip_out(stage + 350, pivot::kFlippedMotorDeg + 50);
-            },
-            [] {
-                curve(chassis.getPose().x, chassis.getPose().y, -24, -48,
-                      180, -90, 3.0, 10.0, 1900, 35, 127, false);
-            },
-        });
+    //     parallel({
+    //         [stage] {
+    //             intake::stop();
+    //             macros::flip_out(stage + 350, pivot::kFlippedMotorDeg + 50);
+    //         },
+    //         [] {
+    //             curve(chassis.getPose().x, chassis.getPose().y, -24, -48,
+    //                   180, -90, 3.0, 10.0, 1900, 35, 127, false);
+    //         },
+    //     });
 
-        chassis.waitUntilDone();
+    //     chassis.waitUntilDone();
 
-        claw::spin(-127);
-        pros::delay(300);
-        chassis.setPoseFromGoal(-24, -48);
-    }
+    //     claw::spin(-127);
+    //     pros::delay(300);
+    //     chassis.setPoseFromGoal(-24, -48);
+    // }
 
-    pivot::move_to(pivot::kScoredMotorDeg);
-    elevator::set_target(elevator::height() + elevator::kOffset);
+    // pivot::move_to(pivot::kScoredMotorDeg);
+    // elevator::set_target(elevator::height() + elevator::kOffset);
 
 
 
