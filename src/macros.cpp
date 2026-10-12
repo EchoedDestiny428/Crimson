@@ -20,7 +20,7 @@ constexpr int kManualPower = 127;
 constexpr double kTopArrivalTolerance = 50.0;
 
 constexpr std::uint32_t kElevatorTimeoutMs = 650;
-constexpr std::uint32_t kPivotTimeoutMs = 500;
+constexpr std::uint32_t kPivotTimeoutMs = 800;
 constexpr std::uint32_t kDualPivotEndTimeoutMs = 500;
 constexpr std::uint32_t kDualPickupDwellMs = 250;
 constexpr std::uint32_t kPollMs = 10;

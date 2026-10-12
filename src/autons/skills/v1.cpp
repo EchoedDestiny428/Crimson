@@ -4,6 +4,23 @@ namespace autons::skills::v1 {
 
 void setup() {}
 
+void curve(float initialX, float initialY, float finalX, float finalY, float exitAngle, float entryAngle,
+           float exitLength, float entryLength,int timeout,int speed=10, int maxSpeed=127, bool forwards=true) {
+    constexpr float kPi = 3.14159265358979323846f;
+    const float exitRadians = exitAngle * kPi / 180.0f;
+    const float entryRadians = entryAngle * kPi / 180.0f;
+    const float movementDirection = forwards ? 1.0f : -1.0f;
+
+    chassis.moveToPoint(initialX + movementDirection * sin(exitRadians) * (exitLength+2.0f),
+                        initialY + movementDirection * cos(exitRadians) * (exitLength+2.0f), 800,
+                        {.forwards = forwards, .maxSpeed = maxSpeed,.minSpeed = speed,.earlyExitRange = 2.0f});
+    chassis.moveToPoint(finalX - movementDirection * sin(entryRadians) * entryLength,
+                        finalY - movementDirection * cos(entryRadians) * entryLength, timeout,
+                        {.forwards = forwards, .maxSpeed = maxSpeed,.minSpeed = speed,.earlyExitRange = 6.0f});
+    chassis.turnToPoint(finalX, finalY, 600, {.forwards = forwards,.maxSpeed = maxSpeed,.minSpeed = speed,.earlyExitRange = 2.0f});
+    chassis.moveToPoint(finalX, finalY, 800, {.forwards = forwards, .maxSpeed = maxSpeed});
+}
+
 void run() {
     chassis.setPose(-39, -63.4, 180);
     parallel({
@@ -183,16 +200,19 @@ void run() {
     // pivot::set_pos(pivot::kFlippedMotorDeg);
 
     intake::spin(127);
-    chassis.moveToPoint(-33.5, -48, 800, {.maxSpeed = 60, .minSpeed = 60});
 
     parallel({
         [] {
-            claw::spin(127);
             macros::home();
         },
         [] {
+            chassis.moveToPoint(-33.5, -48, 800, {.maxSpeed = 60, .minSpeed = 60});
             chassis.turnToHeading(30, 500);
-            chassis.moveToPoint(-25.5, -33, 1900, {.maxSpeed = 60});
+            chassis.moveToPoint(-25.5, -33, 650, {.maxSpeed = 70});
+            chassis.moveToPoint(-25.5, -33, 1000, {.maxSpeed = 20});
+            // curve(chassis.getPose().x, chassis.getPose().y, -25.5, -33,
+            //       -90, 30, 3.0, 5.0, 1000, 20, 60);
+            
             chassis.turnToHeading(100, 500);
         },
     });
@@ -204,7 +224,7 @@ void run() {
     parallel({
         [] { macros::flip_out(10, 950); },
         [] {
-            chassis.moveToPoint(0, -60, 500, {.minSpeed = 127});
+            chassis.moveToPoint(0, -60, 500, {.forwards = false, .minSpeed = 127});
             chassis.moveToPoint(0, -72, 500, {.minSpeed = 127});
             chassis.turnToPoint(24, -48, 500, {.forwards = false});
             chassis.moveToPoint(24, -48, 1100, {.forwards = false, .maxSpeed = 80});
@@ -212,6 +232,7 @@ void run() {
     });
 
     chassis.waitUntilDone();
+    chassis.setPoseFromGoal(24, -48);
 
     claw::spin(-127);
     pros::delay(500);
@@ -223,27 +244,23 @@ void run() {
               [] {
                   chassis.moveToPoint(0, -48, 1000);
                   chassis.turnToPoint(24, -24, 500, {.forwards = false});
-                  chassis.moveToPoint(16.5, -31.0, 1000, {.forwards = false});
+                  chassis.moveToPoint(19.5, -29.5, 1000, {.forwards = false});
                   chassis.waitUntilDone();
               }});
 
-    parallel({
-        [] { macros::dual_pickup_height(700); },
-        [] {
-            pros::delay(800);
-            chassis.turnToPoint(24, -48, 800, {.forwards = false});
-        },
-    });
-
-    chassis.moveToPoint(24, -48, 800, {.forwards = false, .maxSpeed = 60});
+    macros::dual_pickup_height(700);
+    chassis.turnToPoint(25, -48, 800, {.forwards = false});
+    chassis.moveToPoint(25, -48, 800, {.forwards = false, .maxSpeed = 60});
     chassis.waitUntilDone();
+    chassis.setPoseFromGoal(24, -48);
+
 
     claw::spin(-127);
     pros::delay(300);
     pivot::move_to(pivot::kFlippedMotorDeg + 450);
     pros::delay(400);
 
-    chassis.moveToPoint(24, -27, 1000);
+    chassis.moveToPoint(24, -24, 1000);
     claw::spin(127);
 
     parallel({[] { macros::dual_setup(); },
@@ -255,7 +272,8 @@ void run() {
     chassis.waitUntilDone();
 
     parallel({
-        [] { macros::dual_pickup_height(1300); },
+        [] { 
+            macros::dual_setup(); },
         [] {
             pros::delay(800);
             chassis.turnToPoint(24, -48, 800, {.forwards = false});
@@ -264,6 +282,13 @@ void run() {
     });
 
     chassis.waitUntilDone();
+macros::dual_pickup_height(1400);
+    curve(chassis.getPose().x, chassis.getPose().y, 24, -48,
+          -45, 90, 1.0, 5.0, 1500, 50, 127, false);
+
+    chassis.waitUntilDone();
+    chassis.setPoseFromGoal(24, -48);
+
     claw::spin(-127);
     pros::delay(300);
     pivot::move_to(pivot::kFlippedMotorDeg + 450);
