@@ -189,16 +189,18 @@ void autonomous() {
 void opcontrol() {
     macros::cancel();
     chassis.cancelAllMotions();
-    claw::automatic();
-    util::start_driver_task("System check", util::system_check::update, util::system_check::stop);
-    util::start_driver_task("Intake", intake::update, intake::stop);
-    util::start_driver_task("Claw", claw::update, claw::automatic);
-    util::start_driver_task("Pivot", pivot::update, pivot::stop);
-    util::start_driver_task("Macros", macros::update, macros::stop);
-    util::start_driver_task("HUD", display::controller_hud::update);
+    // claw::automatic();
+    // util::start_driver_task("System check", util::system_check::update, util::system_check::stop);
+    // util::start_driver_task("Intake", intake::update, intake::stop);
+    // util::start_driver_task("Claw", claw::update, claw::automatic);
+    // util::start_driver_task("Pivot", pivot::update, pivot::stop);
+    // util::start_driver_task("Macros", macros::update, macros::stop);
+    // util::start_driver_task("HUD", display::controller_hud::update);
     
-    drive::reset();
+    // drive::reset();
     std::uint32_t now = pros::millis();
+    // skills::v1::run();
+    autons::run_selected();
     while (true) {
         drive::update();
         // util::two_button(elevator_motors, controls::kElevatorUp, controls::kElevatorDown);
