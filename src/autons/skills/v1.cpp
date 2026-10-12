@@ -9,9 +9,9 @@ void run() {
     parallel({
         [] { macros::flip_out(10, 950); },
         [] {
-            chassis.moveToPoint(-39, -48, 1900, {.forwards = false});
-            chassis.turnToHeading(-90, 1500);
-            chassis.moveToPoint(-30, -48, 1900, {.forwards = false});
+            chassis.moveToPoint(-39, -48, 1000, {.forwards = false});
+            chassis.turnToHeading(-90, 1000);
+            chassis.moveToPoint(-30, -48, 1000, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
@@ -19,9 +19,9 @@ void run() {
     pros::delay(125);
     parallel({
         [] {
-            chassis.moveToPoint(-56.5, -48, 1900);
-            chassis.turnToHeading(180, 1500);
-            chassis.moveToPoint(-56.5, -63.4, 1900);
+            chassis.moveToPoint(-59.25, -48, 1000);
+            chassis.turnToHeading(180, 1000);
+            chassis.moveToPoint(-59.5, -63.4, 1000);
             chassis.waitUntilDone();
         },
         [] {
@@ -34,7 +34,7 @@ void run() {
     pros::delay(150);
     claw::spin(127);
     intake::spin(127);
-    chassis.setPose(-56.5, -61.9, chassis.getPose().theta);
+    chassis.setPose(-60, -61.9, 180);
     pros::delay(1800);
     parallel({
         [] {
@@ -42,9 +42,9 @@ void run() {
             macros::go_to(subsystems::elevator::kStage1 + subsystems::elevator::kOffset);
         },
         [] {
-            chassis.moveToPoint(-55.25, -47.75, 1900, {.forwards = false});
-            chassis.turnToHeading(-90, 1500);
-            chassis.moveToPoint(-30, -48, 1900, {.forwards = false});
+            chassis.moveToPoint(-59.5, -47.75, 1000, {.forwards = false});
+            chassis.turnToHeading(-90, 1000);
+            chassis.moveToPoint(-30, -48, 1000, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
@@ -52,9 +52,9 @@ void run() {
     pros::delay(125);
     parallel({
         [] {
-            chassis.moveToPoint(-55.25, -48, 1900);
-            chassis.turnToHeading(180, 1500);
-            chassis.moveToPoint(-55.25, -63.4, 1900);
+            chassis.moveToPoint(-59.25, -48, 1000);
+            chassis.turnToHeading(180, 1000);
+            chassis.moveToPoint(-59.5, -63.4, 1000);
             chassis.waitUntilDone();
         },
         [] {
@@ -67,7 +67,7 @@ void run() {
     pros::delay(150);
     claw::spin(127);
     intake::spin(127);
-    chassis.setPose(-56.5, -61.9, chassis.getPose().theta);
+    chassis.setPose(-60, -61.9, 180);
     pros::delay(1800);
     parallel({
         [] {
@@ -75,9 +75,9 @@ void run() {
             macros::go_to(subsystems::elevator::kStage2 + subsystems::elevator::kOffset);
         },
         [] {
-            chassis.moveToPoint(-55.25, -47.75, 1900, {.forwards = false});
-            chassis.turnToHeading(-90, 1500);
-            chassis.moveToPoint(-30, -48, 1900, {.forwards = false});
+            chassis.moveToPoint(-59.5, -47.75, 1000, {.forwards = false});
+            chassis.turnToHeading(-90, 1000);
+            chassis.moveToPoint(-30, -48, 1000, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
@@ -85,9 +85,9 @@ void run() {
     pros::delay(125);
     parallel({
         [] {
-            chassis.moveToPoint(-55.25, -48, 1900);
-            chassis.turnToHeading(180, 1500);
-            chassis.moveToPoint(-55.25, -63.4, 1900);
+            chassis.moveToPoint(-59.25, -48, 1000);
+            chassis.turnToHeading(180, 1000);
+            chassis.moveToPoint(-59.5, -63.4, 1000);
             chassis.waitUntilDone();
         },
         [] {
@@ -100,7 +100,7 @@ void run() {
     pros::delay(150);
     claw::spin(127);
     intake::spin(127);
-    chassis.setPose(-56.5, -61.9, chassis.getPose().theta);
+    chassis.setPose(-60, -61.9, 180);
     pros::delay(1800);
     parallel({
         [] {
@@ -108,9 +108,9 @@ void run() {
             macros::go_to(subsystems::elevator::kStage3 + subsystems::elevator::kOffset);
         },
         [] {
-            chassis.moveToPoint(-55.25, -47.75, 1900, {.forwards = false});
-            chassis.turnToHeading(-90, 1500);
-            chassis.moveToPoint(-30, -48, 1900, {.forwards = false});
+            chassis.moveToPoint(-59.25, -47.75, 1000, {.forwards = false});
+            chassis.turnToHeading(-90, 1000);
+            chassis.moveToPoint(-30, -48, 1000, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
@@ -118,9 +118,9 @@ void run() {
     pros::delay(125);
     parallel({
         [] {
-            chassis.moveToPoint(-55.25, -48, 1900);
-            chassis.turnToHeading(180, 1500);
-            chassis.moveToPoint(-55.25, -63.4, 1900);
+            chassis.moveToPoint(-59.25, -48, 1000);
+            chassis.turnToHeading(180, 1000);
+            chassis.moveToPoint(-59.5, -63.4, 1000);
             chassis.waitUntilDone();
         },
         [] {
@@ -133,7 +133,7 @@ void run() {
     pros::delay(150);
     claw::spin(127);
     intake::spin(127);
-    chassis.setPose(-56.5, -61.9, chassis.getPose().theta);
+    chassis.setPose(-60, -61.9, 180);
     pros::delay(1800);
     parallel({
         [] {
@@ -141,9 +141,37 @@ void run() {
             macros::go_to(subsystems::elevator::kStage4 + subsystems::elevator::kOffset);
         },
         [] {
-            chassis.moveToPoint(-55.25, -48, 1900, {.forwards = false});
-            chassis.turnToHeading(-90, 1500);
-            chassis.moveToPoint(-30, -48, 1900, {.forwards = false});
+            chassis.moveToPoint(-59.75, -48, 1000, {.forwards = false});
+            chassis.turnToHeading(-90, 1000);
+            chassis.moveToPoint(-30, -48, 1000, {.forwards = false});
+            chassis.waitUntilDone();
+        },
+    });
+    claw::spin(-127);
+    pros::delay(125);
+    parallel({
+        [] {
+            chassis.moveToPoint(-59.25, -48, 1000);
+            chassis.turnToHeading(180, 1000);
+            chassis.moveToPoint(-59.5, -63.4, 1000);
+            chassis.waitUntilDone();
+        },
+        [] {
+            pivot::move_to(pivot::kScoredMotorDeg);
+            elevator::set_target(elevator::height() + elevator::kOffset);
+            pros::delay(500);
+            macros::go_to(subsystems::elevator::kHome);
+        },
+    });
+    parallel({
+        [] {
+            intake::stop();
+            macros::go_to(subsystems::elevator::kStage5 + subsystems::elevator::kOffset);
+        },
+        [] {
+            chassis.moveToPoint(-59.75, -48, 1000, {.forwards = false});
+            chassis.turnToHeading(-90, 1000);
+            chassis.moveToPoint(-30, -48, 1000, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
