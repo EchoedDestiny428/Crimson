@@ -17,6 +17,7 @@ public:
 
     bool attach(pros::AbstractMotor* motor);
     bool register_field(const char* name, FieldCallback callback, const void* context = nullptr);
+    void register_robot_fields();
     void start();
     void dump();
 
