@@ -10,7 +10,7 @@ namespace {
 
 constexpr int kManualPower = 127;
 constexpr int kMoveVelocity = 200;
-constexpr double kSettleMotorDeg = 10.0;
+constexpr double kSettleMotorDeg = 30.0;
 constexpr std::uint32_t kWaitPollMs = 10;
 
 bool manual_active = false;
