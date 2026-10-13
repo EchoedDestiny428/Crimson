@@ -78,17 +78,19 @@ void run() {
         },
     });
 
+
     parallel({
         [] {
-            pivot::move_to(pivot::kFlippedMotorDeg + 450);
+            pivot::move_to(pivot::kScoredMotorDeg); // change it to the correct angle
             pros::delay(400);
             macros::dual_setup();
         },
         [] {
-            chassis.moveToPoint(34, -58, 1000);
+            chassis.moveToPoint(33, -59, 800);
             chassis.waitUntilDone();
         },
     });
+
 
     parallel({
         [] {
@@ -97,44 +99,42 @@ void run() {
             macros::dual_pickup_height(600); // changed the height to the correct height
         },
         [] {
-            pros::delay(300);
-            chassis.turnToPoint(43, -53, 700, {.forwards = false}); // needs tuning.
-            chassis.moveToPoint(43, -53, 1200, {.forwards = false}); // goes to alliance goal
+            chassis.turnToPoint(43.6, -52.5, 700, {.forwards = false}); // needs tuning.
+            chassis.moveToPoint(43.6, -52.5, 1200, {.forwards = false}); // goes to alliance goal
             chassis.waitUntilDone();
             pros::delay(300);
+
             chassis.turnToPoint(24, -48, 700,{.forwards=false}); // needs tuning.
             chassis.moveToPoint(24, -48, 1200, {.forwards = false}); // goes to alliance goal
             chassis.waitUntilDone();
         },
     });
 
+    chassis.setPoseFromGoal(24, -48);
     pros::delay(150);
     claw::spin(-127);
-    pros::delay(100);
-    chassis.setPoseFromGoal(24, -48);
-    pros::delay(200);
+    pros::delay(150);
+
+    pros::delay(10000);
 
     parallel({
         [] {
-            pivot::move_to(pivot::kFlippedMotorDeg + 450); // change it to the correct angle
+            pivot::move_to(pivot::kScoredMotorDeg);
             pros::delay(200);
             macros::dual_setup();
         },
         [] {
-            chassis.moveToPoint(45, -48, 550, {.forwards = true}); // needs tuning
-            chassis.turnToPoint(24,-24,500,{.forwards=false}); // needs tuning
-            chassis.moveToPoint(25, -25, 1200, {.forwards = false}); //needs tuning
+            chassis.moveToPoint(48, -48, 550);
+            chassis.turnToPoint(24, -24, 500, {.forwards = false});
+            chassis.moveToPoint(29, -29, 1000, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
 
-    // third pin pickup
     claw::spin(127);
-    pros::delay(300);
     macros::dual_pickup_height(elevator::kStage1);
     pros::delay(200);
-    chassis.turnToPoint(-24, -48, 1200, {.forwards = false}); //just needs to turn slightly first
-    pros::delay(5000);
+    chassis.turnToPoint(-24, -48, 500, {.forwards = false}); //just needs to turn slightly first
     chassis.moveToPoint(-24, -48, 1500, {.forwards = false});
     chassis.moveToPoint(-24, -48, 600, {.forwards = false, .maxSpeed = 40});
     chassis.waitUntilDone();

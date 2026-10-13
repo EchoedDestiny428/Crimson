@@ -26,7 +26,6 @@ constexpr std::array kRoutines{
 
 
     Routine{"SkillsV1", skills::v1::setup, skills::v1::run},
-    Routine{"teambad", match::teambad::setup, match::teambad::run},
     Routine{"None", nullptr, nullptr},
 };
 
