@@ -8,6 +8,12 @@ void setup();
 void run();
 
 }
+namespace match::teambad {
+
+void setup();
+void run();
+
+}
 
 namespace match::snacky {
 

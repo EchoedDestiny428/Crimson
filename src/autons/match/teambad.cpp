@@ -102,13 +102,17 @@ void run() {
             chassis.moveToPoint(43, -53, 1200, {.forwards = false}); // goes to alliance goal
             chassis.waitUntilDone();
             pros::delay(300);
+            chassis.turnToPoint(24, -48, 700,{.forwards=false}); // needs tuning.
+            chassis.moveToPoint(24, -48, 1200, {.forwards = false}); // goes to alliance goal
             chassis.waitUntilDone();
         },
     });
 
-
+    pros::delay(150);
     claw::spin(-127);
     pros::delay(100);
+    chassis.setPoseFromGoal(24, -48);
+    pros::delay(200);
 
     parallel({
         [] {
@@ -117,33 +121,23 @@ void run() {
             macros::dual_setup();
         },
         [] {
-            chassis.moveToPoint(35, -59, 550, {.forwards = true}); // needs tuning
-            chassis.turnToPoint(28, -26, 350, {.forwards = false}); //needs tuning
-            chassis.moveToPoint(28, -26, 350, {.forwards = false}); //needs tuning
+            chassis.moveToPoint(45, -48, 550, {.forwards = true}); // needs tuning
+            chassis.turnToPoint(24,-24,500,{.forwards=false}); // needs tuning
+            chassis.moveToPoint(25, -25, 1200, {.forwards = false}); //needs tuning
             chassis.waitUntilDone();
         },
     });
 
     // third pin pickup
     claw::spin(127);
-
-    parallel ({
-        [] {
-            pros::delay(700);
-            macros::dual_pickup_height(elevator::kStage1);
-            pros::delay(200);
-            claw::spin(-127);
-            pros::delay(300);
-        },
-        [] {
-            chassis.moveToPoint(30.2, -27.2, 800, {.forwards = false});
-            chassis.waitUntilDone();
-            pros::delay(300);
-            chassis.moveToPoint(-24, -51, 1200, {.forwards = false});
-            chassis.moveToPoint(-24, -51, 600, {.forwards = false, .maxSpeed = 40});
-            chassis.waitUntilDone();
-        }
-    });
+    pros::delay(300);
+    macros::dual_pickup_height(elevator::kStage1);
+    pros::delay(200);
+    chassis.turnToPoint(-24, -48, 1200, {.forwards = false}); //just needs to turn slightly first
+    pros::delay(5000);
+    chassis.moveToPoint(-24, -48, 1500, {.forwards = false});
+    chassis.moveToPoint(-24, -48, 600, {.forwards = false, .maxSpeed = 40});
+    chassis.waitUntilDone();
 
     parallel ({
         [] {
