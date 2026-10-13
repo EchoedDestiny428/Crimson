@@ -1,4 +1,5 @@
 #include "subsystems/vision.hpp"
+#include "autons/autons.hpp"
 #include "robotconfig.hpp"
 #include <cstdint>
 
@@ -18,7 +19,9 @@ void run() {
     while (true) {
         crimson_cam.update();
 
-        if (++tick % kDashboardEveryTicks == 0) {
+        if (pros::competition::is_disabled()) {
+            autons::draw_selector();
+        } else if (++tick % kDashboardEveryTicks == 0) {
             const lemlib::Pose odom = chassis.getPose();
             const auto vision = crimson_cam.estimate_global_pose(odom.theta);
             dashboard.update({odom.x, odom.y, odom.theta}, vision, crimson_cam.tag_count(),

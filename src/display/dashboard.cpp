@@ -4,6 +4,8 @@
 #include "util/angle.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstring>
 
 extern "C" const char* const _PROS_COMPILE_TIMESTAMP;
 
@@ -35,6 +37,55 @@ constexpr int kLegendBoxOffsetY = 8;
 constexpr int kGoalRadius = 5;
 constexpr int kBoxHalf = 6;
 constexpr int kHeadingLength = 14;
+constexpr int kTitleX = 15;
+constexpr int kTitleY = 6;
+constexpr int kMediumTextHalfHeight = 8;
+
+constexpr int kAutonColumns = 3;
+constexpr int kAutonMargin = 12;
+constexpr int kAutonGap = 10;
+constexpr int kAutonTop = kHeaderHeight + kAutonMargin;
+constexpr int kAutonTextPadding = 14;
+constexpr int kAutonFooterHeight = 36;
+constexpr int kAutonBottom = kScreenHeight - kAutonFooterHeight;
+constexpr int kPoseTextY = kScreenHeight - 26;
+
+struct Rect {
+    int x0;
+    int y0;
+    int x1;
+    int y1;
+};
+
+Rect auton_button(std::size_t index, std::size_t count) {
+    const int rows = static_cast<int>((count + kAutonColumns - 1) / kAutonColumns);
+    const int width = (kScreenWidth - 2 * kAutonMargin - (kAutonColumns - 1) * kAutonGap) / kAutonColumns;
+    const int height = (kAutonBottom - kAutonTop - (rows - 1) * kAutonGap) / rows;
+    const int x = kAutonMargin + static_cast<int>(index % kAutonColumns) * (width + kAutonGap);
+    const int y = kAutonTop + static_cast<int>(index / kAutonColumns) * (height + kAutonGap);
+    return {x, y, x + width, y + height};
+}
+
+void draw_header(const char* title) {
+    pros::screen::set_pen(kHeaderBackground);
+    pros::screen::fill_rect(0, 0, kScreenWidth, kHeaderHeight);
+    pros::screen::set_pen(kTextWhite);
+    pros::screen::print(pros::E_TEXT_MEDIUM, kTitleX, kTitleY, "%s", title);
+}
+
+void draw_auton_button(const Rect& rect, const char* name, bool selected) {
+    const std::uint32_t fill = selected ? kOdomColor : kFieldBackground;
+    pros::screen::set_pen(fill);
+    pros::screen::fill_rect(rect.x0, rect.y0, rect.x1, rect.y1);
+    pros::screen::set_pen(selected ? kOdomColor : kFieldLine);
+    pros::screen::draw_rect(rect.x0, rect.y0, rect.x1, rect.y1);
+
+    pros::screen::set_eraser(fill);
+    pros::screen::set_pen(selected ? kHeaderBackground : kTextWhite);
+    pros::screen::print(pros::E_TEXT_MEDIUM, rect.x0 + kAutonTextPadding,
+                        (rect.y0 + rect.y1) / 2 - kMediumTextHalfHeight, "%s", name);
+    pros::screen::set_eraser(kBackground);
+}
 
 void draw_box(int center_x, int center_y, std::uint32_t color, bool filled) {
     pros::screen::set_pen(color);
@@ -65,11 +116,7 @@ void Dashboard::initialize() {
     pros::screen::set_eraser(kBackground);
     pros::screen::erase();
 
-    pros::screen::set_pen(kHeaderBackground);
-    pros::screen::fill_rect(0, 0, kScreenWidth, kHeaderHeight);
-    pros::screen::set_pen(kTextWhite);
-    pros::screen::print(pros::E_TEXT_MEDIUM, 15, 6, "CRIMSON | POSE ESTIMATION");
-
+    draw_header("CRIMSON | POSE ESTIMATION");
     draw_field();
 }
 
@@ -79,12 +126,54 @@ void Dashboard::show_status(const char* text) {
 
 void Dashboard::update(const crimson::Pose2D& odom, const std::optional<crimson::Pose2D>& vision, int tag_count,
                        int primary_tag_id) {
+    if (showing_autons) {
+        showing_autons = false;
+        initialize();
+    }
     draw_field();
     draw_pose(odom, kOdomColor, true);
     if (vision) {
         draw_pose(*vision, kVisionColor, false);
     }
     print_stats(odom, vision, tag_count, primary_tag_id);
+}
+
+void Dashboard::show_autons(std::span<const char* const> names, std::size_t selected, const crimson::Pose2D& odom) {
+    const bool first = !showing_autons;
+    if (first) {
+        pros::screen::set_eraser(kBackground);
+        pros::screen::erase();
+        draw_header("CRIMSON | AUTON");
+    }
+    if (first || selected != shown_auton) {
+        for (std::size_t i = 0; i < names.size(); ++i) {
+            draw_auton_button(auton_button(i, names.size()), names[i], i == selected);
+        }
+    }
+
+    char pose[sizeof(shown_pose)];
+    std::snprintf(pose, sizeof(pose), "X %6.1f  Y %6.1f  H %6.1f", odom.x, odom.y, util::wrap_degrees(odom.theta));
+    if (first || std::strcmp(pose, shown_pose) != 0) {
+        const bool valid = std::isfinite(odom.x) && std::isfinite(odom.y) && std::isfinite(odom.theta);
+        pros::screen::set_pen(kBackground);
+        pros::screen::fill_rect(0, kAutonBottom + 1, kScreenWidth, kScreenHeight);
+        pros::screen::set_pen(valid ? kOdomColor : kGoalRed);
+        pros::screen::print(pros::E_TEXT_MEDIUM, kAutonMargin, kPoseTextY, "%s", pose);
+        std::strcpy(shown_pose, pose);
+    }
+
+    showing_autons = true;
+    shown_auton = selected;
+}
+
+std::optional<std::size_t> Dashboard::auton_at(int x, int y, std::size_t count) {
+    for (std::size_t i = 0; i < count; ++i) {
+        const Rect rect = auton_button(i, count);
+        if (x >= rect.x0 && x <= rect.x1 && y >= rect.y0 && y <= rect.y1) {
+            return i;
+        }
+    }
+    return std::nullopt;
 }
 
 int Dashboard::to_screen_x(double x_in) {

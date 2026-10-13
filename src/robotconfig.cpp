@@ -17,7 +17,7 @@ pros::Rotation vertical_odom(ports::kVerticalOdom);
 pros::Rotation horizontal_odom(ports::kHorizontalOdom);
 
 pros::adi::Pneumatics intake_lift(ports::kIntakeLift, false);
-pros::adi::Pneumatics pull_toggle(ports::kPullToggle, false);
+pros::adi::Pneumatics pull_toggle(ports::kPullToggle, true, true);
 
 namespace {
 

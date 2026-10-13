@@ -1,7 +1,8 @@
 #include "autons/autons.hpp"
-#include "config/controls.hpp"
+#include "pros/screen.hpp"
 #include "robotconfig.hpp"
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -40,15 +41,19 @@ constexpr std::size_t index_of(std::string_view name) {
 constexpr std::size_t kDefaultIndex = index_of(kDefaultRoutine);
 static_assert(kDefaultIndex < kRoutines.size(), "kDefaultRoutine must match a name in kRoutines");
 
+constexpr auto kNames = [] {
+    std::array<const char*, kRoutines.size()> names{};
+    for (std::size_t i = 0; i < kRoutines.size(); ++i) {
+        names[i] = kRoutines[i].name;
+    }
+    return names;
+}();
+
 constexpr std::uint32_t kPollMs = 20;
 
-std::size_t selected = kDefaultIndex;
+std::atomic<std::size_t> selected{kDefaultIndex};
 bool prepared = false;
 bool auton_ran = false;
-
-void show_selected() {
-    controller.print(2, 0, "Auton: %-8s", kRoutines[selected].name);
-}
 
 void prepare() {
     if (kRoutines[selected].setup != nullptr) {
@@ -59,27 +64,33 @@ void prepare() {
 
 void change_selection(std::size_t index) {
     selected = index;
-    show_selected();
     prepare();
 }
 
 }
 
 void select() {
-    show_selected();
     if (!prepared && !auton_ran) {
         prepare();
     }
 
+    std::int32_t presses = pros::screen::touch_status().press_count;
     while (pros::competition::is_disabled()) {
-        if (controller.get_digital_new_press(controls::kAutonNext)) {
-            change_selection((selected + 1) % kRoutines.size());
-        }
-        if (controller.get_digital_new_press(controls::kAutonPrevious)) {
-            change_selection((selected + kRoutines.size() - 1) % kRoutines.size());
+        const auto touch = pros::screen::touch_status();
+        if (touch.press_count != presses) {
+            presses = touch.press_count;
+            const auto tapped = display::Dashboard::auton_at(touch.x, touch.y, kRoutines.size());
+            if (tapped && *tapped != selected) {
+                change_selection(*tapped);
+            }
         }
         pros::delay(kPollMs);
     }
+}
+
+void draw_selector() {
+    const lemlib::Pose pose = chassis.getPose();
+    dashboard.show_autons(kNames, selected, {pose.x, pose.y, pose.theta});
 }
 
 void run_selected() {

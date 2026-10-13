@@ -11,7 +11,6 @@
 #include "subsystems/vision.hpp"
 #include "util/driver_task.hpp"
 #include "util/system_check.hpp"
-#include "util/motor_utils.hpp"
 #include <cmath>
 
 using namespace subsystems;
@@ -180,30 +179,33 @@ void disabled() {
     autons::select();
 }
 
-void competition_initialize() {}
+void competition_initialize() {
+    autons::select();
+}
 
 void autonomous() {
     autons::run_selected();
 }
 
 void opcontrol() {
+    if (!pros::competition::is_connected()) {
+        autons::run_selected();
+    }
+
     macros::cancel();
     chassis.cancelAllMotions();
-    // claw::automatic();
-    // util::start_driver_task("System check", util::system_check::update, util::system_check::stop);
-    // util::start_driver_task("Intake", intake::update, intake::stop);
-    // util::start_driver_task("Claw", claw::update, claw::automatic);
-    // util::start_driver_task("Pivot", pivot::update, pivot::stop);
-    // util::start_driver_task("Macros", macros::update, macros::stop);
-    // util::start_driver_task("HUD", display::controller_hud::update);
-    
-    // drive::reset();
+    claw::automatic();
+    util::start_driver_task("System check", util::system_check::update, util::system_check::stop);
+    util::start_driver_task("Intake", intake::update, intake::stop);
+    util::start_driver_task("Claw", claw::update, claw::automatic);
+    util::start_driver_task("Pivot", pivot::update, pivot::stop);
+    util::start_driver_task("Macros", macros::update, macros::stop);
+    util::start_driver_task("HUD", display::controller_hud::update);
+
+    drive::reset();
     std::uint32_t now = pros::millis();
-    // skills::v1::run();
-    autons::run_selected();
     while (true) {
         drive::update();
-        // util::two_button(elevator_motors, controls::kElevatorUp, controls::kElevatorDown);
         pros::Task::delay_until(&now, util::kLoopMs);
     }
 }
