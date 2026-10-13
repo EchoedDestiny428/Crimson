@@ -24,6 +24,10 @@ SIM_MAX_SPEED_IN_S = 48.0
 SIM_STEP_S = 0.02
 SIM_POSITION_TOLERANCE_IN = 0.75
 SIM_HEADING_TOLERANCE_DEG = 2.0
+SIM_LINEAR_ACCEL_IN_S2 = 120.0
+SIM_ANGULAR_ACCEL_DEG_S2 = 720.0
+SIM_LATERAL_SLIP = 0.16
+SIM_MOMENTUM_DAMPING = 0.985
 MOVE_RE = re.compile(
     rf"\b(?:chassis\.)?moveToPoint\s*\(\s*({NUMBER})\s*,\s*({NUMBER})",
     re.IGNORECASE,
@@ -71,6 +75,14 @@ class SimulationCommand:
     args: tuple[float, ...]
     forwards: bool = True
     early_exit: float | None = None
+
+
+@dataclass
+class SimulationState:
+    pose: Pose
+    velocity_x: float = 0.0
+    velocity_y: float = 0.0
+    angular_velocity: float = 0.0
 
 
 def strip_comments(text: str) -> str:
@@ -157,51 +169,82 @@ def bearing_degrees(start: Pose, target: Pose) -> float:
     return math.degrees(math.atan2(target.x - start.x, target.y - start.y))
 
 
+def approach(current: float, target: float, maximum_delta: float) -> float:
+    if current < target:
+        return min(current + maximum_delta, target)
+    return max(current - maximum_delta, target)
+
+
 def simulate_segment(
-    pose: Pose,
+    state: SimulationState,
     target: Pose,
     forwards: bool,
     rotate_only: bool = False,
     early_exit: float | None = None,
+    lookahead: tuple[Pose, bool] | None = None,
 ) -> list[Pose]:
-    """Simulate a bounded differential drive moving toward one target."""
-    if pose.theta is None:
-        pose = Pose(pose.x, pose.y, 0.0)
-    result = [pose]
-    current = pose
+    """Simulate one command while retaining drivetrain velocity between commands."""
+    if state.pose.theta is None:
+        state.pose = Pose(state.pose.x, state.pose.y, 0.0)
+    result = [state.pose]
     for _ in range(5000):
+        current = state.pose
         distance = math.hypot(target.x - current.x, target.y - current.y)
         desired = target.theta if rotate_only and target.theta is not None else bearing_degrees(current, target)
         if not rotate_only and not forwards:
             desired = wrap_degrees(desired + 180.0)
         heading_error = wrap_degrees(desired - (current.theta or 0.0))
+        lookahead_weight = 0.0
+        if lookahead is not None and early_exit is not None:
+            blend_distance = max(8.0, early_exit + 6.0)
+            lookahead_weight = max(0.0, min(1.0, 1.0 - distance / blend_distance))
+            if lookahead_weight > 0.0:
+                next_desired = bearing_degrees(current, lookahead[0])
+                if not lookahead[1]:
+                    next_desired = wrap_degrees(next_desired + 180.0)
+                desired = wrap_degrees(
+                    desired * (1.0 - lookahead_weight) + next_desired * lookahead_weight
+                )
+                heading_error = wrap_degrees(desired - (current.theta or 0.0))
         if rotate_only:
-            linear = 0.0
+            desired_linear = 0.0
         else:
-            linear = min(SIM_MAX_SPEED_IN_S, distance * 3.0)
+            speed_distance = distance
+            if lookahead_weight > 0.0:
+                speed_distance = max(speed_distance, SIM_MAX_SPEED_IN_S / 3.0)
+            desired_linear = min(SIM_MAX_SPEED_IN_S, speed_distance * 3.0)
             if not forwards:
-                linear = -linear
-            linear *= max(0.15, math.cos(math.radians(heading_error)))
-        angular = max(-180.0, min(180.0, heading_error * 5.0))
+                desired_linear = -desired_linear
+            desired_linear *= max(0.15, math.cos(math.radians(heading_error)))
+        desired_angular = max(-180.0, min(180.0, heading_error * 5.0))
         if rotate_only:
-            angular = max(-180.0, min(180.0, heading_error * 6.0))
-        left_speed = linear - math.radians(angular) * TRACK_WIDTH_IN / 2.0
-        right_speed = linear + math.radians(angular) * TRACK_WIDTH_IN / 2.0
-        wheel_limit = max(abs(left_speed), abs(right_speed), 1.0)
-        if wheel_limit > SIM_MAX_SPEED_IN_S:
-            left_speed *= SIM_MAX_SPEED_IN_S / wheel_limit
-            right_speed *= SIM_MAX_SPEED_IN_S / wheel_limit
-        center_speed = (left_speed + right_speed) / 2.0
-        angular_speed = (right_speed - left_speed) / TRACK_WIDTH_IN
+            desired_angular = max(-180.0, min(180.0, heading_error * 6.0))
         theta = math.radians(current.theta or 0.0)
-        next_theta = wrap_degrees((current.theta or 0.0) + math.degrees(angular_speed * SIM_STEP_S))
-        next_pose = Pose(
-            current.x + center_speed * math.sin(theta) * SIM_STEP_S,
-            current.y + center_speed * math.cos(theta) * SIM_STEP_S,
-            next_theta,
+        forward_x, forward_y = math.sin(theta), math.cos(theta)
+        right_x, right_y = math.cos(theta), -math.sin(theta)
+        desired_vx = desired_linear * forward_x
+        desired_vy = desired_linear * forward_y
+        slip = abs(desired_linear) * math.radians(desired_angular) * SIM_LATERAL_SLIP
+        desired_vx += slip * right_x
+        desired_vy += slip * right_y
+        state.velocity_x = approach(
+            state.velocity_x, desired_vx, SIM_LINEAR_ACCEL_IN_S2 * SIM_STEP_S
         )
-        result.append(next_pose)
-        current = next_pose
+        state.velocity_y = approach(
+            state.velocity_y, desired_vy, SIM_LINEAR_ACCEL_IN_S2 * SIM_STEP_S
+        )
+        state.angular_velocity = approach(
+            state.angular_velocity, desired_angular, SIM_ANGULAR_ACCEL_DEG_S2 * SIM_STEP_S
+        )
+        state.velocity_x *= SIM_MOMENTUM_DAMPING
+        state.velocity_y *= SIM_MOMENTUM_DAMPING
+        state.angular_velocity *= SIM_MOMENTUM_DAMPING
+        state.pose = Pose(
+            current.x + state.velocity_x * SIM_STEP_S,
+            current.y + state.velocity_y * SIM_STEP_S,
+            wrap_degrees((current.theta or 0.0) + state.angular_velocity * SIM_STEP_S),
+        )
+        result.append(state.pose)
         position_exit = SIM_POSITION_TOLERANCE_IN if early_exit is None else max(0.0, early_exit)
         heading_exit = SIM_HEADING_TOLERANCE_DEG if early_exit is None else max(0.0, early_exit)
         if (distance <= position_exit and not rotate_only) or (
@@ -213,61 +256,68 @@ def simulate_segment(
 
 def simulate_commands(commands: list[SimulationCommand]) -> list[Pose]:
     """Run a lightweight drivetrain simulation from the parsed commands."""
-    current = Pose(0.0, 0.0, 0.0)
-    result: list[Pose] = [current]
+    state = SimulationState(Pose(0.0, 0.0, 0.0))
+    result: list[Pose] = [state.pose]
     for command in commands:
         if command.kind == "setPose":
-            current = Pose(*command.args)
-            result.append(current)
+            # Resetting odometry changes coordinates, not the robot's physical momentum.
+            state.pose = Pose(*command.args)
+            result.append(state.pose)
         elif command.kind == "move":
             target = Pose(command.args[0], command.args[1])
-            segment = simulate_segment(current, target, command.forwards, early_exit=command.early_exit)
+            segment = simulate_segment(state, target, command.forwards, early_exit=command.early_exit)
             result.extend(segment[1:])
-            current = segment[-1]
         elif command.kind == "set_goal":
-            heading = math.radians(current.theta or 0.0)
+            heading = math.radians(state.pose.theta or 0.0)
             candidate = Pose(
                 command.args[0] + 7.0 * math.sin(heading),
                 command.args[1] + 7.0 * math.cos(heading),
-                current.theta,
+                state.pose.theta,
             )
-            if math.hypot(candidate.x - current.x, candidate.y - current.y) <= 10.0:
-                current = candidate
-                result.append(current)
+            if math.hypot(candidate.x - state.pose.x, candidate.y - state.pose.y) <= 10.0:
+                state.pose = candidate
+                result.append(state.pose)
         elif command.kind == "turn_point":
             target = Pose(command.args[0], command.args[1])
-            target_heading = bearing_degrees(current, target)
+            target_heading = bearing_degrees(state.pose, target)
             if not command.forwards:
                 target_heading = wrap_degrees(target_heading + 180.0)
             segment = simulate_segment(
-                current, Pose(current.x, current.y, target_heading), True, True, command.early_exit
+                state, Pose(state.pose.x, state.pose.y, target_heading), True, True, command.early_exit
             )
             result.extend(segment[1:])
-            current = segment[-1]
         elif command.kind == "turn_heading":
             segment = simulate_segment(
-                current, Pose(current.x, current.y, command.args[0]), True, True, command.early_exit
+                state, Pose(state.pose.x, state.pose.y, command.args[0]), True, True, command.early_exit
             )
             result.extend(segment[1:])
-            current = segment[-1]
         elif command.kind == "curve":
             final_x, final_y, exit_angle, entry_angle, exit_length, entry_length = command.args
             direction = 1.0 if command.forwards else -1.0
             exit_radians = math.radians(exit_angle)
             entry_radians = math.radians(entry_angle)
             first = Pose(
-                current.x + direction * math.sin(exit_radians) * (exit_length + 2.0),
-                current.y + direction * math.cos(exit_radians) * (exit_length + 2.0),
+                state.pose.x + direction * math.sin(exit_radians) * (exit_length + 2.0),
+                state.pose.y + direction * math.cos(exit_radians) * (exit_length + 2.0),
             )
             second = Pose(
                 final_x - direction * math.sin(entry_radians) * entry_length,
                 final_y - direction * math.cos(entry_radians) * entry_length,
             )
-            for target in (first, second, Pose(final_x, final_y)):
+            curve_targets = (first, second, Pose(final_x, final_y))
+            for index, target in enumerate(curve_targets):
                 curve_exit = 2.0 if target is first else 6.0 if target is second else None
-                segment = simulate_segment(current, target, command.forwards, early_exit=curve_exit)
+                lookahead = None
+                if index + 1 < len(curve_targets):
+                    lookahead = (curve_targets[index + 1], command.forwards)
+                segment = simulate_segment(
+                    state,
+                    target,
+                    command.forwards,
+                    early_exit=curve_exit,
+                    lookahead=lookahead,
+                )
                 result.extend(segment[1:])
-                current = segment[-1]
     return result
 
 
