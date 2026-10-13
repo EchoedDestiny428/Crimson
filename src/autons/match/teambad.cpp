@@ -31,7 +31,7 @@ void run() {
     });
 
     // at this point the bot should be at 24, -54 ish
-    chassis.setPose(24, -54, 180);
+    chassis.setPoseFromGoal(24, -48);
 
     parallel({
         [] {
