@@ -22,7 +22,7 @@ inline constexpr std::int8_t kClaw = 4;
 inline constexpr std::int8_t kVerticalOdom = 17;
 inline constexpr std::int8_t kHorizontalOdom = 16;
 
-inline constexpr char kIntakeLift = 'A';
-inline constexpr char kPullToggle = 'B';
+inline constexpr char kIntakeLift = 'B';
+inline constexpr char kPullToggle = 'A';
 
 }

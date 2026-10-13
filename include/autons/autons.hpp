@@ -22,6 +22,12 @@ void run();
 
 }
 
+namespace match::teambad {
+void setup();
+void run();
+
+}
+
 namespace skills::v1 {
 
 void setup();
