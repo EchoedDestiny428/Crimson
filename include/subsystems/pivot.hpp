@@ -8,7 +8,7 @@ inline constexpr double kHomeMotorDeg = 0.0;
 inline constexpr double kFlippedMotorDeg = 910.0;
 inline constexpr double kTopMotorDeg = 1100.0;
 inline constexpr double kDualSetupDeg = 1500.0;
-inline constexpr double kDualPickupDeg = 600.0;
+inline constexpr double kDualPickupDeg = 650.0;
 inline constexpr double kScoredMotorDeg = kFlippedMotorDeg + 350.0;
 
 void init();
