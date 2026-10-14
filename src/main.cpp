@@ -50,10 +50,6 @@ void autonomous() {
 }
 
 void opcontrol() {
-    if (!pros::competition::is_connected()) {
-        autons::run_selected();
-    }
-
     macros::cancel();
     chassis.cancelAllMotions();
     claw::automatic();

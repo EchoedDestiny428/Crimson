@@ -43,12 +43,6 @@ void reset() {
 }
 
 void update() {
-    if (correcting_forward_tip()) {
-        slewed_throttle = kAntiTipPower;
-        chassis.arcade(kAntiTipPower, 0, true);
-        return;
-    }
-
     const int throttle = controller.get_analog(controls::kThrottle);
     const int turn = controller.get_analog(controls::kTurn);
     slewed_throttle = lemlib::slew(throttle, slewed_throttle, kThrottleSlew);
