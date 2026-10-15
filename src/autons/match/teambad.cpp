@@ -122,8 +122,8 @@ void run() {
         },
         [] {
             chassis.moveToPoint(48, -48, 800);
-            chassis.turnToPoint(29, -24, 500, {.forwards = false});
-            chassis.moveToPoint(29, -24, 800, {.forwards = false});
+            chassis.turnToPoint(29.5, -24, 500, {.forwards = false});
+            chassis.moveToPoint(29.5, -24, 800, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
