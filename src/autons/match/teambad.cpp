@@ -99,7 +99,7 @@ void run() {
         [] {
             claw::spin(127);
             pros::delay(500);
-            macros::dual_pickup_height(elevator::kStage1 + 70); // changed the height to the correct height
+            macros::dual_pickup_height(elevator::kStage1); // changed the height to the correct height
         },
         [] {
             chassis.moveToPoint(44.0, -51.125, 1000, {.forwards = false});
@@ -122,8 +122,8 @@ void run() {
         },
         [] {
             chassis.moveToPoint(48, -48, 800);
-            chassis.turnToPoint(29.5, -24, 500, {.forwards = false});
-            chassis.moveToPoint(29.5, -24, 800, {.forwards = false});
+            chassis.turnToPoint(29, -24, 500, {.forwards = false});
+            chassis.moveToPoint(29, -24, 800, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
