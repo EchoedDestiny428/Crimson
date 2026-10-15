@@ -5,6 +5,7 @@
 #include "util/system_check.hpp"
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 
 namespace macros {
@@ -19,9 +20,19 @@ enum class Mode { Stowed, Deployed };
 constexpr int kManualPower = 127;
 constexpr double kTopArrivalTolerance = 50.0;
 
-constexpr std::uint32_t kElevatorTimeoutMs = 1000;
-constexpr std::uint32_t kPivotTimeoutMs = 600;
-constexpr std::uint32_t kDualPivotEndTimeoutMs = 500;
+// Waits scale with the distance left to travel: a base for accelerating and
+// settling, plus the travel time at the commanded speed with some margin,
+// capped at the old fixed timeouts so long moves behave as before.
+// Elevator: SmartMotor move_absolute at 600 rpm = 3.6 motor deg/ms.
+constexpr double kElevatorDegPerMs = 3.6;
+constexpr std::uint32_t kElevatorBaseMs = 150;
+constexpr std::uint32_t kElevatorMaxTimeoutMs = 1000;
+// Pivot: move_absolute at 200 rpm = 1.2 motor deg/ms.
+constexpr double kPivotDegPerMs = 1.2;
+constexpr std::uint32_t kPivotBaseMs = 100;
+constexpr std::uint32_t kPivotMaxTimeoutMs = 600;
+constexpr std::uint32_t kDualPivotEndMaxTimeoutMs = 500;
+constexpr double kTimeoutMargin = 1.5;
 constexpr std::uint32_t kDualPickupDwellMs = 250;
 constexpr std::uint32_t kPollMs = 10;
 
@@ -56,6 +67,23 @@ private:
     std::uint32_t generation_;
 };
 
+std::uint32_t scaled_timeout(double distance, double deg_per_ms, std::uint32_t base_ms, std::uint32_t max_ms) {
+    if (!std::isfinite(distance)) {
+        return max_ms;
+    }
+    const double travel_ms = std::fabs(distance) / deg_per_ms * kTimeoutMargin;
+    return std::min(max_ms, base_ms + static_cast<std::uint32_t>(travel_ms));
+}
+
+std::uint32_t elevator_timeout() {
+    return scaled_timeout(elevator::target() - elevator::height(), kElevatorDegPerMs, kElevatorBaseMs,
+                          kElevatorMaxTimeoutMs);
+}
+
+std::uint32_t pivot_timeout(std::uint32_t max_ms = kPivotMaxTimeoutMs) {
+    return scaled_timeout(pivot::target() - pivot::get_pos(), kPivotDegPerMs, kPivotBaseMs, max_ms);
+}
+
 void tilt_if_at_top() {
     if (!tilted && elevator::height() >= elevator::top_stage() - kTopArrivalTolerance) {
         tilted = true;
@@ -86,13 +114,13 @@ void start_home() {
 }
 
 void finish_motion(const Run& run, bool auto_tilt = true) {
-    if (!run.wait_for(elevator::is_settled, kElevatorTimeoutMs)) {
+    if (!run.wait_for(elevator::is_settled, elevator_timeout())) {
         return;
     }
     if (auto_tilt && mode == Mode::Deployed) {
         tilt_if_at_top();
     }
-    run.wait_for(pivot::is_settled, kPivotTimeoutMs);
+    run.wait_for(pivot::is_settled, pivot_timeout());
 }
 
 }
@@ -132,26 +160,26 @@ void dual_setup() {
     mode = Mode::Deployed;
     tilted = false;
     elevator::set_target_below_home(elevator::kDualSetup);
-    if (!run.wait_for(elevator::is_settled, kElevatorTimeoutMs)) {
+    if (!run.wait_for(elevator::is_settled, elevator_timeout())) {
         return;
     }
     pivot::move_to(pivot::kDualSetupDeg);
-    run.wait_for(pivot::is_settled, kPivotTimeoutMs);
+    run.wait_for(pivot::is_settled, pivot_timeout());
 }
 
 void dual_pickup() {
     const Run run;
     pivot::move_to(pivot::kDualPickupDeg);
-    if (run.wait_for(pivot::is_settled, kPivotTimeoutMs) && run.pause(kDualPickupDwellMs)) {
+    if (run.wait_for(pivot::is_settled, pivot_timeout()) && run.pause(kDualPickupDwellMs)) {
         pivot::move_to(pivot::kFlippedMotorDeg);
-        run.wait_for(pivot::is_settled, kDualPivotEndTimeoutMs);
+        run.wait_for(pivot::is_settled, pivot_timeout(kDualPivotEndMaxTimeoutMs));
     }
 }
 
 void dual_pickup_height(double height) {
     const Run run;
     pivot::move_to(pivot::kDualPickupDeg);
-    if (run.wait_for(pivot::is_settled, kPivotTimeoutMs) && run.pause(kDualPickupDwellMs)) {
+    if (run.wait_for(pivot::is_settled, pivot_timeout()) && run.pause(kDualPickupDwellMs)) {
         start_flip_out(height, pivot::kFlippedMotorDeg);
         finish_motion(run);
     }

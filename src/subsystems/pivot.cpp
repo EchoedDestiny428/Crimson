@@ -71,4 +71,8 @@ double get_pos() {
     return pivot_motor.get_position();
 }
 
+double target() {
+    return pivot_motor.get_target_position();
+}
+
 }
