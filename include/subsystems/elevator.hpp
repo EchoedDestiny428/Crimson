@@ -7,7 +7,7 @@ namespace subsystems::elevator {
 inline constexpr double kBootup = 0.0;
 inline constexpr double kFlipOutMin = 10.0;
 inline constexpr double kHome = 150.0;
-inline constexpr double kDualSetup = 20.0;
+inline constexpr double kDualSetup = 10.0;
 inline constexpr double kOffset = 140.0;
 inline constexpr double kFlipOut = 100.0;
 inline constexpr double kStage1 = 650.0;

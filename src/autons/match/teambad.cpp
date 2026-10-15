@@ -130,7 +130,7 @@ void run() {
 
     parallel ({
         [] {
-            macros::dual_pickup_height(elevator::kStage2-50); // changed the height to the correct height
+            macros::dual_pickup_height(elevator::kStage1+elevator::kOffset+50); // changed the height to the correct height
         },
         [] {
             pros::delay(400);
