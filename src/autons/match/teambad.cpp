@@ -10,9 +10,8 @@ void setup() {
 void run() {
     chassis.setPose(7.8, -63.4, 180);
     pull_toggle.extend();
-    chassis.tank(45, 45, true);
-    pros::delay(300);
-    chassis.tank(0, 0);
+    chassis.tank(127, 127, true);
+    pros::delay(150);
 
     parallel({
         [] { macros::flip_out(10, 900); },
@@ -158,6 +157,114 @@ void run() {
         [] {
             pros::delay(400);
             chassis.moveToPoint(0, -36, 400, {.minSpeed = 127});
+        },
+    });
+}
+
+}
+
+namespace autons::match::teambad_cw {
+
+void setup() {
+    pull_toggle.retract();
+}
+
+// X mirrored from TeamBad. First two scores are the bottom red goal. Last score is the neutral at (24, -48).
+void run() {
+    chassis.setPose(-7.8, -63.4, 180);
+    pull_toggle.extend();
+    chassis.tank(45, 45, true);
+    pros::delay(300);
+    chassis.tank(0, 0);
+
+    parallel({
+        [] { macros::flip_out(10, 900); },
+        [] {
+            chassis.moveToPoint(-7.8, -62.0, 500, {.forwards = false, .minSpeed = 127});
+            chassis.turnToPoint(-25, -47, 400, {.forwards = false});
+            chassis.moveToPoint(-25, -47, 400, {.forwards = false, .minSpeed = 60});
+            chassis.moveToPoint(-25, -47, 350, {.forwards = false, .maxSpeed = 50});
+            chassis.waitUntilDone();
+        },
+    });
+
+    chassis.setPoseFromGoal(-24, -48, {.maxCorrection = 1000});
+
+    claw::spin(-127);
+    pros::delay(600);
+
+    chassis.donut(225, 2000, {.forwards = false, .fastSpeed = 127, .slowSpeed = 30});
+    chassis.waitUntilDone();
+    chassis.setPoseFromGoal(-24, -48, {.maxCorrection = 1000});
+
+    parallel({
+        [] {
+            macros::dual_setup();
+        },
+        [] {
+            chassis.moveToPoint(-33, -59, 700);
+            chassis.turnToPoint(-42.0, -52, 600, {.forwards = false});
+            chassis.waitUntilDone();
+        },
+    });
+
+    parallel({
+        [] {
+            claw::spin(127);
+            pros::delay(500);
+            macros::dual_pickup_height(elevator::kStage1);
+        },
+        [] {
+            chassis.moveToPoint(-42.0, -52, 1200, {.forwards = false});
+            chassis.turnToPoint(-24, -48, 900, {.forwards = false});
+            chassis.moveToPoint(-24, -48, 1200, {.forwards = false, .maxSpeed = 50});
+            chassis.waitUntilDone();
+        },
+    });
+
+    chassis.setPoseFromGoal(-24, -48, {.maxCorrection = 1000});
+    claw::spin(-127);
+    pros::delay(200);
+
+    parallel({
+        [] {
+            macros::dual_setup();
+            claw::spin(127);
+        },
+        [] {
+            chassis.moveToPoint(-48, -48, 800);
+            chassis.turnToPoint(-26, -26.5, 500, {.forwards = false});
+            chassis.moveToPoint(-26, -26.5, 800, {.forwards = false,.maxSpeed = 80});
+            chassis.waitUntilDone();
+        },
+    });
+
+    parallel({
+        [] {
+            macros::dual_pickup_height(elevator::kStage1 + elevator::kOffset + 70);
+        },
+        [] {
+            pros::delay(400);
+            chassis.turnToPoint(24, -48, 600, {.forwards = false});
+            chassis.moveToPoint(24, -48, 1200, {.forwards = false, .minSpeed = 127});
+            chassis.moveToPoint(24, -48, 1000, {.forwards = false, .maxSpeed = 40});
+            chassis.waitUntilDone();
+            claw::spin(-127);
+        },
+    });
+
+    pros::delay(200);
+
+    parallel({
+        [] {
+            pivot::move_to(pivot::kFlippedMotorDeg + 550);
+            pros::delay(800);
+            macros::home();
+            claw::stop();
+        },
+        [] {
+            pros::delay(400);
+            chassis.moveToPoint(0, -36, 400, {.minSpeed = 90});
         },
     });
 }

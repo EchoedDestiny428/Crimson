@@ -15,7 +15,7 @@ void run();
 
 }
 
-namespace match::teambad_left {
+namespace match::teambad_cw {
 
 void setup();
 void run();
@@ -24,12 +24,6 @@ void run();
 
 namespace match::snacky {
 
-void setup();
-void run();
-
-}
-
-namespace match::teambad {
 void setup();
 void run();
 
