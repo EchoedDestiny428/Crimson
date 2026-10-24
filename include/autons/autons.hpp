@@ -15,6 +15,13 @@ void run();
 
 }
 
+namespace match::teambad_left {
+
+void setup();
+void run();
+
+}
+
 namespace match::snacky {
 
 void setup();

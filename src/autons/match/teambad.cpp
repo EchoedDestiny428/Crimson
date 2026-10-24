@@ -10,7 +10,7 @@ void setup() {
 void run() {
     chassis.setPose(7.8, -63.4, 180);
     pull_toggle.extend();
-    chassis.tank(40, 40, true);
+    chassis.tank(45, 45, true);
     pros::delay(300);
     chassis.tank(0, 0);
 
@@ -28,7 +28,7 @@ void run() {
     chassis.setPoseFromGoal(24, -48, {.maxCorrection = 1000}); // always reset, even when odom drifted far
 
     claw::spin(-127);
-    pros::delay(500);
+    pros::delay(600);
 
     // parallel({
     //     [] {
@@ -106,9 +106,9 @@ void run() {
             macros::dual_pickup_height(elevator::kStage1); // changed the height to the correct height
         },
         [] {
-            chassis.moveToPoint(44.0, -51.125, 1000, {.forwards = false});
+            chassis.moveToPoint(44.0, -51.125, 1200, {.forwards = false});
             chassis.turnToPoint(24, -46, 800, {.forwards = false}); // needs tuning.
-            chassis.moveToPoint(24, -46, 1000, {.forwards = false, .maxSpeed = 70});
+            chassis.moveToPoint(24, -46, 1200, {.forwards = false, .maxSpeed = 50});
             chassis.waitUntilDone();
         },
     });
@@ -126,21 +126,21 @@ void run() {
         },
         [] {
             chassis.moveToPoint(48, -48, 800);
-            chassis.turnToPoint(29.5, -24, 500, {.forwards = false});
-            chassis.moveToPoint(29.5, -24, 800, {.forwards = false});
+            chassis.turnToPoint(28.5, -26.5, 500, {.forwards = false});
+            chassis.moveToPoint(28.5, -26.5, 800, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
 
     parallel ({
         [] {
-            macros::dual_pickup_height(elevator::kStage1+elevator::kOffset+50); // changed the height to the correct height
+            macros::dual_pickup_height(elevator::kStage1+elevator::kOffset+70); // changed the height to the correct height
         },
         [] {
             pros::delay(400);
-            chassis.turnToPoint(-24, -44, 600, {.forwards = false}); //just needs to turn slightly first
-            chassis.moveToPoint(-24, -44, 1000, {.forwards = false, .minSpeed = 127});        
-            chassis.moveToPoint(-24, -44, 500, {.forwards = false, .maxSpeed = 40});
+            chassis.turnToPoint(-24, -46, 600, {.forwards = false}); //just needs to turn slightly first
+            chassis.moveToPoint(-24, -46, 1200, {.forwards = false, .minSpeed = 127});        
+            chassis.moveToPoint(-24, -46, 1000, {.forwards = false, .maxSpeed = 40});
             chassis.waitUntilDone();
             claw::spin(-127);
         },
@@ -150,8 +150,8 @@ void run() {
 
     parallel ({
         [] {
-            pivot::move_to(pivot::kFlippedMotorDeg + 450);
-            pros::delay(400);
+            pivot::move_to(pivot::kFlippedMotorDeg + 500);
+            pros::delay(800);
             macros::home();
             claw::stop();
         },
