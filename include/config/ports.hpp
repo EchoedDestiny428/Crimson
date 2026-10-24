@@ -19,7 +19,6 @@ inline constexpr std::int8_t kElevatorB = 8;
 inline constexpr std::int8_t kPivot = 7;
 inline constexpr std::int8_t kClaw = 4;
 
-inline constexpr std::int8_t kVerticalOdom = 17;
 inline constexpr std::int8_t kHorizontalOdom = 16;
 
 inline constexpr char kIntakeLift = 'B';

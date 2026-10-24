@@ -80,6 +80,8 @@ void run() {
     // });
     
     chassis.donut(135, 2000, {.forwards = false, .fastSpeed = 127, .slowSpeed = 30});
+    chassis.waitUntilDone();
+    chassis.setPoseFromGoal(24, -48, {.maxCorrection = 1000}); // always reset, even when odom drifted far
 
     parallel({
         [] {
