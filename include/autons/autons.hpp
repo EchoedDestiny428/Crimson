@@ -22,14 +22,14 @@ void run();
 
 }
 
-namespace match::safe {
+namespace match::zwe_bad_4253 {
 
 void setup();
 void run();
 
 }
 
-namespace match::safe_cw {
+namespace match::zwe_bad_4253_cw {
 
 void setup();
 void run();

@@ -24,8 +24,8 @@ constexpr std::array kRoutines{
     Routine{"Snacky", match::snacky::setup, match::snacky::run},
     Routine{"TeamBad", match::teambad::setup, match::teambad::run},
     Routine{"TeamBadCW", match::teambad_cw::setup, match::teambad_cw::run},
-    Routine{"Safe", match::safe::setup, match::safe::run},
-    Routine{"SafeCW", match::safe_cw::setup, match::safe_cw::run},
+    Routine{"4253ZweBad", match::zwe_bad_4253::setup, match::zwe_bad_4253::run},
+    Routine{"4253ZweBadCW", match::zwe_bad_4253_cw::setup, match::zwe_bad_4253_cw::run},
 
     Routine{"SkillsV1", skills::v1::setup, skills::v1::run},
     Routine{"None", nullptr, nullptr},
