@@ -10,7 +10,9 @@ void setup() {
 void run() {
     chassis.setPose(7.8, -63.4, 180);
     pull_toggle.extend();
-    pros::delay(250);
+    chassis.tank(40, 40, true);
+    pros::delay(300);
+    chassis.tank(0, 0);
 
     parallel({
         [] { macros::flip_out(10, 900); },
@@ -23,7 +25,7 @@ void run() {
         },
     });
 
-    chassis.setPoseFromGoal(24, -48);
+    chassis.setPoseFromGoal(24, -48, {.maxCorrection = 1000}); // always reset, even when odom drifted far
 
     claw::spin(-127);
     pros::delay(500);
@@ -111,7 +113,7 @@ void run() {
         },
     });
 
-    chassis.setPoseFromGoal(24, -48);
+    chassis.setPoseFromGoal(24, -48, {.maxCorrection = 1000}); // always reset, even when odom drifted far
     claw::spin(-127);
     pros::delay(200);
 

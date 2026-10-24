@@ -25,7 +25,7 @@ constexpr float kDriveRpm = 360.0f;
 constexpr float kHorizontalDrift = 2.0f;
 
 constexpr float kTrackingWheelDiameterIn = 2.0f;
-constexpr float kHorizontalWheelOffsetIn = -0.7f; // FIX OFFSET: MOST ISSUES ARE PROBABLY FROM NOT FIXING OFFSET
+constexpr float kHorizontalWheelOffsetIn = -1.2f; // FIX OFFSET: MOST ISSUES ARE PROBABLY FROM NOT FIXING OFFSET
 
 lemlib::Drivetrain drivetrain(&left_motors, &right_motors, kTrackWidthIn, lemlib::Omniwheel::NEW_325, kDriveRpm,
                               kHorizontalDrift);
