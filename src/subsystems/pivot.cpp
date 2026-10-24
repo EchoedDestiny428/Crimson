@@ -9,7 +9,7 @@ namespace subsystems::pivot {
 namespace {
 
 constexpr int kManualPower = 127;
-constexpr int kMoveVelocity = 100;
+constexpr int kMoveVelocity = 200;
 constexpr double kSettleMotorDeg = 30.0;
 constexpr std::uint32_t kWaitPollMs = 10;
 
