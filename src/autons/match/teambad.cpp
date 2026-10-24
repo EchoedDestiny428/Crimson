@@ -138,8 +138,8 @@ void run() {
         [] {
             pros::delay(400);
             chassis.turnToPoint(-24, -46, 600, {.forwards = false}); //just needs to turn slightly first
-            chassis.moveToPoint(-24, -46, 1200, {.forwards = false, .minSpeed = 127});        
-            chassis.moveToPoint(-24, -46, 1000, {.forwards = false, .maxSpeed = 40});
+            chassis.moveToPoint(-24, -46, 1000, {.forwards = false, .minSpeed = 127});        
+            chassis.moveToPoint(-24, -46, 1000, {.forwards = false, .maxSpeed = 50});
             chassis.waitUntilDone();
             claw::spin(-127);
         },

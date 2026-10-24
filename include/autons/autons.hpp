@@ -22,6 +22,20 @@ void run();
 
 }
 
+namespace match::safe {
+
+void setup();
+void run();
+
+}
+
+namespace match::safe_cw {
+
+void setup();
+void run();
+
+}
+
 namespace match::snacky {
 
 void setup();
