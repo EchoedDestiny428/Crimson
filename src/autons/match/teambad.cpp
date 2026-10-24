@@ -23,7 +23,7 @@ void run() {
         },
     });
 
-    chassis.setPoseFromGoal(24, -48);
+    chassis.setPoseFromGoal(24, -48, {.maxCorrection = 1000});
 
     claw::spin(-127);
     pros::delay(500);
@@ -111,7 +111,7 @@ void run() {
         },
     });
 
-    chassis.setPoseFromGoal(24, -48);
+    chassis.setPoseFromGoal(24, -48, {.maxCorrection = 1000});
     claw::spin(-127);
     pros::delay(200);
 
