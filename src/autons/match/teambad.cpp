@@ -221,13 +221,14 @@ void run() {
             chassis.waitUntilDone();
         },
     });
-
     chassis.setPoseFromGoal(-24, -48, {.maxCorrection = 1000});
     claw::spin(-127);
     pros::delay(200);
 
     parallel({
         [] {
+            pivot::move_to(pivot::kScoredMotorDeg+80);
+            pros::delay(900);
             macros::dual_setup();
             claw::spin(127);
         },
@@ -246,14 +247,14 @@ void run() {
         [] {
             pros::delay(400);
             chassis.turnToPoint(24, -48, 600, {.forwards = false});
-            chassis.moveToPoint(24, -48, 1200, {.forwards = false, .minSpeed = 127});
+            chassis.moveToPoint(24, -48, 900, {.forwards = false, .minSpeed = 127});
             chassis.moveToPoint(24, -48, 1000, {.forwards = false, .maxSpeed = 40});
             chassis.waitUntilDone();
             claw::spin(-127);
         },
     });
 
-    pros::delay(200);
+    pros::delay(350);
 
     parallel({
         [] {
@@ -263,7 +264,6 @@ void run() {
             claw::stop();
         },
         [] {
-            pros::delay(400);
             chassis.moveToPoint(0, -36, 400, {.minSpeed = 90});
         },
     });
