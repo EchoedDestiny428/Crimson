@@ -9,17 +9,23 @@ void setup() {
 
 void run() {
     chassis.setPose(7.8, -63.4, 180);
-    pull_toggle.extend();
-    chassis.tank(127, 127, true);
-    pros::delay(150);
+
+    parallel ({
+        [] {
+            pull_toggle.extend();
+        },
+        [] {
+            chassis.moveToPoint(7.8, -70.0, 400, {.minSpeed = 127});
+        }
+    });
 
     parallel({
         [] { macros::flip_out(10, 900); },
         [] {
-            chassis.moveToPoint(7.8, -62.0, 500, {.forwards = false, .minSpeed = 127});
-            chassis.turnToPoint(24, -48, 400, {.forwards = false});
-            chassis.moveToPoint(24, -48, 400, {.forwards = false, .minSpeed = 60});
-            chassis.moveToPoint(24, -48, 200, {.forwards = false, .maxSpeed = 30});
+            chassis.moveToPoint(7.8, -62.0, 8000, {.forwards = false, .minSpeed = 127});
+            chassis.turnToPoint(24, -48, 500, {.forwards = false});
+            chassis.moveToPoint(24, -48, 600, {.forwards = false, .minSpeed = 60});
+            chassis.moveToPoint(24, -48, 300, {.forwards = false, .maxSpeed = 30});
             chassis.waitUntilDone();
         },
     });
@@ -29,60 +35,12 @@ void run() {
     claw::spin(-127);
     pros::delay(600);
 
-    // parallel({
-    //     [] {
-    //         pros::delay(400);
-    //         claw::spin(-127);
-    //     },
-    //     [] {
-    //         chassis.donut(-183, 1300, {.forwards = false, .fastSpeed = 127, .slowSpeed = 30});
-    //         pros::delay(400);
-    //         intake::lift();
-    //         chassis.waitUntilDone();
-    //     },
-    // });
-
-    // chassis.setPoseFromGoal(24, -48);
-
-    // parallel({
-    //     [] {
-    //         pros::delay(200);
-    //         macros::home();
-    //     },
-    //     [] {
-    //         intake::spin(50);
-    //         claw::spin(127);
-    //         chassis.moveToPoint(24, -64, 600);
-    //         chassis.moveToPoint(24, -56, 400, {.forwards = false, .maxSpeed = 50});
-    //         intake::drop();
-    //         intake::spin(127);
-    //         pros::delay(50);
-    //         intake::lift();
-    //         chassis.moveToPoint(24, -60, 600, {.maxSpeed = 80, .minSpeed = 50});
-    //         pros::delay(150);
-    //         intake::drop();
-    //         intake::spin(127);
-    //         chassis.waitUntilDone();
-    //     },
-    // });
-
-    // pros::delay(400);
-
-    // parallel({
-    //     [] { macros::flip_out(elevator::kStage1, pivot::kFlippedMotorDeg); },
-    //     [] {
-    //         pros::delay(100);
-    //         // chassis.moveToPoint(24, -48, 800, {.forwards = false, .maxSpeed = 50});
-    //         pros::delay(200);
-    //         claw::spin(-127);
-    //         chassis.waitUntilDone();
-    //         chassis.setPoseFromGoal(24, -48);
-    //     },
-    // });
     
     chassis.donut(135, 2000, {.forwards = false, .fastSpeed = 127, .slowSpeed = 30});
     chassis.waitUntilDone();
-    chassis.setPoseFromGoal(24, -48, {.maxCorrection = 1000}); // always reset, even when odom drifted far
+    chassis.setPoseFromGoal(24, -48); // always reset, even when odom drifted far
+
+    pros::delay(100000);
 
     parallel({
         [] {
@@ -91,11 +49,16 @@ void run() {
             macros::dual_setup();
         },
         [] {
-            chassis.moveToPoint(33, -59, 700);
-            chassis.turnToPoint(44.0, -50.5, 600, {.forwards = false}); 
+            chassis.moveToPoint(38, -61, 900);
+            chassis.turnToPoint(50.0, -52.125, 600, {.forwards = false}); 
+
+            pros::delay(100000);
+
             chassis.waitUntilDone();
         },
     });
+
+
 
 
     parallel({
@@ -105,7 +68,7 @@ void run() {
             macros::dual_pickup_height(elevator::kStage1); // changed the height to the correct height
         },
         [] {
-            chassis.moveToPoint(44.0, -51.125, 1200, {.forwards = false});
+            chassis.moveToPoint(50.0, -52.125, 1200, {.forwards = false});
             chassis.turnToPoint(24, -46, 800, {.forwards = false}); // needs tuning.
             chassis.moveToPoint(24, -46, 1200, {.forwards = false, .maxSpeed = 50});
             chassis.waitUntilDone();
@@ -125,8 +88,8 @@ void run() {
         },
         [] {
             chassis.moveToPoint(48, -48, 800);
-            chassis.turnToPoint(28.5, -26.5, 500, {.forwards = false});
-            chassis.moveToPoint(28.5, -26.5, 800, {.forwards = false});
+            chassis.turnToPoint(29.5, -27.5, 500, {.forwards = false});
+            chassis.moveToPoint(29.5, -27.5, 900, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
@@ -146,19 +109,12 @@ void run() {
     });
 
     pros::delay(300);
+    chassis.moveToPoint(0, -36, 400, {.minSpeed = 127});
 
-    parallel ({
-        [] {
-            pivot::move_to(pivot::kFlippedMotorDeg + 500);
-            pros::delay(800);
-            macros::home();
-            claw::stop();
-        },
-        [] {
-            pros::delay(400);
-            chassis.moveToPoint(0, -36, 400, {.minSpeed = 127});
-        },
-    });
+    pivot::move_to(pivot::kFlippedMotorDeg + 500);
+    pros::delay(800);
+    macros::home();
+    claw::stop();
 }
 
 }
