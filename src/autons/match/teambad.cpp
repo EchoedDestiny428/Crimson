@@ -24,8 +24,8 @@ void run() {
         [] {
             chassis.moveToPoint(7.8, -62.0, 8000, {.forwards = false, .minSpeed = 127});
             chassis.turnToPoint(24, -48, 500, {.forwards = false});
-            chassis.moveToPoint(24, -48, 600, {.forwards = false, .minSpeed = 60});
-            chassis.moveToPoint(24, -48, 300, {.forwards = false, .maxSpeed = 30});
+            chassis.moveToPoint(24, -48, 600, {.forwards = false, .minSpeed = 60, .earlyExitRange = 10});
+            chassis.moveToPoint(24, -48, 300, {.forwards = false, .maxSpeed = 30, .minSpeed = 20, .earlyExitRange = 6});
             chassis.waitUntilDone();
         },
     });
@@ -40,8 +40,6 @@ void run() {
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(24, -48); // always reset, even when odom drifted far
 
-    pros::delay(100000);
-
     parallel({
         [] {
             pivot::move_to(pivot::kScoredMotorDeg); // change it to the correct angle
@@ -50,10 +48,7 @@ void run() {
         },
         [] {
             chassis.moveToPoint(38, -61, 900);
-            chassis.turnToPoint(50.0, -52.125, 600, {.forwards = false}); 
-
-            pros::delay(100000);
-
+            chassis.turnToPoint(50.0, -52.125, 600, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
@@ -70,7 +65,7 @@ void run() {
         [] {
             chassis.moveToPoint(50.0, -52.125, 1200, {.forwards = false});
             chassis.turnToPoint(24, -46, 800, {.forwards = false}); // needs tuning.
-            chassis.moveToPoint(24, -46, 1200, {.forwards = false, .maxSpeed = 50});
+            chassis.moveToPoint(24, -46, 1200, {.forwards = false, .maxSpeed = 50, .minSpeed = 20, .earlyExitRange = 6});
             chassis.waitUntilDone();
         },
     });
