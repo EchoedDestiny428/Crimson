@@ -15,7 +15,7 @@ struct DonutParams {
 struct GoalPoseParams {
     bool forwards = false;
     float distance = 7;
-    float maxCorrection = 10;
+    float maxCorrection = 10000000000000000;
 };
 
 class Chassis : public lemlib::Chassis {
