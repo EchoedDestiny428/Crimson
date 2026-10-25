@@ -25,7 +25,7 @@ void run() {
             chassis.moveToPoint(7.8, -62.0, 8000, {.forwards = false, .minSpeed = 127});
             chassis.turnToPoint(24, -48, 500, {.forwards = false});
             chassis.moveToPoint(24, -48, 600, {.forwards = false, .minSpeed = 60});
-            chassis.moveToPoint(24, -48, 300, {.forwards = false, .maxSpeed = 30});
+            chassis.moveToPoint(24, -48, 500, {.forwards = false, .maxSpeed = 30});
             chassis.waitUntilDone();
         },
     });
@@ -49,13 +49,10 @@ void run() {
         },
         [] {
             chassis.moveToPoint(40, -58, 900);
-            chassis.turnToPoint(47.8, -51.2, 600, {.forwards = false}); 
-
+            chassis.turnToPoint(46.8, -49.2, 600, {.forwards = false}); 
             chassis.waitUntilDone();
         },
     });
-
-
 
 
     parallel({
@@ -65,9 +62,9 @@ void run() {
             macros::dual_pickup_height(elevator::kStage1); // changed the height to the correct height
         },
         [] {
-            chassis.moveToPoint(47.8, -51.2, 1000, {.forwards = false});
+            chassis.moveToPoint(46.8, -49.2, 1000, {.forwards = false});
             chassis.turnToPoint(24, -46, 800, {.forwards = false}); // needs tuning.
-            chassis.moveToPoint(24, -46, 1000, {.forwards = false, .maxSpeed = 60});
+            chassis.moveToPoint(24, -46, 1000, {.forwards = false, .maxSpeed = 80});
             chassis.waitUntilDone();
         },
     });
@@ -91,8 +88,6 @@ void run() {
         },
     });
 
-
-    pros::delay(100000);
 
     parallel ({
         [] {
