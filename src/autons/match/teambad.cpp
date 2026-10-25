@@ -120,41 +120,48 @@ void setup() {
     pull_toggle.retract();
 }
 
-// X mirrored from TeamBad. First two scores are the bottom red goal. Last score is the neutral at (24, -48).
+// X mirrored from TeamBad.
 void run() {
     chassis.setPose(-7.8, -63.4, 180);
-    pull_toggle.extend();
-    chassis.tank(45, 45, true);
-    pros::delay(300);
-    chassis.tank(0, 0);
+
+    parallel ({
+        [] {
+            pull_toggle.extend();
+        },
+        [] {
+            chassis.moveToPoint(-7.8, -70.0, 400, {.minSpeed = 127});
+        }
+    });
 
     parallel({
         [] { macros::flip_out(10, 900); },
         [] {
-            chassis.moveToPoint(-7.8, -62.0, 500, {.forwards = false, .minSpeed = 127});
-            chassis.turnToPoint(-25, -47, 400, {.forwards = false});
-            chassis.moveToPoint(-25, -47, 400, {.forwards = false, .minSpeed = 60});
-            chassis.moveToPoint(-25, -47, 350, {.forwards = false, .maxSpeed = 50});
+            chassis.moveToPoint(-7.8, -62.0, 8000, {.forwards = false, .minSpeed = 127});
+            chassis.turnToPoint(-24, -48, 500, {.forwards = false});
+            chassis.moveToPoint(-24, -48, 600, {.forwards = false, .minSpeed = 60});
+            chassis.moveToPoint(-24, -48, 500, {.forwards = false, .maxSpeed = 30});
             chassis.waitUntilDone();
         },
     });
 
-    chassis.setPoseFromGoal(-24, -48, {.maxCorrection = 1000});
+    chassis.setPoseFromGoal(-24, -48); // always reset, even when odom drifted far
 
     claw::spin(-127);
     pros::delay(600);
 
     chassis.donut(225, 2000, {.forwards = false, .fastSpeed = 127, .slowSpeed = 30});
     chassis.waitUntilDone();
-    chassis.setPoseFromGoal(-24, -48, {.maxCorrection = 1000});
+    chassis.setPoseFromGoal(-24, -48); // always reset, even when odom drifted far
 
     parallel({
         [] {
+            pivot::move_to(pivot::kScoredMotorDeg); // change it to the correct angle
+            pros::delay(100);
             macros::dual_setup();
         },
         [] {
-            chassis.moveToPoint(-33, -59, 700);
-            chassis.turnToPoint(-42.0, -52, 600, {.forwards = false});
+            chassis.moveToPoint(-40, -58, 900);
+            chassis.turnToPoint(-46.8, -49.2, 600, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
@@ -163,61 +170,56 @@ void run() {
         [] {
             claw::spin(127);
             pros::delay(500);
-            macros::dual_pickup_height(elevator::kStage1);
+            macros::dual_pickup_height(elevator::kStage1); // changed the height to the correct height
         },
         [] {
-            chassis.moveToPoint(-42.0, -52, 1200, {.forwards = false});
-            chassis.turnToPoint(-24, -48, 900, {.forwards = false});
-            chassis.moveToPoint(-24, -48, 1200, {.forwards = false, .maxSpeed = 50});
+            chassis.moveToPoint(-46.8, -49.2, 1000, {.forwards = false});
+            chassis.turnToPoint(-24, -46, 800, {.forwards = false}); // needs tuning.
+            chassis.moveToPoint(-24, -46, 1000, {.forwards = false, .maxSpeed = 80});
             chassis.waitUntilDone();
         },
     });
-    chassis.setPoseFromGoal(-24, -48, {.maxCorrection = 1000});
+
+    chassis.setPoseFromGoal(-24, -48); // always reset, even when odom drifted far
     claw::spin(-127);
     pros::delay(200);
 
     parallel({
         [] {
-            pivot::move_to(pivot::kScoredMotorDeg+80);
-            pros::delay(900);
+            pivot::move_to(pivot::kScoredMotorDeg);
+            pros::delay(200);
             macros::dual_setup();
             claw::spin(127);
         },
         [] {
             chassis.moveToPoint(-48, -48, 800);
-            chassis.turnToPoint(-26, -26.5, 500, {.forwards = false});
-            chassis.moveToPoint(-26, -26.5, 800, {.forwards = false,.maxSpeed = 80});
+            chassis.turnToPoint(-29.5, -27.5, 500, {.forwards = false});
+            chassis.moveToPoint(-29.5, -27.5, 900, {.forwards = false});
             chassis.waitUntilDone();
         },
     });
 
-    parallel({
+    parallel ({
         [] {
-            macros::dual_pickup_height(elevator::kStage1 + elevator::kOffset + 70);
+            macros::dual_pickup_height(elevator::kStage1+elevator::kOffset+70); // changed the height to the correct height
         },
         [] {
             pros::delay(400);
-            chassis.turnToPoint(24, -48, 600, {.forwards = false});
-            chassis.moveToPoint(24, -48, 900, {.forwards = false, .minSpeed = 127});
-            chassis.moveToPoint(24, -48, 1000, {.forwards = false, .maxSpeed = 40});
+            chassis.turnToPoint(24, -46, 600, {.forwards = false}); //just needs to turn slightly first
+            chassis.moveToPoint(24, -46, 1000, {.forwards = false, .minSpeed = 127});
+            chassis.moveToPoint(24, -46, 1000, {.forwards = false, .maxSpeed = 50});
             chassis.waitUntilDone();
             claw::spin(-127);
         },
     });
 
-    pros::delay(350);
+    pros::delay(300);
+    chassis.moveToPoint(0, -36, 400, {.minSpeed = 127});
 
-    parallel({
-        [] {
-            pivot::move_to(pivot::kFlippedMotorDeg + 550);
-            pros::delay(800);
-            macros::home();
-            claw::stop();
-        },
-        [] {
-            chassis.moveToPoint(0, -36, 400, {.minSpeed = 90});
-        },
-    });
+    pivot::move_to(pivot::kFlippedMotorDeg + 500);
+    pros::delay(800);
+    macros::home();
+    claw::stop();
 }
 
 }
