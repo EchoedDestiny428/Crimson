@@ -11,7 +11,7 @@ namespace autons {
 
 namespace {
 
-constexpr std::string_view kDefaultRoutine = "TeamBad";
+constexpr std::string_view kDefaultRoutine = "None";
 
 struct Routine {
     const char* name;
@@ -19,13 +19,8 @@ struct Routine {
     void (*run)();
 };
 
+// Add the new robot's routines here.
 constexpr std::array kRoutines{
-    Routine{"Test", match::test::setup, match::test::run},
-    Routine{"Snacky", match::snacky::setup, match::snacky::run},
-    Routine{"TeamBad", match::teambad::setup, match::teambad::run},
-
-
-    Routine{"SkillsV1", skills::v1::setup, skills::v1::run},
     Routine{"None", nullptr, nullptr},
 };
 

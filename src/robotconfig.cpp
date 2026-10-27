@@ -8,15 +8,8 @@ display::Dashboard dashboard;
 
 pros::MotorGroup left_motors({ports::kLeftDriveA, ports::kLeftDriveB}, pros::MotorGears::blue);
 pros::MotorGroup right_motors({ports::kRightDriveA, ports::kRightDriveB}, pros::MotorGears::blue);
-pros::MotorGroup elevator_motors({ports::kElevatorA, ports::kElevatorB}, pros::MotorGears::blue);
-pros::Motor intake_motor(ports::kIntake, pros::MotorGears::blue);
-pros::Motor claw_motor(ports::kClaw, pros::MotorGears::green);
-pros::Motor pivot_motor(ports::kPivot, pros::MotorGears::green);
 telemetry::Logger logger;
 pros::Rotation horizontal_odom(ports::kHorizontalOdom);
-
-pros::adi::Pneumatics intake_lift(ports::kIntakeLift, false);
-pros::adi::Pneumatics pull_toggle(ports::kPullToggle, true, true);
 
 namespace {
 
@@ -37,9 +30,6 @@ lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_odom, kTrackingWheel
 
 lemlib::OdomSensors sensors(nullptr, nullptr, &horizontal_tracking_wheel, nullptr, &imu);
 
-lemlib::ExpoDriveCurve throttle_curve(2, 2.5, 1.019);
-lemlib::ExpoDriveCurve steer_curve(2, 2.5, 1.0);
-
 }
 
-crimson::Chassis chassis(drivetrain, linear_controller, angular_controller, sensors, &throttle_curve, &steer_curve);
+crimson::Chassis chassis(drivetrain, linear_controller, angular_controller, sensors);
