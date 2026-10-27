@@ -1,6 +1,7 @@
 #include "telemetry/logger.hpp"
 #include "lemlib/logger/logger.hpp"
 #include "robotconfig.hpp"
+#include "config/controls.hpp"
 #include "pros/error.h"
 #include "pros/misc.hpp"
 #include <cmath>
@@ -114,6 +115,13 @@ double vision_pose_theta(const void* context) {
     return pose ? pose->theta : NAN;
 }
 
+// Raw driver stick, -127..127, before the drive curve, slew and arcade mixing.
+double controller_axis(const void* context) {
+    const auto axis = *static_cast<const controls::Axis*>(context);
+    const std::int32_t value = controller.get_analog(axis);
+    return value == PROS_ERR ? NAN : static_cast<double>(value);
+}
+
 }
 
 Logger::Logger(const char* directory, std::uint32_t period) : directory(directory), period(period) {}
@@ -185,6 +193,8 @@ void Logger::register_robot_fields() {
     register_field("vision_pose_x_in", vision_pose_x, &crimson_cam);
     register_field("vision_pose_y_in", vision_pose_y, &crimson_cam);
     register_field("vision_pose_theta_deg", vision_pose_theta, &crimson_cam);
+    register_field("stick_throttle", controller_axis, &controls::kThrottle);
+    register_field("stick_turn", controller_axis, &controls::kTurn);
 }
 
 void Logger::start() {
