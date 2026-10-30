@@ -171,6 +171,8 @@ void Logger::register_robot_fields() {
     register_field("pose_x_in", chassis_x, &chassis);
     register_field("pose_y_in", chassis_y, &chassis);
     register_field("pose_theta_deg", chassis_theta, &chassis);
+    register_field("odom_vertical_position_cdeg", rotation_position, &vertical_odom);
+    register_field("odom_vertical_velocity_cdeg_s", rotation_velocity, &vertical_odom);
     register_field("odom_horizontal_position_cdeg", rotation_position, &horizontal_odom);
     register_field("odom_horizontal_velocity_cdeg_s", rotation_velocity, &horizontal_odom);
     register_field("imu_heading_deg", imu_heading, &imu);

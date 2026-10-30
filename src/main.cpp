@@ -3,6 +3,9 @@
 #include "display/controller_hud.hpp"
 #include "robotconfig.hpp"
 #include "subsystems/drive.hpp"
+#include "subsystems/elevator/claw.hpp"
+#include "subsystems/elevator/extension.hpp"
+#include "subsystems/elevator/pivot.hpp"
 #include "subsystems/vision.hpp"
 #include "util/driver_task.hpp"
 
@@ -14,8 +17,14 @@ void initialize() {
     dashboard.show_status("CALIBRATING");
 
     drive::init();
+    elevator::extension::init();
+    elevator::pivot::init();
+    elevator::claw::init();
     logger.attach(&left_motors);
     logger.attach(&right_motors);
+    logger.attach(&extension_motors);
+    logger.attach(&pivot_motor);
+    logger.attach(&claw_motor);
     logger.register_robot_fields();
     logger.start();
 
@@ -23,6 +32,7 @@ void initialize() {
 }
 
 void disabled() {
+    elevator::extension::hold();
     autons::select();
 }
 
@@ -36,6 +46,9 @@ void autonomous() {
 
 void opcontrol() {
     chassis.cancelAllMotions();
+    util::start_driver_task("Extension", elevator::extension::update, elevator::extension::stop);
+    util::start_driver_task("Pivot", elevator::pivot::update, elevator::pivot::stop);
+    util::start_driver_task("Claw", elevator::claw::update, elevator::claw::stop);
     util::start_driver_task("HUD", display::controller_hud::update);
 
     std::uint32_t now = pros::millis();
