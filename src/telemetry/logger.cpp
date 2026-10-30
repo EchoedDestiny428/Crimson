@@ -1,276 +1,258 @@
 #include "telemetry/logger.hpp"
 #include "lemlib/logger/logger.hpp"
-#include "pros/error.h"
 #include "pros/misc.hpp"
-#include <cmath>
+#include "telemetry/wpilog.hpp"
+#include <bitset>
 #include <cstring>
-#include <cstdio>
+#include <limits>
+#include <mutex>
 
 namespace telemetry {
 
-Logger::Logger(const char* directory, std::uint32_t period) : directory(directory), period(period) {}
+Logger logger;
 
-bool Logger::attach(pros::AbstractMotor* motor) {
-    if (motor == nullptr) {
-        return false;
+namespace {
+
+constexpr std::string_view kFilePrefix = "crimson_";
+constexpr std::string_view kFileSuffix = ".wpilog";
+constexpr std::size_t kIndexDigits = 4;
+constexpr std::size_t kListBufferSize = 8192;
+constexpr std::size_t kMaxExtraHeader = 116;
+
+std::uint32_t parse_index(std::string_view name) {
+    if (name.size() != kFilePrefix.size() + kIndexDigits + kFileSuffix.size() || !name.starts_with(kFilePrefix) ||
+        !name.ends_with(kFileSuffix)) {
+        return 0;
     }
-    bool attached = false;
-    const std::vector<std::int8_t> ports = motor->get_port_all();
-    for (std::size_t index = 0; index < ports.size(); ++index) {
-        if (motorPortCount >= motorPorts.size()) {
-            break;
+    std::uint32_t index = 0;
+    for (const char digit : name.substr(kFilePrefix.size(), kIndexDigits)) {
+        if (digit < '0' || digit > '9') {
+            return 0;
         }
-        const std::int8_t port = ports[index];
-        bool duplicate = false;
-        for (std::size_t i = 0; i < motorPortCount; ++i) {
-            const int existingPort = motorPorts[i].port < 0 ? -motorPorts[i].port : motorPorts[i].port;
-            const int currentPort = port < 0 ? -port : port;
-            if (existingPort == currentPort) {
-                duplicate = true;
-                break;
-            }
-        }
-        if (!duplicate) {
-            motorPorts[motorPortCount++] = {motor, static_cast<std::uint8_t>(index), port};
-            attached = true;
-        }
+        index = index * 10 + static_cast<std::uint32_t>(digit - '0');
     }
-    return attached;
+    return index;
 }
 
-bool Logger::register_field(const char* name, FieldCallback callback, const void* context) {
-    if (name == nullptr || callback == nullptr || fieldCount >= fields.size()) {
+bool file_exists(const char* path) {
+    std::FILE* existing = std::fopen(path, "rb");
+    if (existing == nullptr) {
         return false;
     }
-    for (std::size_t i = 0; i < fieldCount; ++i) {
-        if (std::strcmp(fields[i].name, name) == 0) {
-            return false;
-        }
-    }
-    fields[fieldCount++] = {name, callback, context};
+    std::fclose(existing);
     return true;
 }
 
-void Logger::start() {
-    if (task == nullptr) {
-        task = new pros::Task([this] { run(); }, "Telemetry");
-    }
 }
 
-void Logger::dump() {
-    if (pros::usd::is_installed() == 0) {
-        std::printf("LOG_DUMP_ERROR,sd_not_installed\n");
-        return;
-    }
-
-    char fileList[4096] {};
-    if (pros::usd::list_files("/", fileList, sizeof(fileList)) < 0) {
-        std::printf("LOG_DUMP_ERROR,list_files_failed\n");
-        return;
-    }
-
-    fileMutex.take();
-    char* fileName = fileList;
-    while (*fileName != '\0') {
-        char* lineEnd = std::strchr(fileName, '\n');
-        if (lineEnd != nullptr) {
-            *lineEnd = '\0';
-        }
-
-        if (std::strncmp(fileName, "telemetry_", 10) == 0 &&
-            std::strstr(fileName, ".csv") != nullptr) {
-            char path[96] {};
-            std::snprintf(path, sizeof(path), "/usd/%s", fileName);
-            std::FILE* file = std::fopen(path, "r");
-            if (file != nullptr) {
-                std::printf("LOG_DUMP_BEGIN,%s\n", fileName);
-                char line[256];
-                while (std::fgets(line, sizeof(line), file) != nullptr) {
-                    std::printf("%s", line);
-                    pros::delay(2);
-                }
-                std::fclose(file);
-                std::printf("LOG_DUMP_END,%s\n", fileName);
+bool Logger::choose_path() {
+    static std::bitset<kMaxFileIndex + 1> listed;
+    static char names[kListBufferSize];
+    if (pros::usd::list_files("/", names, static_cast<std::int32_t>(sizeof(names))) == 1) {
+        names[sizeof(names) - 1] = '\0';
+        std::string_view remaining(names);
+        while (!remaining.empty()) {
+            const std::size_t end = remaining.find('\n');
+            std::string_view name = remaining.substr(0, end);
+            if (!name.empty() && name.back() == '\r') {
+                name.remove_suffix(1);
             }
+            const std::uint32_t index = parse_index(name);
+            if (index > 0 && index <= kMaxFileIndex) {
+                listed.set(index);
+            }
+            if (end == std::string_view::npos) {
+                break;
+            }
+            remaining.remove_prefix(end + 1);
         }
-
-        if (lineEnd == nullptr) {
-            break;
-        }
-        fileName = lineEnd + 1;
-    }
-    fileMutex.give();
-    std::printf("LOG_DUMP_COMPLETE\n");
-}
-
-void Logger::run() {
-    if (pros::usd::is_installed() == 0) {
-        lemlib::infoSink()->warn("Telemetry: SD card is not installed");
-        return;
     }
 
-    if (!reserveSession()) {
-        lemlib::infoSink()->warn("Telemetry: unable to reserve a session number");
-        return;
-    }
-
-    std::FILE* file = nullptr;
-    if (!openFile(file)) {
-        lemlib::infoSink()->warn("Telemetry: unable to open {}", filePath);
-        return;
-    }
-    if (!writeMetadata(file) || !writeHeader(file)) {
-        std::fclose(file);
-        lemlib::infoSink()->warn("Telemetry: unable to write metadata to {}", filePath);
-        return;
-    }
-
-    std::uint32_t now = pros::millis();
-    while (true) {
-        fileMutex.take();
-        if (!writeSample(file)) {
-            fileMutex.give();
-            lemlib::infoSink()->warn("Telemetry: unable to write to {}", filePath);
-            break;
-        }
-        std::fflush(file);
-        fileMutex.give();
-        pros::Task::delay_until(&now, period);
-    }
-    std::fclose(file);
-}
-
-bool Logger::openFile(std::FILE*& file) {
-    for (std::uint32_t suffix = 0; suffix < 1000000; ++suffix) {
-        const int length = suffix == 0
-                               ? std::snprintf(filePath, sizeof(filePath), "%s/telemetry_%06lu.csv", directory,
-                                               static_cast<unsigned long>(sessionId))
-                               : std::snprintf(filePath, sizeof(filePath), "%s/telemetry_%06lu_%u.csv", directory,
-                                               static_cast<unsigned long>(sessionId), suffix);
-        if (length < 0 || static_cast<std::size_t>(length) >= sizeof(filePath)) {
-            return false;
-        }
-
-        std::FILE* existing = std::fopen(filePath, "r");
-        if (existing != nullptr) {
-            std::fclose(existing);
+    for (std::uint32_t index = 1; index <= kMaxFileIndex; ++index) {
+        if (listed.test(index)) {
             continue;
         }
-
-        file = std::fopen(filePath, "w");
-        return file != nullptr;
+        std::snprintf(path_, sizeof(path_), "/usd/crimson_%04lu.wpilog", static_cast<unsigned long>(index));
+        if (!file_exists(path_)) {
+            return true;
+        }
     }
     return false;
 }
 
-bool Logger::reserveSession() {
-    char counterPath[64] {};
-    const int pathLength = std::snprintf(counterPath, sizeof(counterPath), "%s/telemetry_session.txt", directory);
-    if (pathLength < 0 || static_cast<std::size_t>(pathLength) >= sizeof(counterPath)) {
+bool Logger::open(std::string_view extra_header) {
+    if (is_open()) {
+        return true;
+    }
+    if (pros::usd::is_installed() == 0) {
+        lemlib::infoSink()->warn("Telemetry: SD card is not installed, logging is off");
+        return false;
+    }
+    if (!choose_path()) {
+        lemlib::infoSink()->warn("Telemetry: no free log file name on the SD card, logging is off");
+        return false;
+    }
+    file_ = std::fopen(path_, "wb");
+    if (file_ == nullptr) {
+        lemlib::infoSink()->warn("Telemetry: unable to open {}, logging is off", path_);
         return false;
     }
 
-    std::uint32_t previous = 0;
-    std::FILE* counter = std::fopen(counterPath, "r");
-    if (counter != nullptr) {
-        const int result = std::fscanf(counter, "%u", &previous);
-        std::fclose(counter);
-        if (result != 1) {
-            return false;
-        }
-    }
-
-    sessionId = previous + 1;
-    counter = std::fopen(counterPath, "w");
-    if (counter == nullptr) {
+    const std::string_view extra = extra_header.substr(0, kMaxExtraHeader);
+    std::array<std::uint8_t, wpilog::file_header_size({}) + kMaxExtraHeader> header{};
+    const std::size_t size = wpilog::encode_file_header(header.data(), extra);
+    if (std::fwrite(header.data(), 1, size, file_) != size) {
+        std::fclose(file_);
+        file_ = nullptr;
+        lemlib::infoSink()->warn("Telemetry: unable to write to {}, logging is off", path_);
         return false;
     }
-    const bool written = std::fprintf(counter, "%u\n", sessionId) >= 0;
-    std::fclose(counter);
-    return written;
+    std::fflush(file_);
+    bytes_written_ = static_cast<std::uint32_t>(size);
+    open_ = true;
+    return true;
 }
 
-bool Logger::writeMetadata(std::FILE* file) {
-    const bool controllerConnected = pros::competition::is_connected();
-    const bool fieldControl = pros::competition::is_field_control();
-    const bool competitionSwitch = pros::competition::is_competition_switch();
-    const bool autonomous = pros::competition::is_autonomous();
-    const bool disabled = pros::competition::is_disabled();
-    const bool inMatch = fieldControl || competitionSwitch;
-
-    return std::fprintf(file, "# session_id,%u\n"
-                              "# start_time_ms,%lu\n"
-                              "# competition_controller_connected,%d\n"
-                              "# field_control,%d\n"
-                              "# competition_switch,%d\n"
-                              "# autonomous,%d\n"
-                              "# disabled,%d\n"
-                              "# in_match,%d\n",
-                        sessionId, static_cast<unsigned long>(pros::millis()), controllerConnected, fieldControl,
-                        competitionSwitch, autonomous, disabled, inMatch) >= 0;
+bool Logger::is_open() const {
+    return open_;
 }
 
-bool Logger::writeHeader(std::FILE* file) {
-    if (std::fprintf(file, "time_ms,competition_controller_connected,field_control,competition_switch,"
-                           "autonomous,disabled,in_match") < 0) {
-        return false;
-    }
-    for (std::size_t i = 0; i < motorPortCount; ++i) {
-        const int port = motorPorts[i].port < 0 ? -motorPorts[i].port : motorPorts[i].port;
-        if (std::fprintf(file,
-                         ",port_%d_position,port_%d_velocity,port_%d_voltage_mV,port_%d_temperature_C"
-                         ",port_%d_current_mA,port_%d_target_position,port_%d_target_velocity",
-                         port, port, port, port, port, port, port) < 0) {
-            return false;
-        }
-    }
-    for (std::size_t i = 0; i < fieldCount; ++i) {
-        if (std::fprintf(file, ",%s", fields[i].name) < 0) {
-            return false;
-        }
-    }
-    return std::fputc('\n', file) != EOF;
+const char* Logger::path() const {
+    return path_;
 }
 
-bool Logger::writeSample(std::FILE* file) {
-    const bool controllerConnected = pros::competition::is_connected();
-    const bool fieldControl = pros::competition::is_field_control();
-    const bool competitionSwitch = pros::competition::is_competition_switch();
-    const bool autonomous = pros::competition::is_autonomous();
-    const bool disabled = pros::competition::is_disabled();
-    const bool inMatch = fieldControl || competitionSwitch;
+std::uint32_t Logger::find_entry(const char* key) const {
+    for (std::size_t i = 0; i < entry_count_; ++i) {
+        if (std::strcmp(entries_[i].key, key) == 0) {
+            return entries_[i].id;
+        }
+    }
+    return wpilog::kControlId;
+}
 
-    if (std::fprintf(file, "%lu,%d,%d,%d,%d,%d,%d", static_cast<unsigned long>(pros::millis()), controllerConnected,
-                     fieldControl, competitionSwitch, autonomous, disabled, inMatch) < 0) {
+std::uint32_t Logger::entry(const char* key, const char* type) {
+    if (!is_open() || key == nullptr || type == nullptr) {
+        return wpilog::kControlId;
+    }
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        {
+            std::lock_guard<pros::Mutex> lock(buffer_mutex_);
+            const std::uint32_t existing = find_entry(key);
+            if (existing != wpilog::kControlId) {
+                return existing;
+            }
+            if (entry_count_ >= kMaxEntries) {
+                return wpilog::kControlId;
+            }
+            const auto id = static_cast<std::uint32_t>(entry_count_ + 1);
+            if (append_start(id, key, type, pros::micros())) {
+                entries_[entry_count_++] = {key, id};
+                return id;
+            }
+        }
+        flush();
+    }
+    ++dropped_;
+    return wpilog::kControlId;
+}
+
+bool Logger::append_start(std::uint32_t entry, std::string_view key, std::string_view type, std::uint64_t timestamp) {
+    const std::size_t payload = wpilog::start_payload_size(key, type);
+    const std::size_t header =
+        wpilog::record_header_size(wpilog::kControlId, static_cast<std::uint32_t>(payload), timestamp);
+    if (used_ + header + payload > kBufferSize) {
         return false;
     }
-    for (std::size_t i = 0; i < motorPortCount; ++i) {
-        const MotorPort& motorPort = motorPorts[i];
-        pros::AbstractMotor* motor = motorPort.motor;
-        const std::uint8_t index = motorPort.index;
-        const auto writeDouble = [file](double value) {
-            return std::isfinite(value) ? std::fprintf(file, "%.3f", value) : std::fprintf(file, "nan");
-        };
-        const auto writeInteger = [file](std::int32_t value) {
-            return value == PROS_ERR ? std::fprintf(file, "nan") : std::fprintf(file, "%d", value);
-        };
+    std::uint8_t* out = buffers_[active_].data() + used_;
+    wpilog::encode_record_header(out, wpilog::kControlId, static_cast<std::uint32_t>(payload), timestamp);
+    wpilog::encode_start_payload(out + header, entry, key, type);
+    used_ += header + payload;
+    return true;
+}
 
-        if (std::fputc(',', file) == EOF || writeDouble(motor->get_position(index)) < 0 ||
-            std::fputc(',', file) == EOF || writeDouble(motor->get_actual_velocity(index)) < 0 ||
-            std::fputc(',', file) == EOF || writeInteger(motor->get_voltage(index)) < 0 ||
-            std::fputc(',', file) == EOF || writeDouble(motor->get_temperature(index)) < 0 ||
-            std::fputc(',', file) == EOF || writeInteger(motor->get_current_draw(index)) < 0 ||
-            std::fputc(',', file) == EOF || writeDouble(motor->get_target_position(index)) < 0 ||
-            std::fputc(',', file) == EOF || writeInteger(motor->get_target_velocity(index)) < 0) {
-            return false;
-        }
+bool Logger::append_record(std::uint32_t id, const void* data, std::size_t size, std::uint64_t timestamp) {
+    if (size > std::numeric_limits<std::uint32_t>::max()) {
+        return false;
     }
-    for (std::size_t i = 0; i < fieldCount; ++i) {
-        if (std::fprintf(file, ",%.6f", fields[i].callback(fields[i].context)) < 0) {
-            return false;
-        }
+    const auto payload = static_cast<std::uint32_t>(size);
+    const std::size_t header = wpilog::record_header_size(id, payload, timestamp);
+    if (used_ + header + size > kBufferSize) {
+        return false;
     }
-    return std::fputc('\n', file) != EOF;
+    std::uint8_t* out = buffers_[active_].data() + used_;
+    wpilog::encode_record_header(out, id, payload, timestamp);
+    if (size > 0) {
+        std::memcpy(out + header, data, size);
+    }
+    used_ += header + size;
+    return true;
+}
+
+void Logger::record(std::uint32_t id, const void* data, std::size_t size, std::uint64_t timestamp) {
+    if (id == wpilog::kControlId || !is_open()) {
+        return;
+    }
+    std::lock_guard<pros::Mutex> lock(buffer_mutex_);
+    if (!append_record(id, data, size, timestamp)) {
+        ++dropped_;
+    }
+}
+
+void Logger::record_boolean(std::uint32_t id, bool value, std::uint64_t timestamp) {
+    const std::uint8_t byte = value ? 1 : 0;
+    record(id, &byte, sizeof(byte), timestamp);
+}
+
+void Logger::record_int64(std::uint32_t id, std::int64_t value, std::uint64_t timestamp) {
+    record(id, &value, sizeof(value), timestamp);
+}
+
+void Logger::record_double(std::uint32_t id, double value, std::uint64_t timestamp) {
+    record(id, &value, sizeof(value), timestamp);
+}
+
+void Logger::record_string(std::uint32_t id, std::string_view value, std::uint64_t timestamp) {
+    record(id, value.data(), value.size(), timestamp);
+}
+
+void Logger::flush() {
+    if (!is_open()) {
+        return;
+    }
+    std::lock_guard<pros::Mutex> file_lock(file_mutex_);
+    if (file_ == nullptr) {
+        return;
+    }
+    std::size_t index = 0;
+    std::size_t size = 0;
+    {
+        std::lock_guard<pros::Mutex> lock(buffer_mutex_);
+        if (used_ == 0) {
+            return;
+        }
+        index = active_;
+        size = used_;
+        active_ ^= 1;
+        used_ = 0;
+    }
+    const std::size_t written = std::fwrite(buffers_[index].data(), 1, size, file_);
+    bytes_written_ += static_cast<std::uint32_t>(written);
+    if (written == size && std::fflush(file_) == 0) {
+        return;
+    }
+    ++dropped_;
+    open_ = false;
+    std::fclose(file_);
+    file_ = nullptr;
+    lemlib::infoSink()->warn("Telemetry: unable to write to {}, logging is off", path_);
+}
+
+std::uint64_t Logger::dropped() const {
+    return dropped_;
+}
+
+std::uint64_t Logger::bytes_written() const {
+    return bytes_written_;
 }
 
 }

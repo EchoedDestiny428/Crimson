@@ -1,4 +1,5 @@
 #include "robotconfig.hpp"
+#include "config/drivetrain.hpp"
 #include "config/ports.hpp"
 
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
@@ -12,7 +13,6 @@ pros::MotorGroup elevator_motors({ports::kElevatorA, ports::kElevatorB}, pros::M
 pros::Motor intake_motor(ports::kIntake, pros::MotorGears::blue);
 pros::Motor claw_motor(ports::kClaw, pros::MotorGears::green);
 pros::Motor pivot_motor(ports::kPivot, pros::MotorGears::green);
-telemetry::Logger logger;
 pros::Rotation vertical_odom(ports::kVerticalOdom);
 pros::Rotation horizontal_odom(ports::kHorizontalOdom);
 
@@ -21,27 +21,31 @@ pros::adi::Pneumatics pull_toggle(ports::kPullToggle, true, true);
 
 namespace {
 
-constexpr float kTrackWidthIn = 12.5f;
-constexpr float kDriveRpm = 360.0f;
-constexpr float kHorizontalDrift = 2.0f;
+lemlib::ControllerSettings controller_settings(const config::PidConstants& pid) {
+    return {pid.kP,         pid.kI,
+            pid.kD,         pid.windupRange,
+            pid.smallError, pid.smallErrorTimeout,
+            pid.largeError, pid.largeErrorTimeout,
+            pid.slew};
+}
 
-constexpr float kTrackingWheelDiameterIn = 2.0f;
-constexpr float kVerticalWheelOffsetIn = 0.5f;
-constexpr float kHorizontalWheelOffsetIn = -0.7f;
+lemlib::Drivetrain drivetrain(&left_motors, &right_motors, config::kTrackWidthIn, config::kWheelDiameterIn,
+                              config::kDriveRpm, config::kHorizontalDrift);
 
-lemlib::Drivetrain drivetrain(&left_motors, &right_motors, kTrackWidthIn, lemlib::Omniwheel::NEW_325, kDriveRpm,
-                              kHorizontalDrift);
+lemlib::ControllerSettings linear_controller = controller_settings(config::kLinearPid);
+lemlib::ControllerSettings angular_controller = controller_settings(config::kAngularPid);
 
-lemlib::ControllerSettings linear_controller(9.5, 0, 12, 1, 0.2, 100, 1, 500, 40);
-lemlib::ControllerSettings angular_controller(5.5, 0, 40, 3, 1, 50, 3, 300, 0);
-
-lemlib::TrackingWheel vertical_tracking_wheel(&vertical_odom, kTrackingWheelDiameterIn, kVerticalWheelOffsetIn);
-lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_odom, kTrackingWheelDiameterIn, kHorizontalWheelOffsetIn);
+lemlib::TrackingWheel vertical_tracking_wheel(&vertical_odom, config::kTrackingWheelDiameterIn,
+                                              config::kVerticalWheelOffsetIn);
+lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_odom, config::kTrackingWheelDiameterIn,
+                                                config::kHorizontalWheelOffsetIn);
 
 lemlib::OdomSensors sensors(&vertical_tracking_wheel, nullptr, &horizontal_tracking_wheel, nullptr, &imu);
 
-lemlib::ExpoDriveCurve throttle_curve(2, 2.5, 1.019);
-lemlib::ExpoDriveCurve steer_curve(2, 2.5, 1.0);
+lemlib::ExpoDriveCurve throttle_curve(config::kThrottleCurve.deadband, config::kThrottleCurve.minOutput,
+                                      config::kThrottleCurve.curve);
+lemlib::ExpoDriveCurve steer_curve(config::kSteerCurve.deadband, config::kSteerCurve.minOutput,
+                                   config::kSteerCurve.curve);
 
 }
 

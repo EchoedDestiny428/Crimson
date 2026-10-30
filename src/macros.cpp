@@ -26,8 +26,8 @@ constexpr std::uint32_t kDualPickupDwellMs = 250;
 constexpr std::uint32_t kPollMs = 10;
 
 std::atomic<Mode> mode{Mode::Stowed};
-std::atomic<bool> tilted{false};
-std::atomic<bool> offset_on{true};
+std::atomic<bool> pivot_tilted{false};
+std::atomic<bool> offset_enabled{true};
 std::atomic<std::uint32_t> generation{0};
 bool manual_active = false;
 
@@ -57,22 +57,22 @@ private:
 };
 
 void tilt_if_at_top() {
-    if (!tilted && elevator::height() >= elevator::top_stage() - kTopArrivalTolerance) {
-        tilted = true;
+    if (!pivot_tilted && elevator::height() >= elevator::top_stage() - kTopArrivalTolerance) {
+        pivot_tilted = true;
         pivot::move_to(pivot::kTopMotorDeg);
     }
 }
 
 void untilt_pivot() {
-    if (tilted) {
-        tilted = false;
+    if (pivot_tilted) {
+        pivot_tilted = false;
         pivot::move_to(pivot::kFlippedMotorDeg);
     }
 }
 
 void start_flip_out(double height, double pivot_motor_deg) {
     mode = Mode::Deployed;
-    tilted = false;
+    pivot_tilted = false;
     pivot::move_to(pivot_motor_deg);
     elevator::set_target_below_home(std::max(height, elevator::kFlipOutMin));
 }
@@ -80,7 +80,7 @@ void start_flip_out(double height, double pivot_motor_deg) {
 void start_home() {
     ++generation;
     mode = Mode::Stowed;
-    tilted = false;
+    pivot_tilted = false;
     pivot::move_to(pivot::kHomeMotorDeg);
     elevator::set_target(elevator::kHome);
 }
@@ -130,7 +130,7 @@ void home() {
 void dual_setup() {
     const Run run;
     mode = Mode::Deployed;
-    tilted = false;
+    pivot_tilted = false;
     elevator::set_target_below_home(elevator::kDualSetup);
     if (!run.wait_for(elevator::is_settled, kElevatorTimeoutMs)) {
         return;
@@ -189,9 +189,9 @@ void outtake_for_score(bool pressed) {
 
 void press(bool up, bool down, bool down_pressed, bool offset_button) {
     if (offset_button) {
-        offset_on = !offset_on;
+        offset_enabled = !offset_enabled;
         if (mode == Mode::Deployed) {
-            elevator::set_target(elevator::target() + (offset_on ? elevator::kOffset : -elevator::kOffset));
+            elevator::set_target(elevator::target() + (offset_enabled ? elevator::kOffset : -elevator::kOffset));
         }
     }
     if (mode == Mode::Stowed) {
@@ -217,7 +217,7 @@ void press(bool up, bool down, bool down_pressed, bool offset_button) {
         elevator::set_manual(up ? kManualPower : -kManualPower);
     } else if (manual_active) {
         manual_active = false;
-        elevator::snap_to_stage(offset_on);
+        elevator::snap_to_stage(offset_enabled);
     }
 
     if (!down) {
@@ -241,6 +241,18 @@ void update() {
 void stop() {
     manual_active = false;
     elevator::hold();
+}
+
+const char* mode_name() {
+    return mode == Mode::Stowed ? "Stowed" : "Deployed";
+}
+
+bool tilted() {
+    return pivot_tilted;
+}
+
+bool offset_on() {
+    return offset_enabled;
 }
 
 }

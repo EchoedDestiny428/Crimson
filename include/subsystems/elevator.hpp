@@ -27,6 +27,7 @@ double snap_to_stage(bool offset = false);
 double top_stage();
 double height();
 double target();
+int manual_power();
 bool has_left_bootup();
 bool is_settled();
 bool wait_until_settled(std::uint32_t timeout_ms);

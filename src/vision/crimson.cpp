@@ -33,6 +33,7 @@ void Crimson::update() {
     tags_.clear();
 
     const std::int32_t count = sensor_.get_object_count();
+    connected_ = count != PROS_ERR;
     if (count > 0 && count != PROS_ERR) {
         for (const auto& object : sensor_.get_all_objects()) {
             if (pros::AIVision::is_type(object, pros::AivisionDetectType::tag)) {
@@ -90,6 +91,13 @@ double Crimson::get_ty() const {
 std::uint32_t Crimson::get_data_age_ms() const {
     mutex_.take();
     const std::uint32_t result = last_update_ms_ == 0 ? 0 : pros::millis() - last_update_ms_;
+    mutex_.give();
+    return result;
+}
+
+bool Crimson::connected() const {
+    mutex_.take();
+    const bool result = connected_;
     mutex_.give();
     return result;
 }

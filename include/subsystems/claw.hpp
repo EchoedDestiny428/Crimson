@@ -8,5 +8,6 @@ void spin(int power);
 void stop();
 void automatic();
 void set_pos(double motor_deg);
+int commanded_power();
 
 }

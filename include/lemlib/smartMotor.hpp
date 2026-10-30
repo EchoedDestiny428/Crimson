@@ -26,13 +26,13 @@ public:
     float getRotation() const;
     float getTarget() const;
     bool isSettled() const;
+    int getManualPower() const;
 
     void setTarget(float newTarget);
     void setDecelerationDistance(float distance);
     void setManual(int power);
     void holdCurrent();
     bool waitUntilSettled(std::uint32_t timeout);
-    /** Enable or disable SmartMotor diagnostics through the configured info sink. */
     void setLogging(bool enabled);
 
 private:

@@ -29,6 +29,7 @@ public:
     double get_tx() const;
     double get_ty() const;
     std::uint32_t get_data_age_ms() const;
+    bool connected() const;
 
 private:
     struct Pixel {
@@ -52,6 +53,7 @@ private:
     std::vector<pros::AIVision::Object> tags_;
     mutable pros::Mutex mutex_;
     std::uint32_t last_update_ms_ = 0;
+    bool connected_ = false;
     double camera_height_mm_ = 100.0;
     double camera_pitch_deg_ = 0.0;
 };

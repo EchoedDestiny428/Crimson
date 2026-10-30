@@ -1,6 +1,7 @@
 #include "autons/autons.hpp"
 #include "pros/screen.hpp"
 #include "robotconfig.hpp"
+#include "telemetry/telemetry.hpp"
 #include <array>
 #include <atomic>
 #include <cstddef>
@@ -98,9 +99,17 @@ void run_selected() {
     prepared = false;
     auton_ran = true;
 
-    if (kRoutines[selected].run != nullptr) {
-        kRoutines[selected].run();
+    const Routine& routine = kRoutines[selected];
+    chassis.armRawAnchor();
+    telemetry::auton_started(routine.name);
+    if (routine.run != nullptr) {
+        routine.run();
     }
+    telemetry::auton_finished();
+}
+
+const char* selected_name() {
+    return kRoutines[selected].name;
 }
 
 }

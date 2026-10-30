@@ -104,6 +104,10 @@ bool SmartMotor::isSettled() const {
     return !manual && std::fabs(target - getRotation()) < settleRange;
 }
 
+int SmartMotor::getManualPower() const {
+    return manual ? manualPower.load() : 0;
+}
+
 void SmartMotor::setTarget(float newTarget) {
     if (!std::isfinite(newTarget)) {
         return;

@@ -118,6 +118,10 @@ double target() {
     return motor.getTarget();
 }
 
+int manual_power() {
+    return motor.getManualPower();
+}
+
 bool has_left_bootup() {
     return left_bootup;
 }

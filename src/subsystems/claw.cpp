@@ -20,6 +20,7 @@ constexpr std::uint32_t kLoopMs = 20;
 std::atomic<int> driver_power{0};
 std::atomic<bool> overridden{false};
 std::atomic<int> override_power{0};
+std::atomic<int> applied_power{0};
 
 bool elevator_away_from_home() {
     if (!elevator::has_left_bootup()) {
@@ -30,6 +31,7 @@ bool elevator_away_from_home() {
 }
 
 void apply(int power) {
+    applied_power = power;
     if (power == 0) {
         claw_motor.brake();
     } else {
@@ -83,6 +85,10 @@ void automatic() {
 
 void set_pos(double motor_deg) {
     claw_motor.set_zero_position(motor_deg);
+}
+
+int commanded_power() {
+    return applied_power;
 }
 
 }

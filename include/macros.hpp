@@ -18,4 +18,8 @@ void press(bool up, bool down, bool down_pressed, bool offset_button);
 void update();
 void stop();
 
+const char* mode_name();
+bool tilted();
+bool offset_on();
+
 }
