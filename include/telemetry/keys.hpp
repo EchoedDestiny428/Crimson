@@ -4,7 +4,6 @@ namespace telemetry::types {
 
 inline constexpr const char* kBoolean = "boolean";
 inline constexpr const char* kInt64 = "int64";
-inline constexpr const char* kDouble = "double";
 inline constexpr const char* kString = "string";
 inline constexpr const char* kStructSchema = "structschema";
 
@@ -30,38 +29,11 @@ inline constexpr const char* kMotorLeftA = "/Motors/LeftA";
 inline constexpr const char* kMotorLeftB = "/Motors/LeftB";
 inline constexpr const char* kMotorRightA = "/Motors/RightA";
 inline constexpr const char* kMotorRightB = "/Motors/RightB";
-inline constexpr const char* kMotorElevatorA = "/Motors/ElevatorA";
-inline constexpr const char* kMotorElevatorB = "/Motors/ElevatorB";
-inline constexpr const char* kMotorIntake = "/Motors/Intake";
-inline constexpr const char* kMotorClaw = "/Motors/Claw";
-inline constexpr const char* kMotorPivot = "/Motors/Pivot";
 
 inline constexpr const char* kMotorLeftAHealth = "/Motors/LeftA/Health";
 inline constexpr const char* kMotorLeftBHealth = "/Motors/LeftB/Health";
 inline constexpr const char* kMotorRightAHealth = "/Motors/RightA/Health";
 inline constexpr const char* kMotorRightBHealth = "/Motors/RightB/Health";
-inline constexpr const char* kMotorElevatorAHealth = "/Motors/ElevatorA/Health";
-inline constexpr const char* kMotorElevatorBHealth = "/Motors/ElevatorB/Health";
-inline constexpr const char* kMotorIntakeHealth = "/Motors/Intake/Health";
-inline constexpr const char* kMotorClawHealth = "/Motors/Claw/Health";
-inline constexpr const char* kMotorPivotHealth = "/Motors/Pivot/Health";
-
-inline constexpr const char* kMechanismElevator = "/Mechanisms/Elevator";
-inline constexpr const char* kMechanismPivot = "/Mechanisms/Pivot";
-inline constexpr const char* kMechanismElevatorManual = "/Mechanisms/ElevatorManual";
-inline constexpr const char* kMechanismClawPower = "/Mechanisms/ClawPower";
-inline constexpr const char* kMechanismMacroMode = "/Mechanisms/MacroMode";
-inline constexpr const char* kMechanismTilted = "/Mechanisms/Tilted";
-inline constexpr const char* kMechanismOffsetOn = "/Mechanisms/OffsetOn";
-inline constexpr const char* kPneumaticIntakeLift = "/Pneumatics/IntakeLift";
-inline constexpr const char* kPneumaticPullToggle = "/Pneumatics/PullToggle";
-
-inline constexpr const char* kVisionConnected = "/Vision/Connected";
-inline constexpr const char* kVisionTagCount = "/Vision/TagCount";
-inline constexpr const char* kVisionPrimaryTag = "/Vision/PrimaryTag";
-inline constexpr const char* kVisionTx = "/Vision/Tx";
-inline constexpr const char* kVisionTy = "/Vision/Ty";
-inline constexpr const char* kVisionPose = "/Vision/Pose";
 
 inline constexpr const char* kSystemBattery = "/System/Battery";
 inline constexpr const char* kControllerMaster = "/Controller/Master";

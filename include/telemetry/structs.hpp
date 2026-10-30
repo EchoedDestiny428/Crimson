@@ -156,21 +156,6 @@ struct Controller {
     }
 };
 
-struct Mechanism {
-    static constexpr const char* kType = "struct:Mechanism";
-    static constexpr const char* kSchemaKey = "/.schema/struct:Mechanism";
-    static constexpr const char* kSchema = "double target;double position;bool settled";
-    static constexpr std::size_t kSize = 17;
-
-    double target;
-    double position;
-    bool settled;
-
-    constexpr std::array<std::uint8_t, kSize> pack() const {
-        return pack_fields(target, position, flag(settled));
-    }
-};
-
 enum class MotionKind : std::uint8_t {
     MoveToPoint = 1,
     MoveToPose = 2,

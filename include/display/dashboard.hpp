@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vision/crimson.hpp"
+#include "lemlib/pose.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -12,9 +12,8 @@ class Dashboard {
 public:
     void initialize();
     void show_status(const char* text);
-    void update(const crimson::Pose2D& odom, const std::optional<crimson::Pose2D>& vision, int tag_count,
-                int primary_tag_id);
-    void show_autons(std::span<const char* const> names, std::size_t selected, const crimson::Pose2D& odom);
+    void update(const lemlib::Pose& odom);
+    void show_autons(std::span<const char* const> names, std::size_t selected, const lemlib::Pose& odom);
 
     static std::optional<std::size_t> auton_at(int x, int y, std::size_t count);
 
@@ -28,10 +27,9 @@ private:
 
     void draw_status(const char* text, std::uint32_t color);
     void draw_field();
-    void draw_pose(const crimson::Pose2D& pose, std::uint32_t color, bool filled);
-    void draw_legend(int y, std::uint32_t color, bool filled, const char* label);
-    void print_stats(const crimson::Pose2D& odom, const std::optional<crimson::Pose2D>& vision, int tag_count,
-                     int primary_tag_id);
+    void draw_pose(const lemlib::Pose& pose);
+    void draw_legend(int y, const char* label);
+    void print_stats(const lemlib::Pose& odom);
 
     bool showing_autons = false;
     std::size_t shown_auton = 0;

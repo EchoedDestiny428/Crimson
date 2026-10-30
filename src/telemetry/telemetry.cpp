@@ -101,12 +101,9 @@ void write_metadata(std::uint64_t timestamp) {
     write_metadata(keys::kMetadataBuild, text, timestamp);
 
     std::snprintf(text, sizeof(text),
-                  "intake=%d,vision=%d,imu=%d,leftDriveA=%d,leftDriveB=%d,rightDriveA=%d,rightDriveB=%d,"
-                  "elevatorA=%d,elevatorB=%d,pivot=%d,claw=%d,verticalOdom=%d,horizontalOdom=%d,intakeLift=%c,"
-                  "pullToggle=%c",
-                  ports::kIntake, ports::kVision, ports::kImu, ports::kLeftDriveA, ports::kLeftDriveB,
-                  ports::kRightDriveA, ports::kRightDriveB, ports::kElevatorA, ports::kElevatorB, ports::kPivot,
-                  ports::kClaw, ports::kVerticalOdom, ports::kHorizontalOdom, ports::kIntakeLift, ports::kPullToggle);
+                  "imu=%d,leftDriveA=%d,leftDriveB=%d,rightDriveA=%d,rightDriveB=%d,verticalOdom=%d,horizontalOdom=%d",
+                  ports::kImu, ports::kLeftDriveA, ports::kLeftDriveB, ports::kRightDriveA, ports::kRightDriveB,
+                  ports::kVerticalOdom, ports::kHorizontalOdom);
     write_metadata(keys::kMetadataPorts, text, timestamp);
 
     std::snprintf(text, sizeof(text), "trackWidth=%g,wheelDiameter=%g,rpm=%g,horizontalDrift=%g", config::kTrackWidthIn,
@@ -132,7 +129,7 @@ void write_metadata(std::uint64_t timestamp) {
                    "motorPosition=deg,motorVelocity=rpm,motorVoltage=V,motorCurrent=A,motorPower=W,motorTorque=Nm,"
                    "motorTemperature=C,motorEfficiency=pct,wheel=centideg,wheelVelocity=centideg/s,imuAngle=deg,"
                    "imuGyro=deg/s,imuAccel=g,batteryVoltage=V,batteryCurrent=A,batteryCapacity=pct,"
-                   "batteryTemperature=C,mechanismElevator=motorDeg,mechanismPivot=motorDeg,power=-127..127",
+                   "batteryTemperature=C",
                    timestamp);
 }
 
@@ -154,13 +151,10 @@ void run() {
         system_log::every_tick(timestamp);
         if (enabled || slow) {
             drive_log::fast(timestamp);
-            mechanism_log::fast(timestamp);
             system_log::fast(timestamp);
-            vision_log::fast(timestamp);
         }
         if (slow) {
             drive_log::slow(timestamp);
-            mechanism_log::slow(timestamp);
             system_log::slow(timestamp);
         }
         if (tick % kFlushEveryTicks == 0) {
@@ -202,7 +196,6 @@ void start() {
     write_schema<structs::Wheel>(timestamp);
     write_schema<structs::Battery>(timestamp);
     write_schema<structs::Controller>(timestamp);
-    write_schema<structs::Mechanism>(timestamp);
     write_schema<structs::Motion>(timestamp);
     write_metadata(timestamp);
 

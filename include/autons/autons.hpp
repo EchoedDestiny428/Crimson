@@ -4,33 +4,6 @@ namespace autons {
 
 namespace match::test {
 
-void setup();
-void run();
-
-}
-namespace match::teambad {
-
-void setup();
-void run();
-
-}
-
-namespace match::snacky {
-
-void setup();
-void run();
-
-}
-
-namespace match::teambad {
-void setup();
-void run();
-
-}
-
-namespace skills::v1 {
-
-void setup();
 void run();
 
 }

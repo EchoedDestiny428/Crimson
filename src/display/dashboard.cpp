@@ -18,7 +18,6 @@ constexpr std::uint32_t kHeaderBackground = 0x15151A;
 constexpr std::uint32_t kFieldBackground = 0x252830;
 constexpr std::uint32_t kFieldLine = 0x4B5363;
 constexpr std::uint32_t kOdomColor = 0x00F0B5;
-constexpr std::uint32_t kVisionColor = 0xE879F9;
 constexpr std::uint32_t kGoalRed = 0xFF4D4D;
 constexpr std::uint32_t kGoalBlue = 0x3B82F6;
 constexpr std::uint32_t kGoalNeutral = 0xFBBF24;
@@ -87,15 +86,13 @@ void draw_auton_button(const Rect& rect, const char* name, bool selected) {
     pros::screen::set_eraser(kBackground);
 }
 
-void draw_box(int center_x, int center_y, std::uint32_t color, bool filled) {
-    pros::screen::set_pen(color);
-    if (filled) {
-        pros::screen::fill_rect(center_x - kBoxHalf, center_y - kBoxHalf, center_x + kBoxHalf, center_y + kBoxHalf);
-    } else {
-        pros::screen::draw_rect(center_x - kBoxHalf, center_y - kBoxHalf, center_x + kBoxHalf, center_y + kBoxHalf);
-        pros::screen::draw_rect(center_x - kBoxHalf + 1, center_y - kBoxHalf + 1, center_x + kBoxHalf - 1,
-                                center_y + kBoxHalf - 1);
-    }
+void draw_box(int center_x, int center_y) {
+    pros::screen::set_pen(kOdomColor);
+    pros::screen::fill_rect(center_x - kBoxHalf, center_y - kBoxHalf, center_x + kBoxHalf, center_y + kBoxHalf);
+}
+
+bool pose_valid(const lemlib::Pose& pose) {
+    return std::isfinite(pose.x) && std::isfinite(pose.y) && std::isfinite(pose.theta);
 }
 
 std::uint32_t goal_color(field::GoalType type) {
@@ -124,21 +121,17 @@ void Dashboard::show_status(const char* text) {
     draw_status(text, kTextAccent);
 }
 
-void Dashboard::update(const crimson::Pose2D& odom, const std::optional<crimson::Pose2D>& vision, int tag_count,
-                       int primary_tag_id) {
+void Dashboard::update(const lemlib::Pose& odom) {
     if (showing_autons) {
         showing_autons = false;
         initialize();
     }
     draw_field();
-    draw_pose(odom, kOdomColor, true);
-    if (vision) {
-        draw_pose(*vision, kVisionColor, false);
-    }
-    print_stats(odom, vision, tag_count, primary_tag_id);
+    draw_pose(odom);
+    print_stats(odom);
 }
 
-void Dashboard::show_autons(std::span<const char* const> names, std::size_t selected, const crimson::Pose2D& odom) {
+void Dashboard::show_autons(std::span<const char* const> names, std::size_t selected, const lemlib::Pose& odom) {
     const bool first = !showing_autons;
     if (first) {
         pros::screen::set_eraser(kBackground);
@@ -154,10 +147,9 @@ void Dashboard::show_autons(std::span<const char* const> names, std::size_t sele
     char pose[sizeof(shown_pose)];
     std::snprintf(pose, sizeof(pose), "X %6.1f  Y %6.1f  H %6.1f", odom.x, odom.y, util::wrap_degrees(odom.theta));
     if (first || std::strcmp(pose, shown_pose) != 0) {
-        const bool valid = std::isfinite(odom.x) && std::isfinite(odom.y) && std::isfinite(odom.theta);
         pros::screen::set_pen(kBackground);
         pros::screen::fill_rect(0, kAutonBottom + 1, kScreenWidth, kScreenHeight);
-        pros::screen::set_pen(valid ? kOdomColor : kGoalRed);
+        pros::screen::set_pen(pose_valid(odom) ? kOdomColor : kGoalRed);
         pros::screen::print(pros::E_TEXT_MEDIUM, kAutonMargin, kPoseTextY, "%s", pose);
         std::strcpy(shown_pose, pose);
     }
@@ -207,10 +199,10 @@ void Dashboard::draw_field() {
     }
 }
 
-void Dashboard::draw_pose(const crimson::Pose2D& pose, std::uint32_t color, bool filled) {
+void Dashboard::draw_pose(const lemlib::Pose& pose) {
     const int x = std::clamp(to_screen_x(pose.x), kMapOffsetX + kBoxHalf, kMapOffsetX + kMapSize - kBoxHalf);
     const int y = std::clamp(to_screen_y(pose.y), kMapOffsetY + kBoxHalf, kMapOffsetY + kMapSize - kBoxHalf);
-    draw_box(x, y, color, filled);
+    draw_box(x, y);
 
     const double heading = util::deg_to_rad(pose.theta);
     const int tip_x = std::clamp(x + static_cast<int>(std::lround(kHeadingLength * std::sin(heading))), kMapOffsetX,
@@ -220,47 +212,25 @@ void Dashboard::draw_pose(const crimson::Pose2D& pose, std::uint32_t color, bool
     pros::screen::draw_line(x, y, tip_x, tip_y);
 }
 
-void Dashboard::draw_legend(int y, std::uint32_t color, bool filled, const char* label) {
-    draw_box(kPanelX + kBoxHalf, y + kLegendBoxOffsetY, color, filled);
+void Dashboard::draw_legend(int y, const char* label) {
+    draw_box(kPanelX + kBoxHalf, y + kLegendBoxOffsetY);
     pros::screen::print(pros::E_TEXT_MEDIUM, kLegendTextX, y, "%s", label);
 }
 
-void Dashboard::print_stats(const crimson::Pose2D& odom, const std::optional<crimson::Pose2D>& vision, int tag_count,
-                            int primary_tag_id) {
+void Dashboard::print_stats(const lemlib::Pose& odom) {
     pros::screen::set_pen(kBackground);
     pros::screen::fill_rect(kPanelX, kHeaderHeight + 1, kScreenWidth, kScreenHeight);
 
-    if (vision) {
-        draw_status("VISION: OK", kVisionColor);
+    if (pose_valid(odom)) {
+        draw_status("ODOM: OK", kOdomColor);
     } else {
-        draw_status("VISION: LOST", kGoalRed);
+        draw_status("ODOM: NAN", kGoalRed);
     }
 
-    draw_legend(40, kOdomColor, true, "ODOMETRY");
+    draw_legend(40, "ODOMETRY");
     pros::screen::set_pen(kTextWhite);
     pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, 62, "X %6.1f  Y %6.1f in", odom.x, odom.y);
     pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, 84, "H %6.1f deg", util::wrap_degrees(odom.theta));
-
-    draw_legend(114, kVisionColor, false, "VISION");
-    pros::screen::set_pen(kTextWhite);
-    if (vision) {
-        pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, 136, "X %6.1f  Y %6.1f in", vision->x, vision->y);
-    } else {
-        pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, 136, "X    ---  Y    ---");
-    }
-    if (tag_count > 0) {
-        pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, 158, "Tags %d  ID %d", tag_count, primary_tag_id);
-    } else {
-        pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, 158, "Tags 0  ID -");
-    }
-
-    pros::screen::set_pen(kTextAccent);
-    if (vision) {
-        pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, 190, "Offset %5.1f in",
-                            std::hypot(vision->x - odom.x, vision->y - odom.y));
-    } else {
-        pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, 190, "Offset ---");
-    }
 
     pros::screen::set_pen(kTextDim);
     pros::screen::print(pros::E_TEXT_SMALL, kPanelX, 220, "Build %s", _PROS_COMPILE_TIMESTAMP);

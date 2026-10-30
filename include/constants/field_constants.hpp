@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <vector>
 
 namespace field {
 
@@ -15,12 +14,6 @@ enum class GoalType { Neutral, Red, Blue };
 struct Goal {
     Point2D pos;
     GoalType type;
-    int tag;
-};
-
-struct GoalInfo {
-    Point2D pos;
-    double height;
 };
 
 inline constexpr double kMmPerInch = 25.4;
@@ -30,45 +23,20 @@ inline constexpr double kFieldTiles = 6.0;
 inline constexpr double kFieldLength = kFieldTiles * kTileMm;
 inline constexpr double kFieldWidth = kFieldTiles * kTileMm;
 
-inline constexpr double kCenterGoalTagHeight = 222.7;
-inline constexpr double kNeutralGoalTagHeight = 146.5;
-inline constexpr double kAllianceGoalTagHeight = 82.5;
-
 inline constexpr Point2D from_center_tiles(double x, double y) {
     return {x * kTileMm + kFieldLength / 2.0, y * kTileMm + kFieldWidth / 2.0};
 }
 
 inline constexpr std::array kGoals{
-    Goal{from_center_tiles(0, 0), GoalType::Neutral, 0},  Goal{from_center_tiles(-2, 1), GoalType::Neutral, 1},
-    Goal{from_center_tiles(2, -1), GoalType::Neutral, 1}, Goal{from_center_tiles(-1, 2), GoalType::Neutral, 4},
-    Goal{from_center_tiles(1, -2), GoalType::Neutral, 4}, Goal{from_center_tiles(-2, -1), GoalType::Red, 2},
-    Goal{from_center_tiles(-1, -2), GoalType::Red, 3},    Goal{from_center_tiles(2, 1), GoalType::Blue, 2},
-    Goal{from_center_tiles(1, 2), GoalType::Blue, 3},
+    Goal{from_center_tiles(0, 0), GoalType::Neutral},  Goal{from_center_tiles(-2, 1), GoalType::Neutral},
+    Goal{from_center_tiles(2, -1), GoalType::Neutral}, Goal{from_center_tiles(-1, 2), GoalType::Neutral},
+    Goal{from_center_tiles(1, -2), GoalType::Neutral}, Goal{from_center_tiles(-2, -1), GoalType::Red},
+    Goal{from_center_tiles(-1, -2), GoalType::Red},    Goal{from_center_tiles(2, 1), GoalType::Blue},
+    Goal{from_center_tiles(1, 2), GoalType::Blue},
 };
-
-inline constexpr bool in_field(const Point2D& point) {
-    return point.x >= 0.0 && point.x <= kFieldLength && point.y >= 0.0 && point.y <= kFieldWidth;
-}
 
 inline constexpr Point2D to_lemlib_inches(const Point2D& field_mm) {
     return {(field_mm.x - kFieldLength / 2.0) / kMmPerInch, (field_mm.y - kFieldWidth / 2.0) / kMmPerInch};
-}
-
-inline constexpr double tag_height(const Goal& goal) {
-    if (goal.type != GoalType::Neutral) {
-        return kAllianceGoalTagHeight;
-    }
-    return goal.tag == 0 ? kCenterGoalTagHeight : kNeutralGoalTagHeight;
-}
-
-inline std::vector<GoalInfo> get_goal_locations_for_tag(int tag_id) {
-    std::vector<GoalInfo> goals;
-    for (const Goal& goal : kGoals) {
-        if (goal.tag == tag_id) {
-            goals.push_back({goal.pos, tag_height(goal)});
-        }
-    }
-    return goals;
 }
 
 }
