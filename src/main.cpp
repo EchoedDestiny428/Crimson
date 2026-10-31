@@ -36,11 +36,4 @@ void opcontrol() {
     }
 
     chassis.cancelAllMotions();
-
-    drive::reset();
-    std::uint32_t now = pros::millis();
-    while (true) {
-        drive::update();
-        pros::Task::delay_until(&now, drive::kLoopMs);
-    }
 }
