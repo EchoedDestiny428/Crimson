@@ -14,4 +14,11 @@ inline constexpr std::int8_t kRightDriveB = 20;
 inline constexpr std::int8_t kVerticalOdom = 4;
 inline constexpr std::int8_t kHorizontalOdom = -11;
 
+inline constexpr std::int8_t kElevatorA = 8;        // cascade, bottom motor. Unassigned. Negate both elevator ports if the carriage lowers on L1.
+inline constexpr std::int8_t kElevatorB = 9;        // cascade, second bottom motor. Unassigned. If the two chains fight, negate only this one.
+inline constexpr std::int8_t kPivot = 7;            // the bar's own motor, driving it through a chain. Negate if positive degrees swing the claw the wrong way.
+inline constexpr std::int8_t kToggle = 6;           // flex-wheel motor. Unassigned. Negate if positive voltage spins the wheels the wrong way.
+
+inline constexpr std::uint8_t kClaw = 'A';          // piston on the brain ADI, not a smart port. Unassigned. HIGH closes; flip claw::kClosedLevel if HIGH opens.
+
 }

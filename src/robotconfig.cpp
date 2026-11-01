@@ -11,6 +11,11 @@ pros::MotorGroup right_motors({ports::kRightDriveA, ports::kRightDriveB}, pros::
 pros::Rotation vertical_odom(ports::kVerticalOdom);
 pros::Rotation horizontal_odom(ports::kHorizontalOdom);
 
+pros::MotorGroup elevator_motors({ports::kElevatorA, ports::kElevatorB}, pros::MotorGears::green); // two bottom cascade motors. Assumed green. Change the gearset with the cartridge, or the degrees scale wrong.
+pros::Motor pivot_motor(ports::kPivot, pros::MotorGears::green);                                     // bar motor. Assumed green. The gearset has to match the cartridge.
+pros::Motor toggle_motor(ports::kToggle, pros::MotorGears::green);                                   // flex wheels. Assumed green. A roller is often blue; change the gearset if this cartridge is blue.
+pros::adi::DigitalOut claw_piston(ports::kClaw);                                                     // piston. claw::init() sets the open level.
+
 namespace {
 
 lemlib::ControllerSettings controller_settings(const config::PidConstants& pid) {

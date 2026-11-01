@@ -15,9 +15,12 @@ void run() {
     std::uint32_t tick = 0;
 
     while (true) {
+        const bool refresh = ++tick % kDashboardEveryTicks == 0;
         if (pros::competition::is_disabled()) {
             autons::draw_selector();
-        } else if (++tick % kDashboardEveryTicks == 0) {
+        } else if (!pros::competition::is_autonomous() && refresh) {
+            autons::match::mech_test::draw();
+        } else if (refresh) {
             dashboard.update(chassis.getPose());
         }
 
