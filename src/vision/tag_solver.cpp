@@ -93,8 +93,8 @@ bool known_id(int id) {
 WorldCorners tag_corners(const Placement& placement) {
     const field::Goal& goal = field::kGoals[placement.goal];
     const double face = deg_to_rad(placement.face_deg);
-    const double normal_x = std::sin(face);
-    const double normal_y = std::cos(face);
+    const double normal_x = std::cos(face);
+    const double normal_y = -std::sin(face);
     const double centre_x = goal.pos.x + field::kTagPlateOffsetMm * normal_x;
     const double centre_y = goal.pos.y + field::kTagPlateOffsetMm * normal_y;
     const double half = field::kTagSizeMm / 2.0;
@@ -116,11 +116,11 @@ std::optional<Pixel> project(const Pose& pose, const Point3& point, const Camera
     const double yaw = deg_to_rad(pose.heading_deg);
     const double dx = point.x - pose.x_mm;
     const double dy = point.y - pose.y_mm;
-    const double depth = dx * std::sin(yaw) + dy * std::cos(yaw);
+    const double depth = dx * std::cos(yaw) - dy * std::sin(yaw);
     if (depth < kMinDepthMm) {
         return std::nullopt;
     }
-    const double right = dx * std::cos(yaw) - dy * std::sin(yaw);
+    const double right = -dx * std::sin(yaw) - dy * std::cos(yaw);
     return Pixel{camera.cx + camera.fx * right / depth, camera.cy + camera.fy * (camera.height_mm - point.z) / depth};
 }
 
@@ -164,10 +164,10 @@ std::optional<Pose> linear_seed(std::span<const View> views, double heading_deg,
             const Point3& point = view.world[i];
             const double bearing = (view.pixels[i].u - camera.cx) / camera.fx;
             const double drop = (view.pixels[i].v - camera.cy) / camera.fy;
-            const double row_x = c - bearing * s;
-            const double row_y = -(s + bearing * c);
+            const double row_x = s + bearing * c;
+            const double row_y = c - bearing * s;
             add_row(row_x, row_y, point.x * row_x + point.y * row_y);
-            add_row(drop * s, drop * c, drop * (point.x * s + point.y * c) - (camera.height_mm - point.z));
+            add_row(drop * c, -drop * s, drop * (point.x * c - point.y * s) - (camera.height_mm - point.z));
         }
     }
 
@@ -189,16 +189,16 @@ Normal normal_equations(const Pose& pose, std::span<const View> views, const Cam
             const Point3& point = view.world[i];
             const double dx = point.x - pose.x_mm;
             const double dy = point.y - pose.y_mm;
-            const double depth = dx * s + dy * c;
+            const double depth = dx * c - dy * s;
             if (depth < kMinDepthMm) {
                 continue;
             }
-            const double right = dx * c - dy * s;
+            const double right = -dx * s - dy * c;
             const double drop = camera.height_mm - point.z;
             const double per_depth_squared = 1.0 / (depth * depth);
 
-            const Vector3 depth_slope{-s, -c, right};
-            const Vector3 right_slope{-c, s, -depth};
+            const Vector3 depth_slope{-c, s, right};
+            const Vector3 right_slope{s, c, -depth};
             Vector3 u_slope{};
             Vector3 v_slope{};
             for (std::size_t k = 0; k < 3; ++k) {

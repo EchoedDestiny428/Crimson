@@ -12,6 +12,7 @@ namespace display {
 
 namespace {
 
+using vision::localizer::FieldPose;
 using vision::localizer::Snapshot;
 using vision::localizer::Status;
 
@@ -42,6 +43,11 @@ constexpr int kTitleX = 15;
 constexpr int kTitleY = 6;
 constexpr int kStationGap = 2;
 constexpr int kStationThickness = 3;
+constexpr int kTickSpacingIn = 24;
+constexpr int kTickLength = 4;
+constexpr int kTickLabelGap = 3;
+constexpr int kSmallCharWidth = 7;
+constexpr int kSmallCharHalfHeight = 6;
 
 constexpr int kLegendY = 40;
 constexpr int kPositionY = 62;
@@ -112,6 +118,7 @@ void Dashboard::initialize() {
     pros::screen::erase();
 
     draw_header("CRIMSON | POSE ESTIMATION");
+    draw_tick_labels();
     draw_field();
 }
 
@@ -131,13 +138,13 @@ void Dashboard::update(const Snapshot& snapshot) {
     print_stats(snapshot, pose_color);
 }
 
-int Dashboard::to_screen_x(double x_mm) {
-    const double fraction = std::clamp(x_mm / field::kFieldSizeMm + 0.5, 0.0, 1.0);
+int Dashboard::to_screen_x(double x_in) {
+    const double fraction = std::clamp(x_in / field::kFieldSizeIn, 0.0, 1.0);
     return kMapOffsetX + static_cast<int>(fraction * kMapSize);
 }
 
-int Dashboard::to_screen_y(double y_mm) {
-    const double fraction = std::clamp(y_mm / field::kFieldSizeMm + 0.5, 0.0, 1.0);
+int Dashboard::to_screen_y(double y_in) {
+    const double fraction = std::clamp(y_in / field::kFieldSizeIn, 0.0, 1.0);
     return kMapOffsetY + kMapSize - static_cast<int>(fraction * kMapSize);
 }
 
@@ -155,29 +162,58 @@ void Dashboard::draw_field() {
     pros::screen::set_pen(kFieldLine);
     pros::screen::draw_rect(kMapOffsetX, kMapOffsetY, kMapOffsetX + kMapSize, kMapOffsetY + kMapSize);
 
-    const int red_station_y = kMapOffsetY - kStationGap;
-    const int blue_station_y = kMapOffsetY + kMapSize + kStationGap;
+    const int map_bottom = kMapOffsetY + kMapSize;
+    pros::screen::set_pen(kTextDim);
+    for (int inches = kTickSpacingIn; inches < field::kFieldSizeIn; inches += kTickSpacingIn) {
+        const int x = to_screen_x(inches);
+        const int y = to_screen_y(inches);
+        pros::screen::draw_line(x, map_bottom, x, map_bottom - kTickLength);
+        pros::screen::draw_line(kMapOffsetX, y, kMapOffsetX + kTickLength, y);
+    }
 
-    pros::screen::set_pen(kGoalRed);
-    pros::screen::draw_rect(kMapOffsetX, red_station_y - kStationThickness, kMapOffsetX + kMapSize, red_station_y);
+    const int blue_station_x = kMapOffsetX - kStationGap;
+    const int red_station_x = kMapOffsetX + kMapSize + kStationGap;
+
     pros::screen::set_pen(kGoalBlue);
-    pros::screen::draw_rect(kMapOffsetX, blue_station_y, kMapOffsetX + kMapSize, blue_station_y + kStationThickness);
+    pros::screen::draw_rect(blue_station_x - kStationThickness, kMapOffsetY, blue_station_x, map_bottom);
+    pros::screen::set_pen(kGoalRed);
+    pros::screen::draw_rect(red_station_x, kMapOffsetY, red_station_x + kStationThickness, map_bottom);
 
     for (const field::Goal& goal : field::kGoals) {
         pros::screen::set_pen(goal_color(goal.type));
-        pros::screen::fill_circle(to_screen_x(goal.pos.x), to_screen_y(goal.pos.y), kGoalRadius);
+        pros::screen::fill_circle(to_screen_x(goal.pos.x / field::kMmPerInch),
+                                  to_screen_y(goal.pos.y / field::kMmPerInch), kGoalRadius);
     }
 }
 
-void Dashboard::draw_pose(const vision::Pose& pose, std::uint32_t color) {
-    const int x = std::clamp(to_screen_x(pose.x_mm), kMapOffsetX + kBoxHalf, kMapOffsetX + kMapSize - kBoxHalf);
-    const int y = std::clamp(to_screen_y(pose.y_mm), kMapOffsetY + kBoxHalf, kMapOffsetY + kMapSize - kBoxHalf);
+void Dashboard::draw_tick_labels() {
+    const int y_labels_right = kMapOffsetX - kStationGap - kStationThickness - kTickLabelGap;
+    const int x_labels_top = kMapOffsetY + kMapSize + kTickLabelGap;
+
+    pros::screen::set_pen(kTextDim);
+    for (int inches = 0; inches < field::kFieldSizeIn; inches += kTickSpacingIn) {
+        char label[8];
+        const int width = std::snprintf(label, sizeof(label), "%d", inches) * kSmallCharWidth;
+        pros::screen::print(pros::E_TEXT_SMALL, to_screen_x(inches) - width / 2, x_labels_top, "%s", label);
+        pros::screen::print(pros::E_TEXT_SMALL, y_labels_right - width, to_screen_y(inches) - kSmallCharHalfHeight,
+                            "%s", label);
+    }
+
+    pros::screen::set_pen(kTextAccent);
+    pros::screen::print(pros::E_TEXT_SMALL, kMapOffsetX + kMapSize - kSmallCharWidth, x_labels_top, "X");
+    pros::screen::print(pros::E_TEXT_SMALL, y_labels_right - kSmallCharWidth, kMapOffsetY, "Y");
+}
+
+void Dashboard::draw_pose(const FieldPose& pose, std::uint32_t color) {
+    const int x = std::clamp(to_screen_x(pose.x_in), kMapOffsetX + kBoxHalf, kMapOffsetX + kMapSize - kBoxHalf);
+    const int y = std::clamp(to_screen_y(pose.y_in), kMapOffsetY + kBoxHalf, kMapOffsetY + kMapSize - kBoxHalf);
     draw_box(x, y, color);
 
+    // Screen rows grow downwards, so a clockwise heading turns the line from +X towards the bottom of the map.
     const double heading = util::deg_to_rad(pose.heading_deg);
-    const int tip_x = std::clamp(x + static_cast<int>(std::lround(kHeadingLength * std::sin(heading))), kMapOffsetX,
+    const int tip_x = std::clamp(x + static_cast<int>(std::lround(kHeadingLength * std::cos(heading))), kMapOffsetX,
                                  kMapOffsetX + kMapSize);
-    const int tip_y = std::clamp(y - static_cast<int>(std::lround(kHeadingLength * std::cos(heading))), kMapOffsetY,
+    const int tip_y = std::clamp(y + static_cast<int>(std::lround(kHeadingLength * std::sin(heading))), kMapOffsetY,
                                  kMapOffsetY + kMapSize);
     pros::screen::draw_line(x, y, tip_x, tip_y);
 }
@@ -193,8 +229,8 @@ void Dashboard::print_stats(const Snapshot& snapshot, std::uint32_t pose_color) 
 
     draw_legend(kLegendY, "CAMERA POSE", pose_color);
     pros::screen::set_pen(kTextWhite);
-    pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, kPositionY, "X %6.1f  Y %6.1f in",
-                        snapshot.pose.x_mm / field::kMmPerInch, snapshot.pose.y_mm / field::kMmPerInch);
+    pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, kPositionY, "X %6.1f  Y %6.1f in", snapshot.pose.x_in,
+                        snapshot.pose.y_in);
     pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, kHeadingY, "H %6.1f deg", snapshot.pose.heading_deg);
 
     pros::screen::set_pen(kTextAccent);
@@ -202,7 +238,7 @@ void Dashboard::print_stats(const Snapshot& snapshot, std::uint32_t pose_color) 
                         snapshot.goals, snapshot.candidates);
     if (snapshot.candidates > 0) {
         pros::screen::print(pros::E_TEXT_MEDIUM, kPanelX, kFitY, "ERR %.1f px  R %.1f in", snapshot.error_px,
-                            snapshot.range_mm / field::kMmPerInch);
+                            snapshot.range_in);
     }
 
     pros::screen::set_pen(kTextDim);

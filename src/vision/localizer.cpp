@@ -29,6 +29,10 @@ constexpr Pose kStartPose{config::kStartXIn * field::kMmPerInch, config::kStartY
 pros::Mutex shared_mutex;
 Snapshot shared;
 
+FieldPose to_field_pose(const Pose& pose) {
+    return {pose.x_mm / field::kMmPerInch, pose.y_mm / field::kMmPerInch, pose.heading_deg};
+}
+
 void publish(const Snapshot& next) {
     const std::lock_guard lock(shared_mutex);
     shared = next;
@@ -83,7 +87,7 @@ std::optional<RawTag> largest_tag(std::span<const Detection> tags) {
 void calibrate_imu(pros::Imu& imu) {
     while (imu.reset(true) == PROS_ERR) {
         Snapshot waiting;
-        waiting.pose = kStartPose;
+        waiting.pose = to_field_pose(kStartPose);
         waiting.status = Status::NoImu;
         publish(waiting);
         pros::delay(kImuRetryMs);
@@ -95,7 +99,7 @@ void run() {
     pros::AIVision sensor(ports::kVision);
 
     Snapshot starting;
-    starting.pose = kStartPose;
+    starting.pose = to_field_pose(kStartPose);
     publish(starting);
     calibrate_imu(imu);
 
@@ -139,7 +143,7 @@ void run() {
             if (solution.count > 0) {
                 next.goals = solution.candidates[0].goals;
                 next.error_px = solution.candidates[0].error_px;
-                next.range_mm = solution.candidates[0].range_mm;
+                next.range_in = solution.candidates[0].range_mm / field::kMmPerInch;
             }
         } else {
             next.status = Status::NoSensor;
@@ -147,7 +151,7 @@ void run() {
         if (!imu_ok) {
             next.status = Status::NoImu;
         }
-        next.pose = filter.pose();
+        next.pose = to_field_pose(filter.pose());
         publish(next);
 
         pros::Task::delay_until(&wake_ms, kPeriodMs);
