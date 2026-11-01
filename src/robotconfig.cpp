@@ -22,13 +22,13 @@ namespace {
 
 constexpr std::int32_t kMotorCurrentLimitMa = 2500; // V5 maximum; set explicitly so every motor has it
 
-constexpr float kTrackWidthIn = 12.5f;
+constexpr float kTrackWidthIn = 28.5f / 2.54f; // measured on the new bot (newbot-localization)
 constexpr float kDriveRpm = 360.0f;
 constexpr float kHorizontalDrift = 2.0f;
 
 constexpr float kTrackingWheelDiameterIn = 2.0f;
-constexpr float kVerticalWheelOffsetIn = 0.5f;
-constexpr float kHorizontalWheelOffsetIn = -0.7f; // FIX OFFSET: MOST ISSUES ARE PROBABLY FROM NOT FIXING OFFSET
+constexpr float kVerticalWheelOffsetIn = 0.0f;   // measured (newbot-localization)
+constexpr float kHorizontalWheelOffsetIn = 1.4f; // measured (newbot-localization)
 
 lemlib::Drivetrain drivetrain(&left_motors, &right_motors, kTrackWidthIn, lemlib::Omniwheel::NEW_325, kDriveRpm,
                               kHorizontalDrift);

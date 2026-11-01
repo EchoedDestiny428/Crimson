@@ -25,8 +25,7 @@ constexpr double kTopArrivalToleranceCm = 2.0; // guess; the old robot used 50 m
 
 constexpr double kPi = 3.14159265358979323846;
 constexpr double kSolveStepDeg = 0.5;
-constexpr double kArmMinDeg = 0.0;   // guess: keep the arm on the side it starts on,
-constexpr double kArmMaxDeg = 180.0; // from straight down to straight up
+constexpr double kSolveFineStepDeg = 0.01;
 constexpr double kMoveTimeoutScale = 1.5;
 constexpr std::uint32_t kMoveTimeoutPadMs = 300;
 
@@ -205,19 +204,20 @@ bool go_to_pose(Pose pose) {
 
 // tip height = pivot start height + lift - arm length * cos(arm angle from straight down).
 // Try every arm angle in range, solve the lift that reaches tip_cm, and keep the
-// pose both mechanisms reach soonest. Lifts below the start are skipped.
-bool solve(double tip_cm, Pose& out) {
+// pose both mechanisms reach soonest. Lifts below the start are skipped. A coarse
+// sweep finds the best region, then a fine sweep around it finds the fastest pose.
+bool solve(double tip_cm, Pose& out, double arm_min_deg, double arm_max_deg) {
     if (!ratios_known()) {
         return false;
     }
     const Pose from = current_pose();
     bool found = false;
     double best_s = 0.0;
-    for (double arm = kArmMinDeg; arm <= kArmMaxDeg; arm += kSolveStepDeg) {
+    const auto consider = [&](double arm) {
         const double lift =
             tip_cm - constants::kPivotStartHeightCm + constants::kArmLengthCm * std::cos(arm * kPi / 180.0);
         if (lift < 0.0) {
-            continue;
+            return;
         }
         const Pose pose{lift, arm};
         const double s = move_seconds(from, pose);
@@ -225,6 +225,17 @@ bool solve(double tip_cm, Pose& out) {
             out = pose;
             best_s = s;
             found = true;
+        }
+    };
+    for (double arm = arm_min_deg; arm <= arm_max_deg; arm += kSolveStepDeg) {
+        consider(arm);
+    }
+    if (found) {
+        const double center = out.arm_deg;
+        const double lo = std::max(arm_min_deg, center - kSolveStepDeg);
+        const double hi = std::min(arm_max_deg, center + kSolveStepDeg);
+        for (double arm = lo; arm <= hi; arm += kSolveFineStepDeg) {
+            consider(arm);
         }
     }
     return found;
@@ -327,11 +338,69 @@ bool pickup(std::uint32_t timeout_ms) {
     return run.pause(kGripMs);
 }
 
+double claw_offset_in(const Pose& pose) {
+    const double reach_cm = constants::kArmLengthCm * std::sin(pose.arm_deg * kPi / 180.0);
+    return (reach_cm - constants::kPivotBehindCenterCm + constants::kClawReleaseOffsetCm) / constants::kCmPerInch;
+}
+
+namespace {
+
+bool score_in_range(constants::Goal goal, int level, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms,
+                    double arm_min_deg, double arm_max_deg) {
+    if (level < 1) {
+        return false;
+    }
+    Pose pose{};
+    if (!solve(constants::release_cm(goal, level), pose, arm_min_deg, arm_max_deg)) {
+        return false;
+    }
+
+    const lemlib::Pose robot = chassis.getPose();
+    const double dx = goal_x_in - robot.x;
+    const double dy = goal_y_in - robot.y;
+    const double distance = std::hypot(dx, dy);
+    const double offset = claw_offset_in(pose);
+    const double standoff = std::fabs(offset);
+    if (distance > 1e-6) {
+        // The center stops `standoff` short of the goal on the robot-to-goal line, facing
+        // the goal if the claw is in front or facing away if it is behind. Driving toward
+        // the goal is forwards when facing it; backing off when too close is the reverse.
+        const bool claw_in_front = offset >= 0.0;
+        const bool toward_goal = distance >= standoff;
+        const float stop_x = static_cast<float>(goal_x_in - dx / distance * standoff);
+        const float stop_y = static_cast<float>(goal_y_in - dy / distance * standoff);
+        chassis.moveToPoint(stop_x, stop_y, static_cast<int>(timeout_ms), {.forwards = claw_in_front == toward_goal});
+    }
+
+    const Run run;
+    mode = Mode::Deployed;
+    tilted = false;
+    set_lift(pose.lift_cm);
+    set_arm(pose.arm_deg);
+    const bool reached = run.wait_for(
+        [] { return !chassis.isInMotion() && extension::is_settled() && arm_pivot::is_settled(); }, timeout_ms);
+    return release_if(reached);
+}
+
+}
+
+bool score(constants::Goal goal, int level, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms) {
+    return score_in_range(goal, level, goal_x_in, goal_y_in, timeout_ms, kArmFrontMinDeg, kArmBehindMaxDeg);
+}
+
+bool score_front(constants::Goal goal, int level, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms) {
+    return score_in_range(goal, level, goal_x_in, goal_y_in, timeout_ms, kArmFrontMinDeg, kArmFrontMaxDeg);
+}
+
+bool score_behind(constants::Goal goal, int level, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms) {
+    return score_in_range(goal, level, goal_x_in, goal_y_in, timeout_ms, kArmBehindMinDeg, kArmBehindMaxDeg);
+}
+
 bool score(constants::Goal goal, int level) {
     if (level < 1) {
         return false;
     }
-    return release_if(move_to(constants::stack_release_cm(constants::goal_height_cm(goal), level)));
+    return release_if(move_to(constants::release_cm(goal, level)));
 }
 
 void cancel() {

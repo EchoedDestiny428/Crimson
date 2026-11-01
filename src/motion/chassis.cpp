@@ -80,13 +80,23 @@ bool Chassis::setPoseFromGoal(float goalX, float goalY, GoalPoseParams params) {
     const lemlib::Pose now = getPose();
     const float heading = lemlib::degToRad(now.theta);
     const float side = params.forwards ? -1.0f : 1.0f;
-    const float x = goalX + side * params.distance * std::sin(heading);
-    const float y = goalY + side * params.distance * std::cos(heading);
+    const float distance =
+        params.distance > 0.0f ? params.distance : (params.forwards ? kGoalResetFrontIn : kGoalResetBackIn);
+    const float x = goalX + side * distance * std::sin(heading);
+    const float y = goalY + side * distance * std::cos(heading);
     if (std::hypot(x - now.x, y - now.y) > params.maxCorrection) {
         return false;
     }
     setPose(x, y, now.theta);
     return true;
+}
+
+bool Chassis::resetFromGoalFront(float goalX, float goalY) {
+    return setPoseFromGoal(goalX, goalY, {.forwards = true, .maxCorrection = 1000});
+}
+
+bool Chassis::resetFromGoalBack(float goalX, float goalY) {
+    return setPoseFromGoal(goalX, goalY, {.forwards = false, .maxCorrection = 1000});
 }
 
 }
