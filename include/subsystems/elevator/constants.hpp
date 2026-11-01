@@ -36,12 +36,43 @@ inline constexpr double kArmTopDeg = 0.0;        // TODO
 inline constexpr double kArmDualSetupDeg = 0.0;  // TODO
 inline constexpr double kArmDualPickupDeg = 0.0; // TODO
 
+// Override (V5RC 2026-27) field elements, from game manual v2.1, in cm.
+inline constexpr double kPinHeightCm = 16.5;
+inline constexpr double kCupHeightCm = 16.45;
+inline constexpr double kAllianceGoalHeightCm = 8.25;
+inline constexpr double kShortGoalHeightCm = 14.65; // neutral quadrant goals
+inline constexpr double kTallGoalHeightCm = 22.27;  // center goal
+
 // Claw grip window relative to the arm tip (measured): it grabs from 8 cm below to 2 cm
 // above the tip, tuned so at its lowest it grabs a cup/pin combo off the floor.
 inline constexpr double kClawGripAboveCm = 2.0;
 inline constexpr double kClawGripBelowCm = 8.0;
 inline constexpr double kClawGripCenterBelowTipCm = (kClawGripBelowCm - kClawGripAboveCm) / 2.0; // 3 cm
 inline constexpr double kClawLowestCm = kPivotStartHeightCm - kArmLengthCm; // arm tip, arm straight down, no lift
+
+// THEORETICAL arm-tip heights above the ground for releasing a piece, with the piece
+// held at the middle of the grip window. Calculated from the manual, not measured on
+// the robot. Stacks nest goal -> pin -> cup -> pin, each half inside the next piece.
+inline constexpr double kReleaseClearanceCm = 2.0; // guess
+
+constexpr double place_pin_on_goal_cm(double goal_cm) {
+    return goal_cm + kReleaseClearanceCm + kPinHeightCm / 2.0 + kClawGripCenterBelowTipCm;
+}
+
+constexpr double place_cup_on_pin_cm(double goal_cm) {
+    return goal_cm + kPinHeightCm / 2.0 + kReleaseClearanceCm + kCupHeightCm / 2.0 + kClawGripCenterBelowTipCm;
+}
+
+constexpr double place_pin_on_cup_cm(double goal_cm) {
+    return goal_cm + kCupHeightCm + kReleaseClearanceCm + kPinHeightCm / 2.0 + kClawGripCenterBelowTipCm;
+}
+
+inline constexpr double kClawPinAllianceCm = place_pin_on_goal_cm(kAllianceGoalHeightCm); // 21.5
+inline constexpr double kClawCupAllianceCm = place_cup_on_pin_cm(kAllianceGoalHeightCm);  // 29.7
+inline constexpr double kClawPinShortCm = place_pin_on_goal_cm(kShortGoalHeightCm);       // 27.9
+inline constexpr double kClawCupShortCm = place_cup_on_pin_cm(kShortGoalHeightCm);        // 36.1
+inline constexpr double kClawPinTallCm = place_pin_on_goal_cm(kTallGoalHeightCm);         // 35.5
+inline constexpr double kClawCupTallCm = place_cup_on_pin_cm(kTallGoalHeightCm);          // 43.7
 
 // Claw pivot, in motor degrees until its gearing is known.
 inline constexpr double kClawPivotHomeMotorDeg = 0.0; // TODO
