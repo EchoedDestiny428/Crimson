@@ -3,6 +3,7 @@
 #include "config/drivetrain.hpp"
 #include "robotconfig.hpp"
 #include "subsystems/drive.hpp"
+#include "subsystems/imu_peaks.hpp"
 #include "subsystems/screen.hpp"
 #include "telemetry/telemetry.hpp"
 
@@ -16,6 +17,7 @@ void initialize() {
     drive::init();
 
     screen::start();
+    imu_peaks::start();
     telemetry::start();
 }
 

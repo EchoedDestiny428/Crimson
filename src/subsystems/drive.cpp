@@ -35,6 +35,7 @@ bool correcting_forward_tip() {
 
 void init() {
     chassis.calibrate();
+    chassis.startTiltGuard(imu);
 }
 
 void reset() {

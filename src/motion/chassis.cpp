@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <vector>
 
 namespace crimson {
 
@@ -39,6 +40,8 @@ void Chassis::resetPose(Apply apply, const std::source_location& where) {
     apply();
     const lemlib::Pose after = getPose();
     rebaseRaw(before, after);
+    discardedX = 0;
+    discardedY = 0;
     rawMutex.give();
     telemetry::pose_reset(before, after, where);
 }
@@ -211,6 +214,82 @@ void Chassis::rebaseRaw(const lemlib::Pose& before, const lemlib::Pose& after) {
     const double phi = util::deg_to_rad(raw.theta);
     raw.x = raw_x - (after.x * std::cos(phi) + after.y * std::sin(phi));
     raw.y = raw_y - (-after.x * std::sin(phi) + after.y * std::cos(phi));
+}
+
+void Chassis::startTiltGuard(pros::Imu& imu, TiltGuardParams params) {
+    pros::Task([this, &imu, params] {
+        const double flat_pitch = imu.get_pitch();
+        const double flat_roll = imu.get_roll();
+
+        // Pose at the end of the last flat tick: a tilt holds here, dropping only the
+        // movement from the tick the tilt was seen onward.
+        lemlib::Pose last_flat = getPose();
+
+        bool holding = false;
+        lemlib::Pose held = getPose();
+
+        while (true) {
+            const double pitch = imu.get_pitch() - flat_pitch;
+            const double roll = imu.get_roll() - flat_roll;
+            // PROS returns PROS_ERR_F (infinity) if the IMU is unplugged; don't hold on that.
+            const bool readable = std::isfinite(pitch) && std::isfinite(roll);
+            const bool tilted = readable && (std::fabs(pitch) > params.tiltDeg || std::fabs(roll) > params.tiltDeg);
+
+            if (tilted) {
+                if (!holding) {
+                    held = last_flat;
+                    const lemlib::Pose before = getPose();
+                    holdPosition(held.x, held.y);
+                    telemetry::pose_reset(before, getPose(), std::source_location::current());
+                    holding = true;
+                    odomTrustedFlag = false;
+                    ++tiltHolds;
+                }
+            } else if (holding) {
+                holding = false;
+                odomTrustedFlag = true;
+            }
+
+            if (holding) {
+                // Discard whatever the tracking wheels added since the last tick.
+                holdPosition(held.x, held.y);
+            }
+
+            if (!holding) {
+                last_flat = getPose();
+            }
+            pros::delay(kPeriodMs);
+        }
+    });
+}
+
+// Like setPose, but not logged as a reset: the guard calls it every tick. The raw pose
+// is rebased as usual, so it keeps what the tracking wheels measured while lifted.
+void Chassis::holdPosition(float x, float y) {
+    rawMutex.take();
+    const lemlib::Pose before = getPose();
+    lemlib::Chassis::setPose(x, y, before.theta);
+    rebaseRaw(before, getPose());
+    discardedX += before.x - x;
+    discardedY += before.y - y;
+    rawMutex.give();
+}
+
+bool Chassis::odomTrusted() const {
+    return odomTrustedFlag;
+}
+
+int Chassis::tiltHoldCount() const {
+    return tiltHolds;
+}
+
+lemlib::Pose Chassis::getUnguardedPose() {
+    rawMutex.take();
+    lemlib::Pose pose = getPose();
+    pose.x += discardedX;
+    pose.y += discardedY;
+    rawMutex.give();
+    return pose;
 }
 
 }
