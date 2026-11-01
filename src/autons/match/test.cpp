@@ -28,13 +28,6 @@ constexpr std::array kForwardSquare{
     Leg{270, -kCornerIn, -kCornerIn},
 };
 
-constexpr std::array kBackwardSquare{
-    Leg{270, kCornerIn, -kCornerIn},
-    Leg{180, kCornerIn, kCornerIn},
-    Leg{90, -kCornerIn, kCornerIn},
-    Leg{0, -kCornerIn, -kCornerIn},
-};
-
 void settle() {
     chassis.waitUntilDone();
     pros::delay(kSettleMs);
@@ -46,10 +39,10 @@ void turn_to(float heading) {
 }
 
 template <std::size_t Count>
-void drive(const std::array<Leg, Count>& legs, bool forwards) {
+void drive(const std::array<Leg, Count>& legs) {
     for (const Leg& leg : legs) {
         turn_to(leg.heading);
-        chassis.moveToPoint(leg.x, leg.y, kDriveTimeoutMs, {.forwards = forwards, .maxSpeed = kDriveSpeed});
+        chassis.moveToPoint(leg.x, leg.y, kDriveTimeoutMs, {.maxSpeed = kDriveSpeed});
         settle();
     }
     turn_to(0);
@@ -61,8 +54,7 @@ void run() {
     chassis.setPose(-kCornerIn, -kCornerIn, 0);
     pros::delay(kSettleMs);
 
-    drive(kForwardSquare, true);
-    drive(kBackwardSquare, false);
+    drive(kForwardSquare);
 }
 
 }

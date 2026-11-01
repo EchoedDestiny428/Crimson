@@ -1,5 +1,6 @@
 #include "main.h"
 #include "autons/autons.hpp"
+#include "config/drivetrain.hpp"
 #include "robotconfig.hpp"
 #include "subsystems/drive.hpp"
 #include "subsystems/screen.hpp"
@@ -31,9 +32,13 @@ void autonomous() {
 }
 
 void opcontrol() {
-    if (!pros::competition::is_connected()) {
-        autons::run_selected();
-    }
-
     chassis.cancelAllMotions();
+    chassis.setPose(config::kStartXIn, config::kStartYIn, config::kStartHeadingDeg);
+
+    drive::reset();
+    std::uint32_t now = pros::millis();
+    while (true) {
+        drive::update();
+        pros::Task::delay_until(&now, drive::kLoopMs);
+    }
 }

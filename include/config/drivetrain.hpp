@@ -27,6 +27,10 @@ inline constexpr float kWheelDiameterIn = lemlib::Omniwheel::NEW_325;
 inline constexpr float kDriveRpm = 360.0f;
 inline constexpr float kHorizontalDrift = 2.0f;
 
+inline constexpr float kStartXIn = -24.0f;
+inline constexpr float kStartYIn = -24.0f;
+inline constexpr float kStartHeadingDeg = 0.0f;
+
 inline constexpr float kTrackingWheelDiameterIn = 2.0f;
 inline constexpr float kVerticalWheelOffsetIn = 0.0f;
 inline constexpr float kHorizontalWheelOffsetIn = 1.4f;
