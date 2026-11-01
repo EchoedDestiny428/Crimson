@@ -5,7 +5,8 @@
 #include "subsystems/drive.hpp"
 #include "subsystems/elevator/claw.hpp"
 #include "subsystems/elevator/extension.hpp"
-#include "subsystems/elevator/pivot.hpp"
+#include "subsystems/elevator/arm_pivot.hpp"
+#include "subsystems/elevator/claw_pivot.hpp"
 #include "subsystems/vision.hpp"
 #include "util/driver_task.hpp"
 
@@ -13,18 +14,19 @@ using namespace subsystems;
 
 void initialize() {
     controller.clear();
+    apply_motor_current_limits();
     vision::init();
     dashboard.show_status("CALIBRATING");
 
     drive::init();
     elevator::extension::init();
-    elevator::pivot::init();
-    elevator::claw::init();
+    elevator::arm_pivot::init();
+    elevator::claw_pivot::init();
     logger.attach(&left_motors);
     logger.attach(&right_motors);
     logger.attach(&extension_motors);
-    logger.attach(&pivot_motor);
-    logger.attach(&claw_motor);
+    logger.attach(&arm_pivot_motor);
+    logger.attach(&claw_pivot_motor);
     logger.register_robot_fields();
     logger.start();
 
@@ -47,8 +49,9 @@ void autonomous() {
 void opcontrol() {
     chassis.cancelAllMotions();
     util::start_driver_task("Extension", elevator::extension::update, elevator::extension::stop);
-    util::start_driver_task("Pivot", elevator::pivot::update, elevator::pivot::stop);
-    util::start_driver_task("Claw", elevator::claw::update, elevator::claw::stop);
+    util::start_driver_task("Arm pivot", elevator::arm_pivot::update, elevator::arm_pivot::stop);
+    util::start_driver_task("Claw pivot", elevator::claw_pivot::update, elevator::claw_pivot::stop);
+    util::start_driver_task("Claw", elevator::claw::update);
     util::start_driver_task("HUD", display::controller_hud::update);
 
     std::uint32_t now = pros::millis();

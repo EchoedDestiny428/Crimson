@@ -1,12 +1,9 @@
 #pragma once
 
+#include "subsystems/elevator/constants.hpp"
 #include <cstdint>
 
 namespace subsystems::elevator::extension {
-
-// Heights in motor degrees. Measure these on the new robot.
-inline constexpr double kHome = 0.0;
-inline constexpr double kMax = 3500.0;
 
 void init();
 void update();

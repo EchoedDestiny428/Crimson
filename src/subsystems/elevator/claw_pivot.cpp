@@ -1,9 +1,9 @@
-#include "subsystems/elevator/pivot.hpp"
+#include "subsystems/elevator/claw_pivot.hpp"
 #include "config/controls.hpp"
 #include "robotconfig.hpp"
 #include <cmath>
 
-namespace subsystems::elevator::pivot {
+namespace subsystems::elevator::claw_pivot {
 
 namespace {
 
@@ -17,38 +17,38 @@ bool manual_active = false;
 }
 
 void init() {
-    pivot_motor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-    pivot_motor.tare_position();
+    claw_pivot_motor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+    claw_pivot_motor.tare_position();
 }
 
 void update() {
-    const bool forward = controller.get_digital(controls::kPivotForward);
-    const bool reverse = controller.get_digital(controls::kPivotReverse);
+    const bool forward = controller.get_digital(controls::kClawPivotForward);
+    const bool reverse = controller.get_digital(controls::kClawPivotReverse);
 
     if (forward || reverse) {
         manual_active = true;
-        pivot_motor.move(forward ? kManualPower : -kManualPower);
+        claw_pivot_motor.move(forward ? kManualPower : -kManualPower);
     } else if (manual_active) {
         manual_active = false;
-        pivot_motor.brake();
+        claw_pivot_motor.brake();
     }
 }
 
 void stop() {
     manual_active = false;
-    pivot_motor.brake();
+    claw_pivot_motor.brake();
 }
 
 void set_pos(double motor_deg) {
-    pivot_motor.set_zero_position(motor_deg);
+    claw_pivot_motor.set_zero_position(motor_deg);
 }
 
 void move_to(double motor_deg) {
-    pivot_motor.move_absolute(motor_deg, kMoveVelocity);
+    claw_pivot_motor.move_absolute(motor_deg, kMoveVelocity);
 }
 
 bool is_settled() {
-    return std::fabs(pivot_motor.get_target_position() - pivot_motor.get_position()) <= kSettleMotorDeg;
+    return std::fabs(claw_pivot_motor.get_target_position() - claw_pivot_motor.get_position()) <= kSettleMotorDeg;
 }
 
 bool wait_until_settled(std::uint32_t timeout_ms) {
@@ -63,7 +63,7 @@ bool wait_until_settled(std::uint32_t timeout_ms) {
 }
 
 double get_pos() {
-    return pivot_motor.get_position();
+    return claw_pivot_motor.get_position();
 }
 
 }

@@ -9,15 +9,18 @@ display::Dashboard dashboard;
 pros::MotorGroup left_motors({ports::kLeftDriveA, ports::kLeftDriveB}, pros::MotorGears::blue);
 pros::MotorGroup right_motors({ports::kRightDriveA, ports::kRightDriveB}, pros::MotorGears::blue);
 pros::MotorGroup extension_motors({ports::kExtensionA, ports::kExtensionB}, pros::MotorGears::blue);
-pros::Motor pivot_motor(ports::kPivot, pros::MotorGears::green);
-pros::Motor claw_motor(ports::kClaw, pros::MotorGears::green);
+pros::Motor arm_pivot_motor(ports::kArmPivot, pros::MotorGears::green);
+pros::Motor claw_pivot_motor(ports::kClawPivot, pros::MotorGears::green);
 telemetry::Logger logger;
 pros::Rotation vertical_odom(ports::kVerticalOdom);
 pros::Rotation horizontal_odom(ports::kHorizontalOdom);
 
+pros::Distance claw_distance(ports::kClawDistance);
 pros::adi::Pneumatics claw_piston(ports::kClawPiston, false);
 
 namespace {
+
+constexpr std::int32_t kMotorCurrentLimitMa = 2500; // V5 maximum; set explicitly so every motor has it
 
 constexpr float kTrackWidthIn = 12.5f;
 constexpr float kDriveRpm = 360.0f;
@@ -41,3 +44,12 @@ lemlib::OdomSensors sensors(&vertical_tracking_wheel, nullptr, &horizontal_track
 }
 
 crimson::Chassis chassis(drivetrain, linear_controller, angular_controller, sensors);
+
+void apply_motor_current_limits() {
+    for (pros::MotorGroup* group : {&left_motors, &right_motors, &extension_motors}) {
+        group->set_current_limit_all(kMotorCurrentLimitMa);
+    }
+    for (pros::Motor* motor : {&arm_pivot_motor, &claw_pivot_motor}) {
+        motor->set_current_limit(kMotorCurrentLimitMa);
+    }
+}

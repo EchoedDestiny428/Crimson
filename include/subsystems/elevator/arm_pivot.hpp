@@ -1,11 +1,9 @@
 #pragma once
 
+#include "subsystems/elevator/constants.hpp"
 #include <cstdint>
 
-namespace subsystems::elevator::pivot {
-
-// Angles in motor degrees. Measure these on the new robot.
-inline constexpr double kHomeMotorDeg = 0.0;
+namespace subsystems::elevator::arm_pivot {
 
 void init();
 void update();

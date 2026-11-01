@@ -2,7 +2,6 @@
 #include "config/controls.hpp"
 #include "lemlib/smartMotor.hpp"
 #include "robotconfig.hpp"
-#include <algorithm>
 #include <cmath>
 
 namespace subsystems::elevator::extension {
@@ -57,17 +56,12 @@ void set_pos(double height) {
 }
 
 void set_target(double height) {
-    motor.setTarget(static_cast<float>(std::clamp(height, kHome, kMax)));
+    motor.setTarget(static_cast<float>(height));
 }
 
+// No software limits on purpose: if the encoder skips, the driver still has full manual control.
 void set_manual(int power) {
-    const double current = height();
-    const bool at_limit = (power > 0 && current >= kMax) || (power < 0 && current <= kHome);
-    if (at_limit) {
-        hold();
-    } else {
-        motor.setManual(power);
-    }
+    motor.setManual(power);
 }
 
 double height() {
