@@ -11,7 +11,5 @@ CompileFlags:
     - -D_UNIX98_THREAD_MUTEX_ATTRIBUTES
     - -D_POSIX_TIMERS
     - -D_POSIX_MONOTONIC_CLOCK
-    - -D_PROS_INCLUDE_LIBLVGL_LLEMU_H
-    - -D_PROS_INCLUDE_LIBLVGL_LLEMU_HPP
 QueryDriver:
   - /Users/royboy/Library/Application Support/Cursor/User/globalStorage/sigbots.pros/install/pros-toolchain-macos/bin/arm-none-eabi-*

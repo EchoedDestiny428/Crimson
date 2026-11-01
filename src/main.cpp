@@ -1,44 +1,35 @@
 #include "main.h"
-#include "autons/autons.hpp"
-#include "config/drivetrain.hpp"
-#include "robotconfig.hpp"
-#include "subsystems/drive.hpp"
-#include "subsystems/screen.hpp"
-#include "telemetry/telemetry.hpp"
+#include "display/dashboard.hpp"
+#include "pros/rtos.hpp"
+#include "vision/localizer.hpp"
+#include <cstdint>
 
-using namespace subsystems;
+namespace {
 
-void initialize() {
-    controller.clear();
-    dashboard.initialize();
-    dashboard.show_status("CALIBRATING");
+constexpr std::uint32_t kScreenPeriodMs = 100;
 
-    drive::init();
+display::Dashboard dashboard;
 
-    screen::start();
-    telemetry::start();
-}
-
-void disabled() {
-    autons::select();
-}
-
-void competition_initialize() {
-    autons::select();
-}
-
-void autonomous() {
-    autons::run_selected();
-}
-
-void opcontrol() {
-    chassis.cancelAllMotions();
-    chassis.setPose(config::kStartXIn, config::kStartYIn, config::kStartHeadingDeg);
-
-    drive::reset();
+void draw_screen() {
     std::uint32_t now = pros::millis();
     while (true) {
-        drive::update();
-        pros::Task::delay_until(&now, drive::kLoopMs);
+        dashboard.update(vision::localizer::snapshot());
+        pros::Task::delay_until(&now, kScreenPeriodMs);
     }
 }
+
+}
+
+void initialize() {
+    dashboard.initialize();
+    vision::localizer::start();
+    pros::Task task(draw_screen, "Screen");
+}
+
+void disabled() {}
+
+void competition_initialize() {}
+
+void autonomous() {}
+
+void opcontrol() {}
