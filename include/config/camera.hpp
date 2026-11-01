@@ -16,8 +16,8 @@ inline constexpr double kCenterYPx = 120.0;
 
 // Where the rig sits at boot. Heading must be right: the IMU only knows how far it has turned since then. Position
 // picks between the two goals that share a tag ID until a view settles it.
-inline constexpr double kStartXIn = 46.2;
-inline constexpr double kStartYIn = 94.2;
+inline constexpr double kStartXIn = 48.0;
+inline constexpr double kStartYIn = 96.0;
 inline constexpr double kStartHeadingDeg = 0.0;
 
 }
