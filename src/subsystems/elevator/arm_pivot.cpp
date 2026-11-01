@@ -18,7 +18,7 @@ bool manual_active = false;
 
 void init() {
     arm_pivot_motor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-    arm_pivot_motor.tare_position();
+    arm_pivot_motor.tare_position(); // motor 0 = constants::kArmStartDeg; the conversions add the offset
 }
 
 void update() {
