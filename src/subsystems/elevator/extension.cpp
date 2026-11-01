@@ -9,7 +9,7 @@ namespace subsystems::elevator::extension {
 namespace {
 
 constexpr int kManualPower = 127;
-constexpr std::int32_t kMaxVelocity = 600;
+constexpr std::int32_t kMaxVelocity = constants::kExtensionMaxRpm;
 constexpr float kSettleRange = 5.0f;
 constexpr float kDecelerationDistance = 300.0f;
 

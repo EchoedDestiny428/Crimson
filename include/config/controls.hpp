@@ -21,4 +21,7 @@ inline constexpr Button kClawPivotReverse = pros::E_CONTROLLER_DIGITAL_LEFT;
 
 inline constexpr Button kClawPiston = pros::E_CONTROLLER_DIGITAL_A;
 
+inline constexpr Button kHome = pros::E_CONTROLLER_DIGITAL_B;
+inline constexpr Button kExtensionOffset = pros::E_CONTROLLER_DIGITAL_Y;
+
 }

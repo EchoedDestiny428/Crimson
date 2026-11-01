@@ -8,7 +8,7 @@ namespace subsystems::elevator::claw_pivot {
 namespace {
 
 constexpr int kManualPower = 127;
-constexpr int kMoveVelocity = 200;
+constexpr int kMoveVelocity = constants::kClawPivotMoveRpm;
 constexpr double kSettleMotorDeg = 30.0;
 constexpr std::uint32_t kWaitPollMs = 10;
 

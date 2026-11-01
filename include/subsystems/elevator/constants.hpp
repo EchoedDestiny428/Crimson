@@ -3,12 +3,19 @@
 // Shared by the elevator extension, arm pivot and claw pivot.
 // Every value marked TODO still has to be measured on the new robot.
 
+#include <cstdint>
+
 namespace subsystems::elevator::constants {
 
 // Geometry and gearing.
 inline constexpr double kArmLengthCm = 32.0;                         // arm pivot axis to claw
 inline constexpr double kArmPivotMotorRotationsPerArmRotation = 1.0; // direct drive
 inline constexpr double kExtensionMotorRotationsPerCm = 0.0;         // TODO: extension motor rotations per cm of lift
+
+// Commanded speeds (motor rpm).
+inline constexpr int kExtensionMaxRpm = 600;
+inline constexpr int kArmPivotMoveRpm = 200;
+inline constexpr int kClawPivotMoveRpm = 200;
 
 // Starting pose (robot at power-on, before anything moves).
 inline constexpr double kPivotStartHeightCm = 43.0; // arm pivot height above the ground
@@ -83,6 +90,9 @@ constexpr double stack_release_cm(double goal_cm, int level) {
     return stack_top_cm(goal_cm, level) + kReleaseClearanceCm + kHeldBottomBelowTipCm;
 }
 // Alliance: 21.2, 29.5, 46.0, 62.4 cm  Short: 27.6, 35.9, 52.3, 68.8  Tall: 35.3, 43.5, 60.0, 76.4
+
+// Pickup: the claw closes once the distance sensor reads closer than this.
+inline constexpr std::int32_t kPickupDistanceMm = 50; // TODO: guess, tune on the robot
 
 // Claw pivot, in motor degrees until its gearing is known.
 inline constexpr double kClawPivotHomeMotorDeg = 0.0; // TODO
