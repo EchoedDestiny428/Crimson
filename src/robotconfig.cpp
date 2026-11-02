@@ -11,6 +11,7 @@ pros::MotorGroup right_motors({ports::kRightDriveA, ports::kRightDriveB}, pros::
 pros::MotorGroup extension_motors({ports::kExtensionA, ports::kExtensionB}, pros::MotorGears::blue);
 pros::Motor arm_pivot_motor(ports::kArmPivot, pros::MotorGears::green);
 pros::Motor claw_pivot_motor(ports::kClawPivot, pros::MotorGears::green);
+pros::Motor side_toggle_motor(ports::kSideToggle, pros::MotorGears::green); // flex wheels; change if the cartridge is blue
 telemetry::Logger logger;
 pros::Rotation vertical_odom(ports::kVerticalOdom);
 pros::Rotation horizontal_odom(ports::kHorizontalOdom);
@@ -49,7 +50,7 @@ void apply_motor_current_limits() {
     for (pros::MotorGroup* group : {&left_motors, &right_motors, &extension_motors}) {
         group->set_current_limit_all(kMotorCurrentLimitMa);
     }
-    for (pros::Motor* motor : {&arm_pivot_motor, &claw_pivot_motor}) {
+    for (pros::Motor* motor : {&arm_pivot_motor, &claw_pivot_motor, &side_toggle_motor}) {
         motor->set_current_limit(kMotorCurrentLimitMa);
     }
 }

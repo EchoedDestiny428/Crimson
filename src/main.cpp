@@ -7,6 +7,7 @@
 #include "subsystems/elevator/extension.hpp"
 #include "subsystems/elevator/arm_pivot.hpp"
 #include "subsystems/elevator/claw_pivot.hpp"
+#include "subsystems/side_toggle.hpp"
 #include "subsystems/vision.hpp"
 #include "util/driver_task.hpp"
 
@@ -22,11 +23,13 @@ void initialize() {
     elevator::extension::init();
     elevator::arm_pivot::init();
     elevator::claw_pivot::init();
+    side_toggle::init();
     logger.attach(&left_motors);
     logger.attach(&right_motors);
     logger.attach(&extension_motors);
     logger.attach(&arm_pivot_motor);
     logger.attach(&claw_pivot_motor);
+    logger.attach(&side_toggle_motor);
     logger.register_robot_fields();
     logger.start();
 
@@ -52,6 +55,7 @@ void opcontrol() {
     util::start_driver_task("Arm pivot", elevator::arm_pivot::update, elevator::arm_pivot::stop);
     util::start_driver_task("Claw pivot", elevator::claw_pivot::update, elevator::claw_pivot::stop);
     util::start_driver_task("Claw", elevator::claw::update);
+    util::start_driver_task("Side toggle", side_toggle::update, side_toggle::stop);
     util::start_driver_task("HUD", display::controller_hud::update);
 
     std::uint32_t now = pros::millis();
