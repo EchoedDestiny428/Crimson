@@ -2,7 +2,8 @@
 #include "config/controls.hpp"
 #include "robotconfig.hpp"
 #include "subsystems/claw.hpp"
-#include "subsystems/elevator.hpp"
+#include "subsystems/elevator/constants.hpp"
+#include "subsystems/elevator/extension.hpp"
 #include "subsystems/pivot.hpp"
 #include "subsystems/toggle.hpp"
 #include <atomic>
@@ -61,7 +62,7 @@ bool bar_to(const Run& run, double motor_deg) {
     return run.wait(subsystems::pivot::is_settled, kPivotTimeoutMs);
 }
 
-void do_pickup(const Run& run) { // the chain stays where the driver left it. Raise the carriage with L1 before this.
+void do_pickup(const Run& run) { // the string stays where the driver left it. Raise the carriage with L1 before this.
     if (!bar_to(run, subsystems::pivot::kPickupDeg)) {
         return;
     }
@@ -72,7 +73,7 @@ void do_pickup(const Run& run) { // the chain stays where the driver left it. Ra
     bar_to(run, subsystems::pivot::kCarryDeg);
 }
 
-void do_score(const Run& run, double angle) { // the chain stays where the driver left it.
+void do_score(const Run& run, double angle) { // the string stays where the driver left it.
     if (!bar_to(run, angle)) {
         return;
     }
@@ -90,8 +91,9 @@ void do_stow(const Run& run) {
     if (!run.active()) {
         return;
     }
-    subsystems::elevator::set_target(subsystems::elevator::kDownDeg); // stow is the only command that moves the chain.
-    run.wait(subsystems::elevator::is_settled, kElevatorTimeoutMs);
+    subsystems::elevator::extension::set_target(
+        subsystems::elevator::constants::extension_cm_to_motor_deg(subsystems::elevator::constants::kExtensionHomeCm)); // stow is the only command that moves the string. Home is still 0 cm.
+    run.wait(subsystems::elevator::extension::is_settled, kElevatorTimeoutMs);
 }
 
 }
@@ -102,7 +104,7 @@ void cancel() {
 
 void stop() {
     cancel();
-    subsystems::elevator::hold();
+    subsystems::elevator::extension::hold();
     subsystems::pivot::stop();
     subsystems::toggle::stop();
     subsystems::claw::stop();

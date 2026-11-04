@@ -5,7 +5,7 @@
 #include "macros.hpp"
 #include "subsystems/claw.hpp"
 #include "subsystems/drive.hpp"
-#include "subsystems/elevator.hpp"
+#include "subsystems/elevator/extension.hpp"
 #include "subsystems/imu_peaks.hpp"
 #include "subsystems/pivot.hpp"
 #include "subsystems/screen.hpp"
@@ -21,10 +21,11 @@ void initialize() {
     dashboard.show_status("CALIBRATING");
 
     drive::init();
-    elevator::init();
+    elevator::extension::init();
     pivot::init();
-    claw::init();
-    toggle::init();
+    // Piston and flex wheels stay off until those tests. Macros stay off so they cannot move the bar.
+    // claw::init();
+    // toggle::init();
 
     screen::start();
     imu_peaks::start();
@@ -32,7 +33,7 @@ void initialize() {
 }
 
 void disabled() {
-    elevator::hold();
+    elevator::extension::hold();
     autons::select();
 }
 
@@ -45,15 +46,15 @@ void autonomous() {
 }
 
 void opcontrol() {
-    macros::cancel();
+    // macros::cancel();
     chassis.cancelAllMotions();
     chassis.setPose(config::kStartXIn, config::kStartYIn, config::kStartHeadingDeg);
 
-    util::start_driver_task("Elevator", elevator::update, elevator::stop);
+    util::start_driver_task("Extension", elevator::extension::update, elevator::extension::stop);
     util::start_driver_task("Pivot", pivot::update, pivot::stop);
-    util::start_driver_task("Claw", claw::update, claw::stop);
-    util::start_driver_task("Toggle", toggle::update, toggle::stop);
-    util::start_driver_task("Macros", macros::update, macros::stop);
+    // util::start_driver_task("Claw", claw::update, claw::stop);
+    // util::start_driver_task("Toggle", toggle::update, toggle::stop);
+    // util::start_driver_task("Macros", macros::update, macros::stop);
 
     drive::reset();
     std::uint32_t now = pros::millis();

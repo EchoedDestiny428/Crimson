@@ -29,6 +29,7 @@ void update() {
     const bool down = controller.get_digital(controls::kExtensionDown);
 
     if (up || down) {
+
         manual_active = true;
         set_manual(up ? kManualPower : -kManualPower);
     } else if (manual_active) {

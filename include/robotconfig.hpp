@@ -14,7 +14,7 @@ extern pros::MotorGroup right_motors;
 extern pros::Rotation vertical_odom;
 extern pros::Rotation horizontal_odom;
 
-extern pros::MotorGroup elevator_motors;
+extern pros::MotorGroup extension_motors;
 extern pros::Motor pivot_motor;
 extern pros::Motor toggle_motor;
 extern pros::adi::DigitalOut claw_piston;

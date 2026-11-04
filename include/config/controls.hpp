@@ -10,8 +10,10 @@ using Button = pros::controller_digital_e_t;
 inline constexpr Axis kThrottle = pros::E_CONTROLLER_ANALOG_LEFT_Y;
 inline constexpr Axis kTurn = pros::E_CONTROLLER_ANALOG_RIGHT_X;
 
-inline constexpr Button kElevatorUp = pros::E_CONTROLLER_DIGITAL_L1;     // positive chain voltage. Assumed to raise the carriage.
-inline constexpr Button kElevatorDown = pros::E_CONTROLLER_DIGITAL_L2;
+inline constexpr Button kExtensionUp = pros::E_CONTROLLER_DIGITAL_L1;    // positive string voltage. Assumed to raise the carriage. The lift is a string, not a chain.
+inline constexpr Button kExtensionDown = pros::E_CONTROLLER_DIGITAL_L2;
+inline constexpr Button kElevatorUp = kExtensionUp;                      // same buttons. The merged cascade code reads kExtensionUp.
+inline constexpr Button kElevatorDown = kExtensionDown;
 
 inline constexpr Button kPivotOut = pros::E_CONTROLLER_DIGITAL_UP;       // positive bar degrees. Assumed to swing the claw down toward the stack.
 inline constexpr Button kPivotIn = pros::E_CONTROLLER_DIGITAL_DOWN;

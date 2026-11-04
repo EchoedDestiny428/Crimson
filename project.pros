@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "regular",
+    "project_name": "mech_tests",
     "target": "v5",
     "templates": {
       "kernel": {
@@ -642,8 +642,8 @@
       }
     },
     "upload_options": {
-      "slot": 1,
-      "description": "hi"
+      "slot": 3,
+      "description": "mech_tests"
     },
     "use_early_access": false
   }

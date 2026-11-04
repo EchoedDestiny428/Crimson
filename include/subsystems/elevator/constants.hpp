@@ -11,7 +11,7 @@ namespace subsystems::elevator::constants {
 // Geometry and gearing.
 inline constexpr double kArmLengthCm = 32.0;                         // arm pivot axis to claw
 inline constexpr double kArmPivotMotorRotationsPerArmRotation = 1.0; // direct drive
-inline constexpr double kExtensionMotorRotationsPerCm = 1.0 / 6.0;   // one motor rotation lifts the elevator 6 cm
+inline constexpr double kExtensionMotorRotationsPerCm = 1.0 / 6.0;   // string lift, not a chain. One motor rotation raises the carriage 6 cm.
 
 // Commanded speeds (motor rpm).
 inline constexpr int kExtensionMaxRpm = 600;
