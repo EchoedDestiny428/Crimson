@@ -5,6 +5,7 @@
 #include "subsystems/drive.hpp"
 #include "subsystems/elevator/claw.hpp"
 #include "subsystems/elevator/extension.hpp"
+#include "subsystems/elevator/macros.hpp"
 #include "subsystems/elevator/arm_pivot.hpp"
 #include "subsystems/elevator/claw_pivot.hpp"
 #include "subsystems/side_toggle.hpp"
@@ -51,7 +52,7 @@ void autonomous() {
 
 void opcontrol() {
     chassis.cancelAllMotions();
-    util::start_driver_task("Extension", elevator::extension::update, elevator::extension::stop);
+    util::start_driver_task("Elevator stages", elevator::macros::update, elevator::macros::stop);
     util::start_driver_task("Arm pivot", elevator::arm_pivot::update, elevator::arm_pivot::stop);
     util::start_driver_task("Claw pivot", elevator::claw_pivot::update, elevator::claw_pivot::stop);
     util::start_driver_task("Claw", elevator::claw::update);

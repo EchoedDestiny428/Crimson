@@ -9,7 +9,7 @@ display::Dashboard dashboard;
 pros::MotorGroup left_motors({ports::kLeftDriveA, ports::kLeftDriveB}, pros::MotorGears::blue);
 pros::MotorGroup right_motors({ports::kRightDriveA, ports::kRightDriveB}, pros::MotorGears::blue);
 pros::MotorGroup extension_motors({ports::kExtensionA, ports::kExtensionB}, pros::MotorGears::blue);
-pros::Motor arm_pivot_motor(ports::kArmPivot, pros::MotorGears::green);
+pros::Motor arm_pivot_motor(ports::kArmPivot, pros::MotorGears::red);
 pros::Motor claw_pivot_motor(ports::kClawPivot, pros::MotorGears::green);
 pros::Motor side_toggle_motor(ports::kSideToggle, pros::MotorGears::green); // flex wheels; change if the cartridge is blue
 telemetry::Logger logger;

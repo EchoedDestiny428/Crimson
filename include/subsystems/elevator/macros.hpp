@@ -68,9 +68,16 @@ double claw_offset_in(const Pose& pose);
 
 void cancel();
 
-// Driver control: L1/L2 move the lift (snapping to a stage on release), Y toggles the
-// scoring offset, B goes home. Not wired into main.cpp yet (see update()).
-void press(bool up, bool down, bool down_pressed, bool offset_button);
+// Stages are the scoring levels on kStageGoal: stage n puts the arm tip at
+// release_cm(kStageGoal, n) using the solver; stage 0 is the starting pose.
+inline constexpr constants::Goal kStageGoal = constants::Goal::Alliance;
+inline constexpr int kTopStage = static_cast<int>(constants::kAllianceReleaseCm.size()); // measured levels
+bool go_to_level(int stage);
+void stage_up();   // one stage above the tip (or above the stage already being moved to)
+void stage_down(); // one stage below
+
+// Driver control: tap L1/L2 to step a stage up/down, hold either (250 ms) to drive the
+// lift by hand. B goes to stage 0.
 void update();
 void stop();
 

@@ -16,10 +16,10 @@ inline constexpr std::int8_t kRightDriveB = 20;
 inline constexpr std::int8_t kVerticalOdom = 4;
 inline constexpr std::int8_t kHorizontalOdom = -11;
 
-inline constexpr std::int8_t kExtensionA = -10; // placeholder
-inline constexpr std::int8_t kExtensionB = 8;   // placeholder
+inline constexpr std::int8_t kExtensionA = 10;  // from newbot-mechanism_tests (string lift)
+inline constexpr std::int8_t kExtensionB = -8;  // from newbot-mechanism_tests
 
-inline constexpr std::int8_t kArmPivot = 7;     // placeholder
+inline constexpr std::int8_t kArmPivot = 7;     // from newbot-mechanism_tests (red cartridge)
 inline constexpr std::int8_t kClawPivot = 5;    // placeholder
 
 inline constexpr std::int8_t kClawDistance = 12; // placeholder: 4 is now the vertical wheel

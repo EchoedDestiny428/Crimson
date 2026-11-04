@@ -20,7 +20,6 @@ namespace {
 enum class Mode { Stowed, Deployed };
 
 constexpr int kManualPower = 127;
-constexpr double kSnapDownFraction = 0.6;
 constexpr double kTopArrivalToleranceCm = 2.0; // guess; the old robot used 50 motor deg
 
 constexpr double kPi = 3.14159265358979323846;
@@ -46,7 +45,6 @@ constexpr auto kStagesCm = [] {
 
 std::atomic<Mode> mode{Mode::Stowed};
 std::atomic<bool> tilted{false};
-std::atomic<bool> offset_on{true};
 std::atomic<std::uint32_t> generation{0};
 bool manual_active = false;
 
@@ -120,29 +118,6 @@ double move_seconds(const Pose& from, const Pose& to) {
 
 double top_stage_cm() {
     return kStagesCm.back();
-}
-
-double nearest_stage(double current) {
-    if (current <= kStagesCm.front()) {
-        return kStagesCm.front();
-    }
-    for (std::size_t i = 1; i < kStagesCm.size(); ++i) {
-        const double lower = kStagesCm[i - 1];
-        const double upper = kStagesCm[i];
-        if (current < upper) {
-            return current <= lower + kSnapDownFraction * (upper - lower) ? lower : upper;
-        }
-    }
-    return kStagesCm.back();
-}
-
-void snap_to_stage(bool offset) {
-    const double current = lift_cm();
-    if (!std::isfinite(current)) {
-        extension::hold();
-        return;
-    }
-    set_lift(nearest_stage(current) + (offset ? constants::kExtensionOffsetCm : 0.0));
 }
 
 void tilt_if_at_top() {
@@ -407,59 +382,114 @@ void cancel() {
     ++generation;
 }
 
-void press(bool up, bool down, bool down_pressed, bool offset_button) {
-    if (offset_button) {
-        offset_on = !offset_on;
-        if (mode == Mode::Deployed) {
-            const double target_cm = constants::extension_motor_deg_to_cm(extension::target());
-            set_lift(target_cm + (offset_on ? constants::kExtensionOffsetCm : -constants::kExtensionOffsetCm));
-        }
-    }
-    if (mode == Mode::Stowed) {
-        if (up) {
-            start_flip_out(constants::kExtensionFlipOutCm, constants::kArmFlippedDeg);
-        } else if (down_pressed) {
-            start_home();
-        }
-        return;
-    }
+namespace {
 
-    if (down && lift_cm() < constants::kExtensionFlipOutCm) {
-        manual_active = false;
-        start_home();
-        return;
-    }
+constexpr std::uint32_t kStageHoldMs = 250; // a press shorter than this steps a stage; longer drives the lift
+constexpr double kStageToleranceCm = 2.0;    // the tip counts as at a stage within this
 
-    if (up || down) {
-        if (down) {
-            untilt_arm();
-        }
-        manual_active = true;
-        extension::set_manual(up ? kManualPower : -kManualPower);
-    } else if (manual_active) {
-        manual_active = false;
-        snap_to_stage(offset_on);
-    }
+std::atomic<int> moving_stage{-1}; // stage a step is heading to, -1 when none is running
+std::uint32_t pressed_at = 0;
+bool pressed_up = false;
+bool was_held = false;
 
-    if (!down) {
-        tilt_if_at_top();
-    }
+double tip_cm(const Pose& pose) {
+    return constants::kPivotStartHeightCm + pose.lift_cm - constants::kArmLengthCm * std::cos(pose.arm_deg * kPi / 180.0);
 }
 
-// Replaces extension::update as the driver task for L1/L2 once the setpoints are
-// filled in; run one or the other, not both.
+// Highest stage whose release height is at or below the tip (0 under stage 1).
+int stage_at_or_below(double tip) {
+    int stage = 0;
+    for (int level = 1; level <= kTopStage; ++level) {
+        if (constants::release_cm(kStageGoal, level) <= tip + kStageToleranceCm) {
+            stage = level;
+        }
+    }
+    return stage;
+}
+
+// Highest stage clearly below the tip (0 if none).
+int stage_below(double tip) {
+    int stage = 0;
+    for (int level = 1; level <= kTopStage; ++level) {
+        if (constants::release_cm(kStageGoal, level) < tip - kStageToleranceCm) {
+            stage = level;
+        }
+    }
+    return stage;
+}
+
+void start_stage(int stage) {
+    moving_stage = stage;
+    pros::Task([stage] {
+        go_to_level(stage);
+        int expected = stage;
+        moving_stage.compare_exchange_strong(expected, -1);
+    });
+}
+
+}
+
+bool go_to_level(int stage) {
+    if (stage <= 0) {
+        return go_to_pose({0.0, constants::kArmStartDeg});
+    }
+    return move_to(constants::release_cm(kStageGoal, std::min(stage, kTopStage)));
+}
+
+void stage_up() {
+    const int moving = moving_stage;
+    const int from = moving >= 0 ? moving : stage_at_or_below(tip_cm(current_pose()));
+    start_stage(std::min(from + 1, kTopStage));
+}
+
+void stage_down() {
+    const int moving = moving_stage;
+    const int to = moving >= 0 ? moving - 1 : stage_below(tip_cm(current_pose()));
+    start_stage(std::max(to, 0));
+}
+
+// L1/L2: a tap steps one stage up/down, a hold drives the lift by hand. B goes to stage 0.
 void update() {
-    press(controller.get_digital(controls::kExtensionUp), controller.get_digital(controls::kExtensionDown),
-          controller.get_digital_new_press(controls::kExtensionDown),
-          controller.get_digital_new_press(controls::kExtensionOffset));
+    const bool up = controller.get_digital(controls::kExtensionUp);
+    const bool down = controller.get_digital(controls::kExtensionDown);
+    const bool held = up || down;
+    const std::uint32_t now = pros::millis();
+
+    if (held && !was_held) {
+        pressed_at = now;
+        pressed_up = up;
+    }
+    if (held && now - pressed_at >= kStageHoldMs) {
+        if (!manual_active) {
+            cancel();
+            moving_stage = -1;
+            manual_active = true;
+        }
+        extension::set_manual(up ? kManualPower : -kManualPower);
+    }
+    if (!held && was_held) {
+        if (manual_active) {
+            manual_active = false;
+            extension::hold();
+        } else if (pressed_up) {
+            stage_up();
+        } else {
+            stage_down();
+        }
+    }
+    was_held = held;
+
     if (controller.get_digital_new_press(controls::kHome)) {
         manual_active = false;
-        start_home();
+        start_stage(0);
     }
 }
 
 void stop() {
     manual_active = false;
+    was_held = false;
+    cancel();
+    moving_stage = -1;
     extension::hold();
 }
 
