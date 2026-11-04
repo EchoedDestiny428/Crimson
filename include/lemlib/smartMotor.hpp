@@ -42,6 +42,8 @@ public:
      * Call before reset().
      */
     void useRawCounts(float degreesPerCount);
+    /** Cap on every output (manual, PID, profile), in motor power 0..127. Default 127. */
+    void setMaxPower(float power);
     /** Extra PID output from the current position, e.g. gravity on an arm (kG * sin(angle)). */
     void setFeedforward(std::function<float(float position)> positionFeedforward);
     /** Enable or disable SmartMotor diagnostics through the configured info sink. */
@@ -62,6 +64,7 @@ private:
     std::int32_t maxVelocity = 0;
     bool motorEncoderPid = false;
     std::function<float(float)> positionFeedforward;
+    std::atomic<float> maxPower{127.0f};
     float degreesPerCount = 0.0f; // > 0: read raw counts (see useRawCounts)
     std::atomic<float> rawZero{0.0f};
     float averageRawCounts() const;

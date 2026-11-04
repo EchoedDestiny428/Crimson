@@ -390,6 +390,7 @@ void cancel() {
 namespace {
 
 constexpr int kFullPower = 127;
+constexpr int kArmUpPower = 89; // 70% of full, arm only, while L1 is held
 constexpr double kStageLiftStepCm = 6.0; // lift added per stage; the arm angle makes up the rest
 
 int dir = 0;          // +1 while L1 is held, -1 while L2 is held
@@ -471,12 +472,12 @@ void update() {
     const int held = up ? 1 : down ? -1 : 0;
 
     if (held != 0) {
-        // Hold: 100% to both, no control loop.
+        // Hold: 100% to the lift, 70% to the arm going up (100% down), no control loop.
         if (held != dir) {
             cancel();
         }
         extension::set_manual(held * kFullPower);
-        arm_pivot::set_power(held * kFullPower);
+        arm_pivot::set_power(held > 0 ? kArmUpPower : -kFullPower);
     } else if (dir != 0) {
         // Release: the only place motor control runs.
         snap(closest_stage(tip_cm(current_pose())));

@@ -162,6 +162,10 @@ bool SmartMotor::waitUntilSettled(std::uint32_t timeout) {
     return true;
 }
 
+void SmartMotor::setMaxPower(float power) {
+    maxPower = std::clamp(power, 0.0f, kMaxPower);
+}
+
 void SmartMotor::useRawCounts(float countsToDegrees) {
     degreesPerCount = countsToDegrees;
 }
@@ -198,7 +202,8 @@ void SmartMotor::controlLoop() {
         const bool newTarget = targetChanged.exchange(false);
         if (manual) {
             positionCommanded = false;
-            actuator->move(manualPower);
+            const float cap = maxPower;
+            actuator->move(static_cast<std::int32_t>(std::clamp(static_cast<float>(manualPower.load()), -cap, cap)));
         } else if (usesMotorEncoders() && !motorEncoderPid) {
             const float distance = decelerationDistance;
             if (distance > settleRange) {
@@ -246,7 +251,8 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
     if (positionFeedforward) {
         output += positionFeedforward(position);
     }
-    actuator->move(static_cast<std::int32_t>(std::clamp(output, -kMaxPower, kMaxPower)));
+    const float cap = maxPower;
+    actuator->move(static_cast<std::int32_t>(std::clamp(output, -cap, cap)));
 }
 
 void SmartMotor::log(float goal, float position) const {

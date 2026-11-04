@@ -13,13 +13,13 @@ constexpr int kManualPower = 127;
 // SmartMotor PID on the motor's encoder, in motor degrees (= arm degrees, direct drive).
 // kG carries the arm's weight; low kP so snaps don't jerk the claw. I (only within
 // kWindupDeg, reset on overshoot) pulls out what's left of the sag; D damps the stop.
-constexpr float kP = 1.0f;
-constexpr float kI = 0.2f;
-constexpr float kD = 5.0f;
+constexpr float kP = 0.1f;
+constexpr float kI = 0.0f;
+constexpr float kD = 3.0f;
 constexpr float kWindupDeg = 30.0f;
 // Gravity: power to hold the arm horizontal. Added as kG * sin(arm angle from straight
 // down): full at horizontal, none straight up or down, negative behind the pivot.
-constexpr float kG = 1.0f;
+constexpr float kG = 19.0f;
 constexpr float kSettleRange = 2.0f; // motor deg; inside this it brakes (HOLD)
 // Red cartridge: 1800 raw encoder counts per output turn, independent of the gearset
 // setting (which wasn't taking, so PROS degrees read wrong).
