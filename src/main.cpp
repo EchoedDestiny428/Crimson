@@ -8,6 +8,7 @@
 #include "subsystems/elevator/macros.hpp"
 #include "subsystems/elevator/arm_pivot.hpp"
 #include "subsystems/vision.hpp"
+#include "tuning/kg_tune.hpp"
 #include "util/driver_task.hpp"
 
 using namespace subsystems;
@@ -20,7 +21,7 @@ void initialize() {
 
     drive::init();
     elevator::extension::init();
-    elevator::arm_pivot::init();
+    tuning::kg::init(); // kG tuning build: instead of elevator::arm_pivot::init()
     logger.attach(&left_motors);
     logger.attach(&right_motors);
     logger.attach(&extension_motors);
@@ -46,10 +47,8 @@ void autonomous() {
 
 void opcontrol() {
     chassis.cancelAllMotions();
-    util::start_driver_task("Elevator stages", elevator::macros::update, elevator::macros::stop);
-    util::start_driver_task("Arm pivot", elevator::arm_pivot::update, elevator::arm_pivot::stop);
-    util::start_driver_task("Claw", elevator::claw::update);
-    util::start_driver_task("HUD", display::controller_hud::update);
+    // kG tuning build: only the drive and the tuner (A, Up, Down) run.
+    util::start_driver_task("kG tune", tuning::kg::update);
 
     std::uint32_t now = pros::millis();
     while (true) {

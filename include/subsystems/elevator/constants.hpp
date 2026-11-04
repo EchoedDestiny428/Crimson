@@ -4,6 +4,7 @@
 // Every value marked TODO still has to be measured on the new robot.
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 
 namespace subsystems::elevator::constants {
@@ -19,15 +20,16 @@ inline constexpr int kArmPivotMoveRpm = 100; // red cartridge
 
 // Starting pose (robot at power-on, before anything moves).
 inline constexpr double kPivotStartHeightCm = 43.0; // arm pivot height above the ground
-inline constexpr double kClawStartHeightCm = 18.0;  // claw height above the ground
+inline constexpr double kClawStartHeightCm = 15.0;  // claw height above the ground
 inline constexpr double kPivotBehindCenterCm = 3.5; // elevator pivot shaft, behind the robot's center
 // The piece releases this far toward the robot's front from the arm tip: 7 cm farther
 // out when the claw is in front, 7 cm closer when it is behind.
 inline constexpr double kClawReleaseOffsetCm = 7.0;
 inline constexpr double kCmPerInch = 2.54;
-// Measured on the robot: the arm starts 32 deg off straight down. (acos((43 - 18) / 32)
-// gives 38.6, so one of those three lengths is a little off.)
-inline constexpr double kArmStartDeg = 32.0;
+// Calculated from the measurements: acos((pivot height - claw height) / arm length),
+// acos((43 - 15) / 32) = 29.0 deg off straight down. Change a length and this follows.
+inline constexpr double kArmStartDeg =
+    std::acos((kPivotStartHeightCm - kClawStartHeightCm) / kArmLengthCm) * 180.0 / 3.14159265358979323846;
 
 // Elevator extension setpoints, in cm of lift.
 inline constexpr double kExtensionBootupCm = 0.0;     // TODO
