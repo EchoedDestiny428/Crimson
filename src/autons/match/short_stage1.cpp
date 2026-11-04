@@ -25,9 +25,9 @@ void run() {
     chassis.setPose(kGoalX, kGoalY, kStartHeading);
     chassis.resetFromGoalBack(kGoalX, kGoalY); // back 22 cm from the goal: (-15.3, -48)
     claw::grab();
-    // Level 3 (51.5 cm): arm swings up and over the top to 254.6 deg (75 deg past straight
-    // up), no lift; with the 7 cm release offset the piece releases 27.4 cm behind
-    // center, so the robot drives forward 5.4 cm to (-13.2, -48) and releases.
+    // Level 3 (51.5 cm): arm swings up and over the top to 252.2 deg, no lift; with the
+    // 7 cm release offset the piece releases 26.0 cm behind center, so the robot drives
+    // forward 4.0 cm to (-13.8, -48) and releases.
     macros::score_behind(constants::Goal::Alliance, 3, kGoalX, kGoalY);
 }
 

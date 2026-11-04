@@ -76,7 +76,8 @@ bool go_to_level(int stage); // blocks until there; 0 is the start pose
 
 // Driver control: hold L1/L2 to run the lift and arm up/down at full power; release to
 // snap both to the stage closest to the piece's actual height. B goes home. Right cycles
-// the goal (alliance, neutral, center), moving only the elevator 7 cm per goal.
+// the goal (alliance, neutral, center), moving only the elevator 7 cm per goal. R1/R2
+// drive the lift by hand (100% up, 35% down) and hold where let go, no snap.
 void update();
 void stop();
 

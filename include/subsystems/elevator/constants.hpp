@@ -10,24 +10,28 @@
 namespace subsystems::elevator::constants {
 
 // Geometry and gearing.
-inline constexpr double kArmLengthCm = 32.0;                         // arm pivot axis to claw
+inline constexpr double kArmLengthCm = 31.0;                         // arm pivot axis to claw
 inline constexpr double kArmPivotMotorRotationsPerArmRotation = 1.0; // direct drive
 inline constexpr double kExtensionMotorRotationsPerCm = 1.0 / 6.0;   // string lift: one motor rotation raises it 6 cm
 
 // Commanded speeds (motor rpm).
 inline constexpr int kExtensionMaxRpm = 600;
+inline constexpr int kExtensionDownPower = 44; // 35% of 127: the lift never comes down faster than this
 inline constexpr int kArmPivotMoveRpm = 100; // red cartridge
 
 // Starting pose (robot at power-on, before anything moves).
-inline constexpr double kPivotStartHeightCm = 43.0; // arm pivot height above the ground
-inline constexpr double kClawStartHeightCm = 15.0;  // claw height above the ground
+inline constexpr double kPivotStartHeightCm = 42.0; // arm pivot height above the ground
+inline constexpr double kClawStartHeightCm = 14.0;  // claw height above the ground
 inline constexpr double kPivotBehindCenterCm = 3.5; // elevator pivot shaft, behind the robot's center
 // The piece releases this far toward the robot's front from the arm tip: 7 cm farther
 // out when the claw is in front, 7 cm closer when it is behind.
 inline constexpr double kClawReleaseOffsetCm = 7.0;
 inline constexpr double kCmPerInch = 2.54;
+// Slack adjustment: every arm setpoint is commanded this much higher than planned, to take
+// up slack in the arm so it ends where it was meant to.
+inline constexpr double kArmSlackAdjustmentDeg = 2.0;
 // Calculated from the measurements: acos((pivot height - claw height) / arm length),
-// acos((43 - 15) / 32) = 29.0 deg off straight down. Change a length and this follows.
+// acos((42 - 14) / 31) = 25.4 deg off straight down. Change a length and this follows.
 inline constexpr double kArmStartDeg =
     std::acos((kPivotStartHeightCm - kClawStartHeightCm) / kArmLengthCm) * 180.0 / 3.14159265358979323846;
 

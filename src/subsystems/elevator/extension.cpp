@@ -21,6 +21,7 @@ bool manual_active = false;
 void init() {
     extension_motors.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
     motor.reset();
+    motor.setMaxReversePower(constants::kExtensionDownPower); // snaps and home coming down at 35%
     motor.start();
 }
 

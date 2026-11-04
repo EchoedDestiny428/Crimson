@@ -20,6 +20,8 @@ inline constexpr Button kArmPivotReverse = pros::E_CONTROLLER_DIGITAL_DOWN;
 inline constexpr Button kClawPiston = pros::E_CONTROLLER_DIGITAL_A;
 
 inline constexpr Button kHome = pros::E_CONTROLLER_DIGITAL_B;
+inline constexpr Button kLiftManualUp = pros::E_CONTROLLER_DIGITAL_R1;   // hold: lift only, 100% up
+inline constexpr Button kLiftManualDown = pros::E_CONTROLLER_DIGITAL_R2; // hold: lift only, 35% down
 inline constexpr Button kGoalOffset = pros::E_CONTROLLER_DIGITAL_RIGHT; // v1's offset button: cycles alliance/neutral/center
 
 }

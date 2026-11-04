@@ -44,6 +44,13 @@ public:
     void useRawCounts(float degreesPerCount);
     /** Cap on every output (manual, PID, profile), in motor power 0..127. Default 127. */
     void setMaxPower(float power);
+    /** Cap on ramp-mode output going negative (e.g. a lift coming down), 0..127. Default 127. */
+    void setMaxReversePower(float power);
+    /**
+     * PID mode: keep running the PID inside settleRange and only brake once the error has
+     * stayed inside it this long. 0 (the default) brakes as soon as it enters the range.
+     */
+    void setSettleTime(std::uint32_t ms);
     /** Extra PID output from the current position, e.g. gravity on an arm (kG * sin(angle)). */
     void setFeedforward(std::function<float(float position)> positionFeedforward);
     /** Enable or disable SmartMotor diagnostics through the configured info sink. */
@@ -65,6 +72,9 @@ private:
     bool motorEncoderPid = false;
     std::function<float(float)> positionFeedforward;
     std::atomic<float> maxPower{127.0f};
+    std::atomic<float> maxReversePower{127.0f};
+    std::atomic<std::uint32_t> settleTimeMs{0};
+    std::uint32_t inRangeSince = 0; // control task only; 0 = not inside settleRange
     float degreesPerCount = 0.0f; // > 0: read raw counts (see useRawCounts)
     std::atomic<float> rawZero{0.0f};
     float averageRawCounts() const;

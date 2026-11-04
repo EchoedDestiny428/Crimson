@@ -166,6 +166,10 @@ void SmartMotor::setMaxPower(float power) {
     maxPower = std::clamp(power, 0.0f, kMaxPower);
 }
 
+void SmartMotor::setMaxReversePower(float power) {
+    maxReversePower = std::clamp(power, 0.0f, kMaxPower);
+}
+
 void SmartMotor::useRawCounts(float countsToDegrees) {
     degreesPerCount = countsToDegrees;
 }
@@ -181,6 +185,10 @@ float SmartMotor::averageRawCounts() const {
         }
     }
     return count > 0 ? static_cast<float>(sum / count) : kInvalid;
+}
+
+void SmartMotor::setSettleTime(std::uint32_t ms) {
+    settleTimeMs = ms;
 }
 
 void SmartMotor::setFeedforward(std::function<float(float position)> feedforwardFn) {
@@ -212,9 +220,9 @@ void SmartMotor::controlLoop() {
                     actuator->brake();
                     positionCommanded = true;
                 } else {
-                    const float power =
-                        std::max(kMinimumProfilePower, std::clamp(std::fabs(error) / distance, 0.0f, 1.0f) *
-                                                            kMaxPower);
+                    const float top = error < 0.0f ? std::min(kMaxPower, maxReversePower.load()) : kMaxPower;
+                    const float power = std::max(std::min(kMinimumProfilePower, top),
+                                                 std::clamp(std::fabs(error) / distance, 0.0f, 1.0f) * top);
                     const auto output = static_cast<std::int32_t>(std::copysign(power, error));
                     actuator->move(output);
                     positionCommanded = true;
@@ -239,12 +247,28 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
     const float error = goal - position;
     if (newTarget) {
         controller.reset();
+        inRangeSince = 0;
     }
 
-    if (!std::isfinite(error) || std::fabs(error) < settleRange) {
+    if (!std::isfinite(error)) {
         controller.reset();
         actuator->brake();
         return;
+    }
+    // Inside settleRange: keep running the PID until it has stayed there settleTimeMs,
+    // then brake. Leaving the range (or sagging out after braking) restarts the timer.
+    if (std::fabs(error) < settleRange) {
+        const std::uint32_t now = pros::millis();
+        if (inRangeSince == 0) {
+            inRangeSince = now == 0 ? 1 : now;
+        }
+        if (now - inRangeSince >= settleTimeMs) {
+            controller.reset();
+            actuator->brake();
+            return;
+        }
+    } else {
+        inRangeSince = 0;
     }
 
     float output = controller.update(error) + feedforward;

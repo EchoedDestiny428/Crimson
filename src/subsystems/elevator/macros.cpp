@@ -88,8 +88,9 @@ void set_lift(double cm) {
     extension::set_target(constants::extension_cm_to_motor_deg(cm));
 }
 
+// Every arm setpoint goes through here, slack adjustment included.
 void set_arm(double deg) {
-    arm_pivot::move_to(constants::arm_deg_to_motor_deg(deg));
+    arm_pivot::move_to(constants::arm_deg_to_motor_deg(deg + constants::kArmSlackAdjustmentDeg));
 }
 
 bool ratios_known() {
@@ -171,7 +172,7 @@ bool release_if(bool reached) {
 bool go_to_pose(Pose pose) {
     const Run run;
     extension::set_target(constants::extension_cm_to_motor_deg(pose.lift_cm));
-    arm_pivot::move_to(constants::arm_deg_to_motor_deg(pose.arm_deg));
+    set_arm(pose.arm_deg);
     return run.wait_for([] { return extension::is_settled() && arm_pivot::is_settled(); }, kMoveTimeoutMs);
 }
 
@@ -391,9 +392,9 @@ namespace {
 
 constexpr int kFullPower = 127;
 constexpr int kArmUpPower = 89; // 70% of full, arm only, while L1 is held
-constexpr double kStageLiftStepCm = 6.0; // lift added per stage; the arm angle makes up the rest
 
 int dir = 0;          // +1 while L1 is held, -1 while L2 is held
+bool lift_manual = false; // R1/R2 driving the lift by hand
 int goal_tier = 0;    // 0 alliance, 1 neutral, 2 center: lifts the elevator kGoalTierStepCm per tier
 int snapped_stage = -1; // stage of the last snap, so the offset can move the lift there
 
@@ -405,16 +406,16 @@ double stage_tip_cm(int stage) {
     return constants::release_cm(kStageGoal, stage);
 }
 
-// Precomputed stage setpoints: stage 0 is home; stage n lifts (n - 1) * kStageLiftStepCm
-// and the arm takes the angle (in front) that puts the tip at stage n's release height.
+// Precomputed stage setpoints: stage 0 is home; each stage after it is the solver's
+// fastest pose from the stage before, claw in front of the pivot.
 const std::array<Pose, kTopStage + 1>& stage_poses() {
     static const auto poses = [] {
         std::array<Pose, kTopStage + 1> out{};
         out[0] = {0.0, constants::kArmStartDeg};
         for (int stage = 1; stage <= kTopStage; ++stage) {
-            const double lift = (stage - 1) * kStageLiftStepCm;
-            const double c = (constants::kPivotStartHeightCm + lift - stage_tip_cm(stage)) / constants::kArmLengthCm;
-            out[stage] = {lift, std::acos(std::clamp(c, -1.0, 1.0)) * 180.0 / kPi};
+            if (!solve_from(out[stage - 1], stage_tip_cm(stage), out[stage], kArmFrontMinDeg, kArmFrontMaxDeg)) {
+                out[stage] = out[stage - 1];
+            }
         }
         return out;
     }();
@@ -471,12 +472,26 @@ void update() {
     const bool down = controller.get_digital(controls::kExtensionDown) && !up;
     const int held = up ? 1 : down ? -1 : 0;
 
+    // R1/R2: the lift by hand, no snap; it holds where it is let go. L1/L2 take priority.
+    const bool lift_up = controller.get_digital(controls::kLiftManualUp);
+    const bool lift_down = controller.get_digital(controls::kLiftManualDown) && !lift_up;
+    if (held == 0 && dir == 0 && (lift_up || lift_down)) {
+        if (!lift_manual) {
+            cancel();
+            lift_manual = true;
+        }
+        extension::set_manual(lift_up ? kFullPower : -constants::kExtensionDownPower);
+    } else if (lift_manual) {
+        lift_manual = false;
+        extension::hold();
+    }
+
     if (held != 0) {
-        // Hold: 100% to the lift, 70% to the arm going up (100% down), no control loop.
+        // Hold: lift 100% up / 35% down, arm 70% up / 100% down, no control loop.
         if (held != dir) {
             cancel();
         }
-        extension::set_manual(held * kFullPower);
+        extension::set_manual(held > 0 ? kFullPower : -constants::kExtensionDownPower);
         arm_pivot::set_power(held > 0 ? kArmUpPower : -kFullPower);
     } else if (dir != 0) {
         // Release: the only place motor control runs.
@@ -499,6 +514,7 @@ void update() {
 
 void stop() {
     dir = 0;
+    lift_manual = false;
     snapped_stage = -1;
     cancel();
     extension::hold();
