@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <utility>
 #include <vector>
 
 namespace lemlib {
@@ -47,6 +48,15 @@ SmartMotor::SmartMotor(pros::MotorGroup* actuator, std::int32_t maxVelocity, flo
       maxVelocity(maxVelocity),
       decelerationDistance(std::max(0.0f, decelerationDistance)) {}
 
+SmartMotor::SmartMotor(pros::MotorGroup* actuator, PID controller, float settleRange, float feedforward)
+    : actuator(actuator),
+      encoder(nullptr),
+      rotation(nullptr),
+      controller(controller),
+      settleRange(settleRange),
+      feedforward(feedforward),
+      motorEncoderPid(true) {}
+
 bool SmartMotor::usesMotorEncoders() const {
     return encoder == nullptr && rotation == nullptr;
 }
@@ -70,7 +80,12 @@ void SmartMotor::setPosition(float position) {
     } else if (rotation != nullptr) {
         rotation->set_position(static_cast<std::int32_t>(position));
     } else {
-        actuator->set_zero_position_all(position);
+        // tare, then read as `position` from here (set_zero_position does not tare)
+        actuator->tare_position_all();
+        if (degreesPerCount > 0.0f) {
+            rawZero = averageRawCounts();
+        }
+        encoderOffset = position;
     }
     setTarget(position);
 }
@@ -85,6 +100,11 @@ float SmartMotor::getRotation() const {
         return value == PROS_ERR ? kInvalid : static_cast<float>(value);
     }
 
+    if (degreesPerCount > 0.0f) {
+        const float raw = averageRawCounts();
+        return std::isfinite(raw) ? (raw - rawZero) * degreesPerCount + encoderOffset : kInvalid;
+    }
+
     float sum = 0.0f;
     int count = 0;
     for (const double position : actuator->get_position_all()) {
@@ -93,7 +113,7 @@ float SmartMotor::getRotation() const {
             ++count;
         }
     }
-    return count > 0 ? sum / static_cast<float>(count) : kInvalid;
+    return count > 0 ? sum / static_cast<float>(count) + encoderOffset : kInvalid;
 }
 
 float SmartMotor::getTarget() const {
@@ -142,6 +162,27 @@ bool SmartMotor::waitUntilSettled(std::uint32_t timeout) {
     return true;
 }
 
+void SmartMotor::useRawCounts(float countsToDegrees) {
+    degreesPerCount = countsToDegrees;
+}
+
+float SmartMotor::averageRawCounts() const {
+    std::uint32_t timestamp = 0;
+    double sum = 0.0;
+    int count = 0;
+    for (const std::int32_t raw : actuator->get_raw_position_all(&timestamp)) {
+        if (raw != PROS_ERR) {
+            sum += raw;
+            ++count;
+        }
+    }
+    return count > 0 ? static_cast<float>(sum / count) : kInvalid;
+}
+
+void SmartMotor::setFeedforward(std::function<float(float position)> feedforwardFn) {
+    positionFeedforward = std::move(feedforwardFn);
+}
+
 void SmartMotor::setLogging(bool enabled) {
     logging = enabled;
 }
@@ -158,7 +199,7 @@ void SmartMotor::controlLoop() {
         if (manual) {
             positionCommanded = false;
             actuator->move(manualPower);
-        } else if (usesMotorEncoders()) {
+        } else if (usesMotorEncoders() && !motorEncoderPid) {
             const float distance = decelerationDistance;
             if (distance > settleRange) {
                 const float error = goal - position;
@@ -174,7 +215,7 @@ void SmartMotor::controlLoop() {
                     positionCommanded = true;
                 }
             } else if (newTarget || !positionCommanded) {
-                actuator->move_absolute(goal, maxVelocity);
+                actuator->move_absolute(goal - encoderOffset, maxVelocity);
                 positionCommanded = true;
             }
         } else {
@@ -201,7 +242,10 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
         return;
     }
 
-    const float output = controller.update(error) + feedforward;
+    float output = controller.update(error) + feedforward;
+    if (positionFeedforward) {
+        output += positionFeedforward(position);
+    }
     actuator->move(static_cast<std::int32_t>(std::clamp(output, -kMaxPower, kMaxPower)));
 }
 

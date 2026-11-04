@@ -15,9 +15,7 @@ extern display::Dashboard dashboard;
 extern pros::MotorGroup left_motors;
 extern pros::MotorGroup right_motors;
 extern pros::MotorGroup extension_motors;
-extern pros::Motor arm_pivot_motor;
-extern pros::Motor claw_pivot_motor;
-extern pros::Motor side_toggle_motor;
+extern pros::MotorGroup arm_pivot_motor;
 extern telemetry::Logger logger;
 extern pros::Rotation vertical_odom;
 extern pros::Rotation horizontal_odom;
@@ -27,4 +25,4 @@ extern pros::adi::Pneumatics claw_piston;
 
 extern crimson::Chassis chassis;
 
-void apply_motor_current_limits();
+void apply_motor_config(); // cartridges, degrees, current limits; call first in initialize()

@@ -19,7 +19,6 @@ namespace {
 
 enum class Mode { Stowed, Deployed };
 
-constexpr int kManualPower = 127;
 constexpr double kTopArrivalToleranceCm = 2.0; // guess; the old robot used 50 motor deg
 
 constexpr double kPi = 3.14159265358979323846;
@@ -46,7 +45,6 @@ constexpr auto kStagesCm = [] {
 std::atomic<Mode> mode{Mode::Stowed};
 std::atomic<bool> tilted{false};
 std::atomic<std::uint32_t> generation{0};
-bool manual_active = false;
 
 // A macro remembers the generation it started in; cancel() or a newer macro
 // bumps the generation, and the older one stops at its next wait.
@@ -181,11 +179,12 @@ bool go_to_pose(Pose pose) {
 // Try every arm angle in range, solve the lift that reaches tip_cm, and keep the
 // pose both mechanisms reach soonest. Lifts below the start are skipped. A coarse
 // sweep finds the best region, then a fine sweep around it finds the fastest pose.
-bool solve(double tip_cm, Pose& out, double arm_min_deg, double arm_max_deg) {
+namespace {
+
+bool solve_from(const Pose& from, double tip_cm, Pose& out, double arm_min_deg, double arm_max_deg) {
     if (!ratios_known()) {
         return false;
     }
-    const Pose from = current_pose();
     bool found = false;
     double best_s = 0.0;
     const auto consider = [&](double arm) {
@@ -214,6 +213,12 @@ bool solve(double tip_cm, Pose& out, double arm_min_deg, double arm_max_deg) {
         }
     }
     return found;
+}
+
+}
+
+bool solve(double tip_cm, Pose& out, double arm_min_deg, double arm_max_deg) {
+    return solve_from(current_pose(), tip_cm, out, arm_min_deg, arm_max_deg);
 }
 
 bool move_to(double tip_cm) {
@@ -384,113 +389,143 @@ void cancel() {
 
 namespace {
 
-constexpr std::uint32_t kStageHoldMs = 250; // a press shorter than this steps a stage; longer drives the lift
-constexpr double kStageToleranceCm = 2.0;    // the tip counts as at a stage within this
+constexpr int kFullPower = 127;
+constexpr double kStageLiftStepCm = 6.0; // lift added per stage; the arm angle makes up the rest
 
-std::atomic<int> moving_stage{-1}; // stage a step is heading to, -1 when none is running
-std::uint32_t pressed_at = 0;
-bool pressed_up = false;
-bool was_held = false;
+int dir = 0;          // +1 while L1 is held, -1 while L2 is held
+int goal_tier = 0;    // 0 alliance, 1 neutral, 2 center: lifts the elevator kGoalTierStepCm per tier
+int snapped_stage = -1; // stage of the last snap, so the offset can move the lift there
 
 double tip_cm(const Pose& pose) {
     return constants::kPivotStartHeightCm + pose.lift_cm - constants::kArmLengthCm * std::cos(pose.arm_deg * kPi / 180.0);
 }
 
-// Highest stage whose release height is at or below the tip (0 under stage 1).
-int stage_at_or_below(double tip) {
-    int stage = 0;
-    for (int level = 1; level <= kTopStage; ++level) {
-        if (constants::release_cm(kStageGoal, level) <= tip + kStageToleranceCm) {
-            stage = level;
-        }
-    }
-    return stage;
+double stage_tip_cm(int stage) {
+    return constants::release_cm(kStageGoal, stage);
 }
 
-// Highest stage clearly below the tip (0 if none).
-int stage_below(double tip) {
-    int stage = 0;
-    for (int level = 1; level <= kTopStage; ++level) {
-        if (constants::release_cm(kStageGoal, level) < tip - kStageToleranceCm) {
-            stage = level;
+// Precomputed stage setpoints: stage 0 is home; stage n lifts (n - 1) * kStageLiftStepCm
+// and the arm takes the angle (in front) that puts the tip at stage n's release height.
+const std::array<Pose, kTopStage + 1>& stage_poses() {
+    static const auto poses = [] {
+        std::array<Pose, kTopStage + 1> out{};
+        out[0] = {0.0, constants::kArmStartDeg};
+        for (int stage = 1; stage <= kTopStage; ++stage) {
+            const double lift = (stage - 1) * kStageLiftStepCm;
+            const double c = (constants::kPivotStartHeightCm + lift - stage_tip_cm(stage)) / constants::kArmLengthCm;
+            out[stage] = {lift, std::acos(std::clamp(c, -1.0, 1.0)) * 180.0 / kPi};
         }
-    }
-    return stage;
+        return out;
+    }();
+    return poses;
 }
 
-void start_stage(int stage) {
-    moving_stage = stage;
-    pros::Task([stage] {
-        go_to_level(stage);
-        int expected = stage;
-        moving_stage.compare_exchange_strong(expected, -1);
-    });
+double offset_cm() {
+    return goal_tier * constants::kGoalTierStepCm;
+}
+
+// The stage whose release height on the selected goal (the offset included) is closest
+// to where the piece actually is.
+int closest_stage(double tip) {
+    int best = 1;
+    for (int stage = 2; stage <= kTopStage; ++stage) {
+        if (std::fabs(stage_tip_cm(stage) + offset_cm() - tip) < std::fabs(stage_tip_cm(best) + offset_cm() - tip)) {
+            best = stage;
+        }
+    }
+    return best;
+}
+
+bool stage_pose(int stage, Pose& pose) {
+    pose = stage_poses()[std::clamp(stage, 0, kTopStage)];
+    return true;
+}
+
+// Release: the lift to the stage's height (slowing over its last 5 cm) and the arm to
+// the stage's angle on its SmartMotor PID.
+void snap(int stage) {
+    Pose pose{};
+    stage_pose(stage, pose);
+    cancel();
+    mode = Mode::Deployed;
+    tilted = false;
+    snapped_stage = std::clamp(stage, 0, kTopStage);
+    set_lift(pose.lift_cm + (snapped_stage > 0 ? offset_cm() : 0.0));
+    set_arm(pose.arm_deg);
 }
 
 }
 
 bool go_to_level(int stage) {
-    if (stage <= 0) {
-        return go_to_pose({0.0, constants::kArmStartDeg});
-    }
-    return move_to(constants::release_cm(kStageGoal, std::min(stage, kTopStage)));
+    Pose pose{};
+    stage_pose(stage, pose);
+    return go_to_pose(pose);
 }
 
-void stage_up() {
-    const int moving = moving_stage;
-    const int from = moving >= 0 ? moving : stage_at_or_below(tip_cm(current_pose()));
-    start_stage(std::min(from + 1, kTopStage));
-}
-
-void stage_down() {
-    const int moving = moving_stage;
-    const int to = moving >= 0 ? moving - 1 : stage_below(tip_cm(current_pose()));
-    start_stage(std::max(to, 0));
-}
-
-// L1/L2: a tap steps one stage up/down, a hold drives the lift by hand. B goes to stage 0.
+// Hold L1/L2: 100% to the lift and the arm, up/down, no control loop. Release: snap to the
+// stage whose release height is closest to the piece's actual height (from the lift and
+// arm), lift and arm each to that stage's setpoint. B goes home.
 void update() {
     const bool up = controller.get_digital(controls::kExtensionUp);
-    const bool down = controller.get_digital(controls::kExtensionDown);
-    const bool held = up || down;
-    const std::uint32_t now = pros::millis();
+    const bool down = controller.get_digital(controls::kExtensionDown) && !up;
+    const int held = up ? 1 : down ? -1 : 0;
 
-    if (held && !was_held) {
-        pressed_at = now;
-        pressed_up = up;
-    }
-    if (held && now - pressed_at >= kStageHoldMs) {
-        if (!manual_active) {
+    if (held != 0) {
+        // Hold: 100% to both, no control loop.
+        if (held != dir) {
             cancel();
-            moving_stage = -1;
-            manual_active = true;
         }
-        extension::set_manual(up ? kManualPower : -kManualPower);
+        extension::set_manual(held * kFullPower);
+        arm_pivot::set_power(held * kFullPower);
+    } else if (dir != 0) {
+        // Release: the only place motor control runs.
+        snap(closest_stage(tip_cm(current_pose())));
     }
-    if (!held && was_held) {
-        if (manual_active) {
-            manual_active = false;
-            extension::hold();
-        } else if (pressed_up) {
-            stage_up();
-        } else {
-            stage_down();
-        }
-    }
-    was_held = held;
+    dir = held;
 
     if (controller.get_digital_new_press(controls::kHome)) {
-        manual_active = false;
-        start_stage(0);
+        snap(0);
+    }
+
+    // Right cycles the goal (alliance -> neutral -> center): only the elevator moves.
+    if (controller.get_digital_new_press(controls::kGoalOffset)) {
+        goal_tier = (goal_tier + 1) % 3;
+        if (held == 0 && snapped_stage > 0) {
+            set_lift(stage_poses()[snapped_stage].lift_cm + offset_cm());
+        }
     }
 }
 
 void stop() {
-    manual_active = false;
-    was_held = false;
+    dir = 0;
+    snapped_stage = -1;
     cancel();
-    moving_stage = -1;
     extension::hold();
+    arm_pivot::stop();
+}
+
+Pose pose_now() {
+    return current_pose();
+}
+
+double tip_now() {
+    return tip_cm(current_pose());
+}
+
+int snap_stage_now() {
+    return closest_stage(tip_now());
+}
+
+int goal_tier_now() {
+    return goal_tier;
+}
+
+Pose target_now() {
+    return {constants::extension_motor_deg_to_cm(extension::target()), constants::arm_motor_deg_to_deg(arm_pivot::target())};
+}
+
+int target_stage() {
+    return snapped_stage;
 }
 
 }

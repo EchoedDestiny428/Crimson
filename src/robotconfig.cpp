@@ -1,17 +1,20 @@
 #include "robotconfig.hpp"
 #include "config/ports.hpp"
+#include <utility>
 
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 pros::Imu imu(ports::kImu);
 crimson::Crimson crimson_cam(ports::kVision);
 display::Dashboard dashboard;
 
-pros::MotorGroup left_motors({ports::kLeftDriveA, ports::kLeftDriveB}, pros::MotorGears::blue);
-pros::MotorGroup right_motors({ports::kRightDriveA, ports::kRightDriveB}, pros::MotorGears::blue);
-pros::MotorGroup extension_motors({ports::kExtensionA, ports::kExtensionB}, pros::MotorGears::blue);
-pros::Motor arm_pivot_motor(ports::kArmPivot, pros::MotorGears::red);
-pros::Motor claw_pivot_motor(ports::kClawPivot, pros::MotorGears::green);
-pros::Motor side_toggle_motor(ports::kSideToggle, pros::MotorGears::green); // flex wheels; change if the cartridge is blue
+// Encoder units are set explicitly: left unset, a motor keeps whatever units the last
+// program gave it (rotations or counts), and every angle and height would be off.
+pros::MotorGroup left_motors({ports::kLeftDriveA, ports::kLeftDriveB}, pros::MotorGears::blue, pros::MotorUnits::degrees);
+pros::MotorGroup right_motors({ports::kRightDriveA, ports::kRightDriveB}, pros::MotorGears::blue, pros::MotorUnits::degrees);
+pros::MotorGroup extension_motors({ports::kExtensionA, ports::kExtensionB}, pros::MotorGears::blue,
+                                  pros::MotorUnits::degrees);
+pros::MotorGroup arm_pivot_motor({ports::kArmPivot}, pros::MotorGears::red,
+                                 pros::MotorUnits::degrees); // a group so SmartMotor can drive it
 telemetry::Logger logger;
 pros::Rotation vertical_odom(ports::kVerticalOdom);
 pros::Rotation horizontal_odom(ports::kHorizontalOdom);
@@ -46,11 +49,19 @@ lemlib::OdomSensors sensors(&vertical_tracking_wheel, nullptr, &horizontal_track
 
 crimson::Chassis chassis(drivetrain, linear_controller, angular_controller, sensors);
 
-void apply_motor_current_limits() {
-    for (pros::MotorGroup* group : {&left_motors, &right_motors, &extension_motors}) {
+// Cartridge, encoder units and current limit, applied at runtime: the constructors run
+// as globals before the devices are up, so the settings they pass can silently not take,
+// leaving the default green cartridge (a red arm then reads double its real angle).
+void apply_motor_config() {
+    const std::pair<pros::MotorGroup*, pros::MotorGears> groups[] = {
+        {&left_motors, pros::MotorGears::blue},
+        {&right_motors, pros::MotorGears::blue},
+        {&extension_motors, pros::MotorGears::blue},
+        {&arm_pivot_motor, pros::MotorGears::red},
+    };
+    for (const auto& [group, gears] : groups) {
+        group->set_gearing_all(gears);
+        group->set_encoder_units_all(pros::MotorUnits::degrees);
         group->set_current_limit_all(kMotorCurrentLimitMa);
-    }
-    for (pros::Motor* motor : {&arm_pivot_motor, &claw_pivot_motor, &side_toggle_motor}) {
-        motor->set_current_limit(kMotorCurrentLimitMa);
     }
 }

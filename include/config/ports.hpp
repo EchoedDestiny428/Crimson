@@ -20,11 +20,10 @@ inline constexpr std::int8_t kExtensionA = 10;  // from newbot-mechanism_tests (
 inline constexpr std::int8_t kExtensionB = -8;  // from newbot-mechanism_tests
 
 inline constexpr std::int8_t kArmPivot = 7;     // from newbot-mechanism_tests (red cartridge)
-inline constexpr std::int8_t kClawPivot = 5;    // placeholder
 
 inline constexpr std::int8_t kClawDistance = 12; // placeholder: 4 is now the vertical wheel
 
-inline constexpr std::int8_t kSideToggle = 6;   // placeholder (newbot-mechanism_tests); negate if R1 spits pieces out
+inline constexpr std::int8_t kSideToggle = 6;   // side toggle (flex wheels), from newbot-mechanism_tests; not wired yet
 
 inline constexpr char kClawPiston = 'A';
 

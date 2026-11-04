@@ -1,6 +1,6 @@
 #pragma once
 
-// Shared by the elevator extension, arm pivot and claw pivot.
+// Shared by the elevator extension and arm pivot.
 // Every value marked TODO still has to be measured on the new robot.
 
 #include <array>
@@ -16,18 +16,18 @@ inline constexpr double kExtensionMotorRotationsPerCm = 1.0 / 6.0;   // string l
 // Commanded speeds (motor rpm).
 inline constexpr int kExtensionMaxRpm = 600;
 inline constexpr int kArmPivotMoveRpm = 100; // red cartridge
-inline constexpr int kClawPivotMoveRpm = 200;
 
 // Starting pose (robot at power-on, before anything moves).
 inline constexpr double kPivotStartHeightCm = 43.0; // arm pivot height above the ground
-inline constexpr double kClawStartHeightCm = 14.0;  // claw height above the ground
+inline constexpr double kClawStartHeightCm = 18.0;  // claw height above the ground
 inline constexpr double kPivotBehindCenterCm = 3.5; // elevator pivot shaft, behind the robot's center
 // The piece releases this far toward the robot's front from the arm tip: 7 cm farther
 // out when the claw is in front, 7 cm closer when it is behind.
 inline constexpr double kClawReleaseOffsetCm = 7.0;
 inline constexpr double kCmPerInch = 2.54;
-// acos((43 - 14) / 32): the arm starts 25.0 deg off straight down, claw 13.5 cm out from the pivot.
-inline constexpr double kArmStartDeg = 25.0078;
+// Measured on the robot: the arm starts 32 deg off straight down. (acos((43 - 18) / 32)
+// gives 38.6, so one of those three lengths is a little off.)
+inline constexpr double kArmStartDeg = 32.0;
 
 // Elevator extension setpoints, in cm of lift.
 inline constexpr double kExtensionBootupCm = 0.0;     // TODO
@@ -117,8 +117,6 @@ constexpr double release_cm(Goal goal, int level) {
 // Pickup: the claw closes once the distance sensor reads closer than this.
 inline constexpr std::int32_t kPickupDistanceMm = 50; // TODO: guess, tune on the robot
 
-// Claw pivot, in motor degrees until its gearing is known.
-inline constexpr double kClawPivotHomeMotorDeg = 0.0; // TODO
 
 // Unit conversions. These divide by the ratios above, so fill those in first.
 constexpr double extension_cm_to_motor_deg(double cm) {

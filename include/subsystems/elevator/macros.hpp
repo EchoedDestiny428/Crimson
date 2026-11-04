@@ -72,13 +72,21 @@ void cancel();
 // release_cm(kStageGoal, n) using the solver; stage 0 is the starting pose.
 inline constexpr constants::Goal kStageGoal = constants::Goal::Alliance;
 inline constexpr int kTopStage = static_cast<int>(constants::kAllianceReleaseCm.size()); // measured levels
-bool go_to_level(int stage);
-void stage_up();   // one stage above the tip (or above the stage already being moved to)
-void stage_down(); // one stage below
+bool go_to_level(int stage); // blocks until there; 0 is the start pose
 
-// Driver control: tap L1/L2 to step a stage up/down, hold either (250 ms) to drive the
-// lift by hand. B goes to stage 0.
+// Driver control: hold L1/L2 to run the lift and arm up/down at full power; release to
+// snap both to the stage closest to the piece's actual height. B goes home. Right cycles
+// the goal (alliance, neutral, center), moving only the elevator 7 cm per goal.
 void update();
 void stop();
+
+// Live readings for the controller readout: lift (cm), arm (deg from straight down),
+// piece height (cm) from those, and the stage a release would snap to.
+Pose pose_now();
+double tip_now();
+int snap_stage_now();
+int goal_tier_now(); // 0 alliance, 1 neutral, 2 center
+Pose target_now();   // lift and arm setpoints currently commanded
+int target_stage();  // stage of the last snap, -1 before the first
 
 }

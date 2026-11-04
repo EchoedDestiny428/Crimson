@@ -7,6 +7,7 @@
 #include "pros/rtos.hpp"
 #include <atomic>
 #include <cstdint>
+#include <functional>
 
 namespace lemlib {
 
@@ -18,6 +19,8 @@ public:
                float feedforward = 0.0f);
     SmartMotor(pros::MotorGroup* actuator, std::int32_t maxVelocity, float settleRange = 5.0f,
                float decelerationDistance = 0.0f);
+    /** PID (runPid) on the motor group's own encoders, in motor degrees. */
+    SmartMotor(pros::MotorGroup* actuator, PID controller, float settleRange = 5.0f, float feedforward = 0.0f);
 
     void start();
     void reset();
@@ -32,6 +35,15 @@ public:
     void setManual(int power);
     void holdCurrent();
     bool waitUntilSettled(std::uint32_t timeout);
+    /**
+     * Read position from the motors' raw encoder counts times degreesPerCount instead of
+     * PROS degrees. Raw counts come from the encoder before the cartridge, so they don't
+     * depend on the gearset setting (red is 1800 per output turn: 0.2 deg per count).
+     * Call before reset().
+     */
+    void useRawCounts(float degreesPerCount);
+    /** Extra PID output from the current position, e.g. gravity on an arm (kG * sin(angle)). */
+    void setFeedforward(std::function<float(float position)> positionFeedforward);
     /** Enable or disable SmartMotor diagnostics through the configured info sink. */
     void setLogging(bool enabled);
 
@@ -48,6 +60,11 @@ private:
     float settleRange;
     float feedforward;
     std::int32_t maxVelocity = 0;
+    bool motorEncoderPid = false;
+    std::function<float(float)> positionFeedforward;
+    float degreesPerCount = 0.0f; // > 0: read raw counts (see useRawCounts)
+    std::atomic<float> rawZero{0.0f};
+    float averageRawCounts() const;
     std::atomic<float> decelerationDistance{0.0f};
 
     std::atomic<float> encoderOffset{0.0f};

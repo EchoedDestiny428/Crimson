@@ -16,15 +16,10 @@ inline constexpr Button kExtensionDown = pros::E_CONTROLLER_DIGITAL_L2;
 inline constexpr Button kArmPivotForward = pros::E_CONTROLLER_DIGITAL_UP;
 inline constexpr Button kArmPivotReverse = pros::E_CONTROLLER_DIGITAL_DOWN;
 
-inline constexpr Button kClawPivotForward = pros::E_CONTROLLER_DIGITAL_RIGHT;
-inline constexpr Button kClawPivotReverse = pros::E_CONTROLLER_DIGITAL_LEFT;
 
 inline constexpr Button kClawPiston = pros::E_CONTROLLER_DIGITAL_A;
 
-inline constexpr Button kSideToggleIn = pros::E_CONTROLLER_DIGITAL_R1;  // hold
-inline constexpr Button kSideToggleOut = pros::E_CONTROLLER_DIGITAL_R2; // hold
-
 inline constexpr Button kHome = pros::E_CONTROLLER_DIGITAL_B;
-inline constexpr Button kExtensionOffset = pros::E_CONTROLLER_DIGITAL_Y;
+inline constexpr Button kGoalOffset = pros::E_CONTROLLER_DIGITAL_RIGHT; // v1's offset button: cycles alliance/neutral/center
 
 }

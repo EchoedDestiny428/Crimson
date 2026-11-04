@@ -11,7 +11,7 @@ namespace {
 constexpr int kManualPower = 127;
 constexpr std::int32_t kMaxVelocity = constants::kExtensionMaxRpm;
 constexpr float kSettleRange = 5.0f;
-constexpr float kDecelerationDistance = 300.0f;
+constexpr float kDecelerationDistance = 300.0f; // slows over the last 5 cm of a move
 
 lemlib::SmartMotor motor(&extension_motors, kMaxVelocity, kSettleRange, kDecelerationDistance);
 bool manual_active = false;
