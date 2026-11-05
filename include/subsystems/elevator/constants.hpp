@@ -20,8 +20,10 @@ inline constexpr int kExtensionDownPower = 44; // 35% of 127: the lift never com
 inline constexpr int kArmPivotMoveRpm = 100; // red cartridge
 
 // Starting pose (robot at power-on, before anything moves).
-inline constexpr double kPivotStartHeightCm = 42.0; // arm pivot height above the ground
-inline constexpr double kClawStartHeightCm = 14.0;  // claw height above the ground
+// Pivot height fitted to measured claw heights (27 / 41.8 / 56.6 cm at arm 68 / 94.2 / 122.2 deg
+// on the old 25.4 deg start), within 0.5 cm. Tape measure said 42.
+inline constexpr double kPivotStartHeightCm = 45.9; // arm pivot height above the ground
+inline constexpr double kClawStartHeightCm = 15.0;  // claw height above the ground
 inline constexpr double kPivotBehindCenterCm = 3.5; // elevator pivot shaft, behind the robot's center
 // The piece releases this far toward the robot's front from the arm tip: 7 cm farther
 // out when the claw is in front, 7 cm closer when it is behind.
@@ -31,7 +33,7 @@ inline constexpr double kCmPerInch = 2.54;
 // up slack in the arm so it ends where it was meant to.
 inline constexpr double kArmSlackAdjustmentDeg = 2.0;
 // Calculated from the measurements: acos((pivot height - claw height) / arm length),
-// acos((42 - 14) / 31) = 25.4 deg off straight down. Change a length and this follows.
+// acos((45.9 - 15) / 31) = 4.6 deg off straight down. Change a length and this follows.
 inline constexpr double kArmStartDeg =
     std::acos((kPivotStartHeightCm - kClawStartHeightCm) / kArmLengthCm) * 180.0 / 3.14159265358979323846;
 

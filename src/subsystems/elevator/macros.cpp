@@ -391,10 +391,10 @@ void cancel() {
 namespace {
 
 constexpr int kFullPower = 127;
-constexpr int kArmUpPower = 89; // 70% of full, arm only, while L1 is held
+constexpr int kArmUpPower = 89;   // 70% of full, arm only, while L1 is held
+constexpr int kArmDownPower = 44; // 35% of full, arm only, while L2 is held
 
 int dir = 0;          // +1 while L1 is held, -1 while L2 is held
-bool lift_manual = false; // R1/R2 driving the lift by hand
 int goal_tier = 0;    // 0 alliance, 1 neutral, 2 center: lifts the elevator kGoalTierStepCm per tier
 int snapped_stage = -1; // stage of the last snap, so the offset can move the lift there
 
@@ -452,6 +452,8 @@ void snap(int stage) {
     mode = Mode::Deployed;
     tilted = false;
     snapped_stage = std::clamp(stage, 0, kTopStage);
+    // Coming down to stage 1 or home: the arm's last 30 deg at 35%.
+    arm_pivot::set_down_slow_zone(snapped_stage <= 1);
     set_lift(pose.lift_cm + (snapped_stage > 0 ? offset_cm() : 0.0));
     set_arm(pose.arm_deg);
 }
@@ -472,27 +474,13 @@ void update() {
     const bool down = controller.get_digital(controls::kExtensionDown) && !up;
     const int held = up ? 1 : down ? -1 : 0;
 
-    // R1/R2: the lift by hand, no snap; it holds where it is let go. L1/L2 take priority.
-    const bool lift_up = controller.get_digital(controls::kLiftManualUp);
-    const bool lift_down = controller.get_digital(controls::kLiftManualDown) && !lift_up;
-    if (held == 0 && dir == 0 && (lift_up || lift_down)) {
-        if (!lift_manual) {
-            cancel();
-            lift_manual = true;
-        }
-        extension::set_manual(lift_up ? kFullPower : -constants::kExtensionDownPower);
-    } else if (lift_manual) {
-        lift_manual = false;
-        extension::hold();
-    }
-
     if (held != 0) {
-        // Hold: lift 100% up / 35% down, arm 70% up / 100% down, no control loop.
+        // Hold: lift 100% up / 35% down, arm 70% up / 35% down, no control loop.
         if (held != dir) {
             cancel();
         }
         extension::set_manual(held > 0 ? kFullPower : -constants::kExtensionDownPower);
-        arm_pivot::set_power(held > 0 ? kArmUpPower : -kFullPower);
+        arm_pivot::set_power(held > 0 ? kArmUpPower : -kArmDownPower);
     } else if (dir != 0) {
         // Release: the only place motor control runs.
         snap(closest_stage(tip_cm(current_pose())));
@@ -503,18 +491,24 @@ void update() {
         snap(0);
     }
 
-    // Right cycles the goal (alliance -> neutral -> center): only the elevator moves.
+    // Right cycles the goal (alliance -> neutral -> center): only the elevator moves, right
+    // away. At a stage it goes to that stage plus the new offset; anywhere else it shifts by
+    // the change in offset. While L1/L2 is held the release snap picks the offset up.
     if (controller.get_digital_new_press(controls::kGoalOffset)) {
+        const double old_offset = offset_cm();
         goal_tier = (goal_tier + 1) % 3;
-        if (held == 0 && snapped_stage > 0) {
-            set_lift(stage_poses()[snapped_stage].lift_cm + offset_cm());
+        if (held == 0) {
+            if (snapped_stage > 0) {
+                set_lift(stage_poses()[snapped_stage].lift_cm + offset_cm());
+            } else {
+                set_lift(current_pose().lift_cm + offset_cm() - old_offset);
+            }
         }
     }
 }
 
 void stop() {
     dir = 0;
-    lift_manual = false;
     snapped_stage = -1;
     cancel();
     extension::hold();

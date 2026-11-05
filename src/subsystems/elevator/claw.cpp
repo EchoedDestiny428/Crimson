@@ -15,6 +15,12 @@ void update() {
     if (controller.get_digital_new_press(controls::kClawPiston)) {
         toggle();
     }
+    if (controller.get_digital_new_press(controls::kClawExtend)) {
+        release();
+    }
+    if (controller.get_digital_new_press(controls::kClawRetract)) {
+        grab();
+    }
 }
 
 void open() {
