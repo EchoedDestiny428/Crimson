@@ -41,7 +41,6 @@ bool configure(pros::AIVision& sensor) {
            sensor.set_tag_family(pros::AivisionTagFamily::tag_21H7, true) != PROS_ERR;
 }
 
-// Returns the number of tags read, or nothing if the sensor is not answering.
 std::optional<std::size_t> read_tags(pros::AIVision& sensor, std::array<Detection, kMaxDetections>& tags) {
     const std::int32_t objects = sensor.get_object_count();
     if (objects == PROS_ERR) {
@@ -80,8 +79,6 @@ std::optional<RawTag> largest_tag(std::span<const Detection> tags) {
     return largest;
 }
 
-// The chassis owns and calibrates the IMU, so heading comes from its pose, which also follows any setPose. The
-// filter starts wherever the chassis says the robot is.
 void run() {
     pros::AIVision sensor(ports::kVision);
 

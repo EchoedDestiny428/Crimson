@@ -6,14 +6,12 @@ namespace display::controller_hud {
 
 namespace {
 
-constexpr std::uint32_t kPrintMs = 60; // the controller drops text sent faster than ~50 ms
+constexpr std::uint32_t kPrintMs = 60;
 std::uint32_t last_print = 0;
 int line = 0;
 
 }
 
-// Line 1: lift cm and arm deg. Line 2: piece height, the stage a release snaps to, and
-// the goal. Line 3: the setpoints being driven to (stage, lift cm, arm deg).
 void update() {
     if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_UP) &&
         controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {

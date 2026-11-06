@@ -92,7 +92,6 @@ Fix PoseFilter::update(const Solution& solution) {
         return Fix::Ambiguous;
     }
 
-    // One clear answer far from the estimate: either a glitch, or the rig really moved. Repeats mean it moved.
     const Candidate& only = solution.candidates[0];
     const bool repeat = pending_frames_ > 0 && std::hypot(only.pose.x_mm - pending_.pose.x_mm,
                                                           only.pose.y_mm - pending_.pose.y_mm) < kRelockRadiusMm;

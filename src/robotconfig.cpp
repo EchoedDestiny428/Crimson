@@ -6,14 +6,12 @@ pros::Controller controller(pros::E_CONTROLLER_MASTER);
 pros::Imu imu(ports::kImu);
 display::Dashboard dashboard;
 
-// Encoder units are set explicitly: left unset, a motor keeps whatever units the last
-// program gave it (rotations or counts), and every angle and height would be off.
 pros::MotorGroup left_motors({ports::kLeftDriveA, ports::kLeftDriveB}, pros::MotorGears::blue, pros::MotorUnits::degrees);
 pros::MotorGroup right_motors({ports::kRightDriveA, ports::kRightDriveB}, pros::MotorGears::blue, pros::MotorUnits::degrees);
 pros::MotorGroup extension_motors({ports::kExtensionA, ports::kExtensionB}, pros::MotorGears::blue,
                                   pros::MotorUnits::degrees);
 pros::MotorGroup arm_pivot_motor({ports::kArmPivot}, pros::MotorGears::red,
-                                 pros::MotorUnits::degrees); // a group so SmartMotor can drive it
+                                 pros::MotorUnits::degrees);
 telemetry::Logger logger;
 pros::Rotation vertical_odom(ports::kVerticalOdom);
 pros::Rotation horizontal_odom(ports::kHorizontalOdom);
@@ -23,15 +21,15 @@ pros::adi::Pneumatics claw_piston(ports::kClawPiston, false);
 
 namespace {
 
-constexpr std::int32_t kMotorCurrentLimitMa = 2500; // V5 maximum; set explicitly so every motor has it
+constexpr std::int32_t kMotorCurrentLimitMa = 2500;
 
-constexpr float kTrackWidthIn = 28.5f / 2.54f; // measured on the new bot (newbot-localization)
+constexpr float kTrackWidthIn = 28.5f / 2.54f;
 constexpr float kDriveRpm = 360.0f;
 constexpr float kHorizontalDrift = 2.0f;
 
 constexpr float kTrackingWheelDiameterIn = 2.0f;
-constexpr float kVerticalWheelOffsetIn = 0.0f;   // measured (newbot-localization)
-constexpr float kHorizontalWheelOffsetIn = 1.4f; // measured (newbot-localization)
+constexpr float kVerticalWheelOffsetIn = 0.0f;
+constexpr float kHorizontalWheelOffsetIn = 1.4f;
 
 lemlib::Drivetrain drivetrain(&left_motors, &right_motors, kTrackWidthIn, lemlib::Omniwheel::NEW_325, kDriveRpm,
                               kHorizontalDrift);
@@ -48,9 +46,6 @@ lemlib::OdomSensors sensors(&vertical_tracking_wheel, nullptr, &horizontal_track
 
 crimson::Chassis chassis(drivetrain, linear_controller, angular_controller, sensors);
 
-// Cartridge, encoder units and current limit, applied at runtime: the constructors run
-// as globals before the devices are up, so the settings they pass can silently not take,
-// leaving the default green cartridge (a red arm then reads double its real angle).
 void apply_motor_config() {
     const std::pair<pros::MotorGroup*, pros::MotorGears> groups[] = {
         {&left_motors, pros::MotorGears::blue},

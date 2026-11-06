@@ -7,14 +7,12 @@ namespace vision::localizer {
 
 enum class Status { Calibrating, NoImu, NoSensor, Searching, Ambiguous, Locked };
 
-// Estimated camera position in inches and heading in degrees, in the frame described in field_constants.hpp.
 struct FieldPose {
     double x_in;
     double y_in;
     double heading_deg;
 };
 
-// Largest tag in view, unsolved, for calibrating against a tape measure.
 struct RawTag {
     int id;
     double u;

@@ -23,4 +23,4 @@ extern pros::adi::Pneumatics claw_piston;
 
 extern crimson::Chassis chassis;
 
-void apply_motor_config(); // cartridges, degrees, current limits; call first in initialize()
+void apply_motor_config();

@@ -14,7 +14,6 @@ struct LemlibPoint {
     float y;
 };
 
-// Both frames turn clockwise and share the origin, so field (x, y) sits at LemLib (-y, x).
 LemlibPoint to_lemlib(float x, float y) {
     return {-y, x};
 }

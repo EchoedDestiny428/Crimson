@@ -13,7 +13,6 @@ class Dashboard {
 public:
     void initialize();
     void show_status(const char* text);
-    // Odometry and camera poses are both in the field frame from field_constants.hpp.
     void update(const lemlib::Pose& odom, const vision::localizer::Snapshot& camera);
     void show_autons(std::span<const char* const> names, std::size_t selected, const lemlib::Pose& odom);
 

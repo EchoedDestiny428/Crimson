@@ -19,7 +19,6 @@ struct Routine {
     void (*run)();
 };
 
-// Add the new robot's routines here.
 constexpr std::array kRoutines{
     Routine{"ShortStage1", match::short_stage1::setup, match::short_stage1::run},
     Routine{"None", nullptr, nullptr},

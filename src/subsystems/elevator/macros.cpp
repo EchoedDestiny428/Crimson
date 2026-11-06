@@ -19,7 +19,7 @@ namespace {
 
 enum class Mode { Stowed, Deployed };
 
-constexpr double kTopArrivalToleranceCm = 2.0; // guess; the old robot used 50 motor deg
+constexpr double kTopArrivalToleranceCm = 2.0; // unsure
 
 constexpr double kPi = 3.14159265358979323846;
 constexpr double kSolveStepDeg = 0.5;
@@ -46,8 +46,6 @@ std::atomic<Mode> mode{Mode::Stowed};
 std::atomic<bool> tilted{false};
 std::atomic<std::uint32_t> generation{0};
 
-// A macro remembers the generation it started in; cancel() or a newer macro
-// bumps the generation, and the older one stops at its next wait.
 class Run {
 public:
     Run() : generation_(++generation) {}
@@ -88,7 +86,6 @@ void set_lift(double cm) {
     extension::set_target(constants::extension_cm_to_motor_deg(cm));
 }
 
-// Every arm setpoint goes through here, slack adjustment included.
 void set_arm(double deg) {
     arm_pivot::move_to(constants::arm_deg_to_motor_deg(deg + constants::kArmSlackAdjustmentDeg));
 }
@@ -109,7 +106,6 @@ Pose current_pose() {
     return {lift_cm(), constants::arm_motor_deg_to_deg(arm_pivot::get_pos())};
 }
 
-// Both mechanisms move at once, so a move takes as long as the slower one.
 double move_seconds(const Pose& from, const Pose& to) {
     return std::max(std::fabs(to.lift_cm - from.lift_cm) / lift_cm_per_s(),
                     std::fabs(to.arm_deg - from.arm_deg) / arm_deg_per_s());
@@ -176,10 +172,6 @@ bool go_to_pose(Pose pose) {
     return run.wait_for([] { return extension::is_settled() && arm_pivot::is_settled(); }, kMoveTimeoutMs);
 }
 
-// tip height = pivot start height + lift - arm length * cos(arm angle from straight down).
-// Try every arm angle in range, solve the lift that reaches tip_cm, and keep the
-// pose both mechanisms reach soonest. Lifts below the start are skipped. A coarse
-// sweep finds the best region, then a fine sweep around it finds the fastest pose.
 namespace {
 
 bool solve_from(const Pose& from, double tip_cm, Pose& out, double arm_min_deg, double arm_max_deg) {
@@ -306,9 +298,6 @@ bool dual_pickup_height(double lift_cm) {
     return finish_motion(run);
 }
 
-// Prime the claw (open), wait until the distance sensor sees a piece closer than
-// constants::kPickupDistanceMm, then close on it. The claw ends Grabbed; if it times
-// out or is cancelled first, it stays Primed (open).
 bool pickup(std::uint32_t timeout_ms) {
     const Run run;
     claw::prime();
@@ -343,9 +332,6 @@ bool score_in_range(constants::Goal goal, int level, float goal_x_in, float goal
     const double offset = claw_offset_in(pose);
     const double standoff = std::fabs(offset);
     if (distance > 1e-6) {
-        // The center stops `standoff` short of the goal on the robot-to-goal line, facing
-        // the goal if the claw is in front or facing away if it is behind. Driving toward
-        // the goal is forwards when facing it; backing off when too close is the reverse.
         const bool claw_in_front = offset >= 0.0;
         const bool toward_goal = distance >= standoff;
         const float stop_x = static_cast<float>(goal_x_in - dx / distance * standoff);
@@ -391,12 +377,12 @@ void cancel() {
 namespace {
 
 constexpr int kFullPower = 127;
-constexpr int kArmUpPower = 89;   // 70% of full, arm only, while L1 is held
-constexpr int kArmDownPower = 44; // 35% of full, arm only, while L2 is held
+constexpr int kArmUpPower = 89;
+constexpr int kArmDownPower = 44;
 
-int dir = 0;          // +1 while L1 is held, -1 while L2 is held
-int goal_tier = 0;    // 0 alliance, 1 neutral, 2 center: lifts the elevator kGoalTierStepCm per tier
-int snapped_stage = -1; // stage of the last snap, so the offset can move the lift there
+int dir = 0;
+int goal_tier = 0;
+int snapped_stage = -1;
 
 double tip_cm(const Pose& pose) {
     return constants::kPivotStartHeightCm + pose.lift_cm - constants::kArmLengthCm * std::cos(pose.arm_deg * kPi / 180.0);
@@ -406,8 +392,6 @@ double stage_tip_cm(int stage) {
     return constants::release_cm(kStageGoal, stage);
 }
 
-// Precomputed stage setpoints: stage 0 is home; each stage after it is the solver's
-// fastest pose from the stage before, claw in front of the pivot.
 const std::array<Pose, kTopStage + 1>& stage_poses() {
     static const auto poses = [] {
         std::array<Pose, kTopStage + 1> out{};
@@ -426,8 +410,6 @@ double offset_cm() {
     return goal_tier * constants::kGoalTierStepCm;
 }
 
-// The stage whose release height on the selected goal (the offset included) is closest
-// to where the piece actually is.
 int closest_stage(double tip) {
     int best = 1;
     for (int stage = 2; stage <= kTopStage; ++stage) {
@@ -443,8 +425,6 @@ bool stage_pose(int stage, Pose& pose) {
     return true;
 }
 
-// Release: the lift to the stage's height (slowing over its last 5 cm) and the arm to
-// the stage's angle on its SmartMotor PID.
 void snap(int stage) {
     Pose pose{};
     stage_pose(stage, pose);
@@ -452,7 +432,6 @@ void snap(int stage) {
     mode = Mode::Deployed;
     tilted = false;
     snapped_stage = std::clamp(stage, 0, kTopStage);
-    // Coming down to stage 1 or home: the arm's last 30 deg at 35%.
     arm_pivot::set_down_slow_zone(snapped_stage <= 1);
     set_lift(pose.lift_cm + (snapped_stage > 0 ? offset_cm() : 0.0));
     set_arm(pose.arm_deg);
@@ -466,23 +445,18 @@ bool go_to_level(int stage) {
     return go_to_pose(pose);
 }
 
-// Hold L1/L2: 100% to the lift and the arm, up/down, no control loop. Release: snap to the
-// stage whose release height is closest to the piece's actual height (from the lift and
-// arm), lift and arm each to that stage's setpoint. B goes home.
 void update() {
     const bool up = controller.get_digital(controls::kExtensionUp);
     const bool down = controller.get_digital(controls::kExtensionDown) && !up;
     const int held = up ? 1 : down ? -1 : 0;
 
     if (held != 0) {
-        // Hold: lift 100% up / 35% down, arm 70% up / 35% down, no control loop.
         if (held != dir) {
             cancel();
         }
         extension::set_manual(held > 0 ? kFullPower : -constants::kExtensionDownPower);
         arm_pivot::set_power(held > 0 ? kArmUpPower : -kArmDownPower);
     } else if (dir != 0) {
-        // Release: the only place motor control runs.
         snap(closest_stage(tip_cm(current_pose())));
     }
     dir = held;
@@ -491,9 +465,6 @@ void update() {
         snap(0);
     }
 
-    // Right cycles the goal (alliance -> neutral -> center): only the elevator moves, right
-    // away. At a stage it goes to that stage plus the new offset; anywhere else it shifts by
-    // the change in offset. While L1/L2 is held the release snap picks the offset up.
     if (controller.get_digital_new_press(controls::kGoalOffset)) {
         const double old_offset = offset_cm();
         goal_tier = (goal_tier + 1) % 3;

@@ -112,7 +112,6 @@ double vision_pose_theta(const void*) {
     return vision::localizer::snapshot().pose.heading_deg;
 }
 
-// Raw driver stick, -127..127, before the drive curve, slew and arcade mixing.
 double controller_axis(const void* context) {
     const auto axis = *static_cast<const controls::Axis*>(context);
     const std::int32_t value = controller.get_analog(axis);

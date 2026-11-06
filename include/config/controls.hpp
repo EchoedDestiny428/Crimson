@@ -20,8 +20,8 @@ inline constexpr Button kArmPivotReverse = pros::E_CONTROLLER_DIGITAL_DOWN;
 inline constexpr Button kClawPiston = pros::E_CONTROLLER_DIGITAL_A;
 
 inline constexpr Button kHome = pros::E_CONTROLLER_DIGITAL_B;
-inline constexpr Button kClawExtend = pros::E_CONTROLLER_DIGITAL_R1;  // claw piston on (port A)
-inline constexpr Button kClawRetract = pros::E_CONTROLLER_DIGITAL_R2; // claw piston off (port A)
-inline constexpr Button kGoalOffset = pros::E_CONTROLLER_DIGITAL_RIGHT; // v1's offset button: cycles alliance/neutral/center
+inline constexpr Button kClawExtend = pros::E_CONTROLLER_DIGITAL_R1;
+inline constexpr Button kClawRetract = pros::E_CONTROLLER_DIGITAL_R2;
+inline constexpr Button kGoalOffset = pros::E_CONTROLLER_DIGITAL_RIGHT;
 
 }

@@ -13,7 +13,6 @@ void toggle();
 bool is_open();
 std::int32_t distance_mm();
 
-// Open and wait for a piece (Primed), close on it (Grabbed), or let go (Empty).
 void prime();
 void grab();
 void release();

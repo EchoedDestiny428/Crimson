@@ -303,7 +303,6 @@ void Dashboard::draw_pose(const FieldPose& pose, std::uint32_t color) {
     const int y = std::clamp(to_screen_y(pose.y_in), kMapOffsetY + kBoxHalf, kMapOffsetY + kMapSize - kBoxHalf);
     draw_box(x, y, color);
 
-    // Screen rows grow downwards, so a clockwise heading turns the line from +X towards the bottom of the map.
     const double heading = util::deg_to_rad(pose.heading_deg);
     const int tip_x = std::clamp(x + static_cast<int>(std::lround(kHeadingLength * std::cos(heading))), kMapOffsetX,
                                  kMapOffsetX + kMapSize);

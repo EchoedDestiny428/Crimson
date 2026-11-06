@@ -7,7 +7,6 @@ namespace vision {
 class Kalman1D {
 public:
     void reset(double value, double variance);
-    // The control input is the feedforward: how far the state is known to have moved since the last step.
     void predict(double control, double process_variance);
     void correct(double innovation, double measurement_variance);
 
@@ -21,8 +20,6 @@ private:
 
 enum class Fix { None, Accepted, Ambiguous, Rejected };
 
-// X and Y each run a 1D filter, and heading runs a third with the IMU as its feedforward. X and Y have no feedforward
-// source on this rig, so they predict no motion and lean on process noise.
 class PoseFilter {
 public:
     void reset(const Pose& start);

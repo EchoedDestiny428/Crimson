@@ -80,7 +80,6 @@ void SmartMotor::setPosition(float position) {
     } else if (rotation != nullptr) {
         rotation->set_position(static_cast<std::int32_t>(position));
     } else {
-        // tare, then read as `position` from here (set_zero_position does not tare)
         actuator->tare_position_all();
         if (degreesPerCount > 0.0f) {
             rawZero = averageRawCounts();
@@ -260,8 +259,6 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
         actuator->brake();
         return;
     }
-    // Inside settleRange: keep running the PID until it has stayed there settleTimeMs,
-    // then brake. Leaving the range (or sagging out after braking) restarts the timer.
     if (std::fabs(error) < settleRange) {
         const std::uint32_t now = pros::millis();
         if (inRangeSince == 0) {

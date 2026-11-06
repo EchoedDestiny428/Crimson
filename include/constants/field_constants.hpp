@@ -4,13 +4,6 @@
 
 namespace field {
 
-// Same frame as FRC's blue origin. (0, 0) is the corner on blue's right as they face red. +X runs from the blue wall to
-// the red wall, and +Y runs to blue's left. Heading 0 faces red as in FRC, but turns are clockwise to match LemLib, so
-// heading 90 faces -Y. The goal layout has no mirror symmetry, so no axis can be flipped alone.
-//
-// Goals sit on a 24 in tile grid by choice. Appendix A draws them 23.55 in apart in a 140.41 in field, with red on the
-// left, so this table is its layout turned 180 degrees and squared up to whole tiles.
-
 struct Point2D {
     double x;
     double y;
@@ -29,16 +22,13 @@ inline constexpr double kMmPerInch = 25.4;
 inline constexpr double kFieldSizeIn = 144.0;
 inline constexpr double kFieldSizeMm = kFieldSizeIn * kMmPerInch;
 
-// Height of the tag centre above the tiles.
 inline constexpr double kCentreTagHeightMm = 178.0;
 inline constexpr double kNeutralTagHeightMm = 101.8;
 inline constexpr double kAllianceTagHeightMm = 37.8;
 
-// Every goal carries the same tag on four plates, one facing each wall.
 inline constexpr std::array kTagFacesDeg{0.0, 90.0, 180.0, 270.0};
 inline constexpr double kTagPlateOffsetMm = 49.0;
-// Side of the 5-cell inner square of the tag, which is the outline the sensor is expected to report.
-inline constexpr double kTagSizeMm = 18.0;
+inline constexpr double kTagSizeMm = 18.0; // unsure
 
 inline constexpr Goal goal_at(double x_in, double y_in, GoalType type, int tag_id, double tag_height_mm) {
     return {{x_in * kMmPerInch, y_in * kMmPerInch}, type, tag_id, tag_height_mm};
