@@ -7,15 +7,16 @@
 #include "subsystems/elevator/extension.hpp"
 #include "subsystems/elevator/macros.hpp"
 #include "subsystems/elevator/arm_pivot.hpp"
-#include "subsystems/vision.hpp"
+#include "subsystems/screen.hpp"
 #include "util/driver_task.hpp"
+#include "vision/localizer.hpp"
 
 using namespace subsystems;
 
 void initialize() {
     controller.clear();
     apply_motor_config();
-    vision::init();
+    dashboard.initialize();
     dashboard.show_status("CALIBRATING");
 
     drive::init();
@@ -28,7 +29,8 @@ void initialize() {
     logger.register_robot_fields();
     logger.start();
 
-    vision::start();
+    screen::start();
+    vision::localizer::start();
 }
 
 void disabled() {

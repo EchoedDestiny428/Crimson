@@ -4,7 +4,6 @@
 
 namespace ports {
 
-// Drive and odometry ports are the new robot's. Everything marked placeholder is a guess.
 inline constexpr std::int8_t kVision = 16; // temp
 inline constexpr std::int8_t kImu = 3;
 

@@ -4,6 +4,7 @@
 #include "config/controls.hpp"
 #include "pros/error.h"
 #include "pros/misc.hpp"
+#include "vision/localizer.hpp"
 #include <cmath>
 #include <cstring>
 #include <cstdio>
@@ -76,43 +77,39 @@ double imu_status(const void* context) {
     return static_cast<double>(static_cast<int>(static_cast<const pros::Imu*>(context)->get_status()));
 }
 
-double vision_has_target(const void* context) {
-    return static_cast<const crimson::Crimson*>(context)->has_target() ? 1.0 : 0.0;
+double vision_locked(const void*) {
+    return vision::localizer::snapshot().status == vision::localizer::Status::Locked ? 1.0 : 0.0;
 }
 
-double vision_tag_count(const void* context) {
-    return static_cast<const crimson::Crimson*>(context)->tag_count();
+double vision_tag_count(const void*) {
+    return vision::localizer::snapshot().tags;
 }
 
-double vision_primary_tag_id(const void* context) {
-    return static_cast<const crimson::Crimson*>(context)->primary_tag_id();
+double vision_tag_id(const void*) {
+    const auto raw = vision::localizer::snapshot().raw;
+    return raw ? raw->id : -1.0;
 }
 
-double vision_tx(const void* context) {
-    return static_cast<const crimson::Crimson*>(context)->get_tx();
+double vision_range_in(const void*) {
+    const auto snapshot = vision::localizer::snapshot();
+    return snapshot.candidates > 0 ? snapshot.range_in : NAN;
 }
 
-double vision_ty(const void* context) {
-    return static_cast<const crimson::Crimson*>(context)->get_ty();
+double vision_error_px(const void*) {
+    const auto snapshot = vision::localizer::snapshot();
+    return snapshot.candidates > 0 ? snapshot.error_px : NAN;
 }
 
-double vision_data_age_ms(const void* context) {
-    return static_cast<const crimson::Crimson*>(context)->get_data_age_ms();
+double vision_pose_x(const void*) {
+    return vision::localizer::snapshot().pose.x_in;
 }
 
-double vision_pose_x(const void* context) {
-    const auto pose = static_cast<const crimson::Crimson*>(context)->estimate_global_pose(imu.get_heading());
-    return pose ? pose->x : NAN;
+double vision_pose_y(const void*) {
+    return vision::localizer::snapshot().pose.y_in;
 }
 
-double vision_pose_y(const void* context) {
-    const auto pose = static_cast<const crimson::Crimson*>(context)->estimate_global_pose(imu.get_heading());
-    return pose ? pose->y : NAN;
-}
-
-double vision_pose_theta(const void* context) {
-    const auto pose = static_cast<const crimson::Crimson*>(context)->estimate_global_pose(imu.get_heading());
-    return pose ? pose->theta : NAN;
+double vision_pose_theta(const void*) {
+    return vision::localizer::snapshot().pose.heading_deg;
 }
 
 // Raw driver stick, -127..127, before the drive curve, slew and arcade mixing.
@@ -186,15 +183,14 @@ void Logger::register_robot_fields() {
     register_field("imu_accel_y_g", imu_accel_y, &imu);
     register_field("imu_accel_z_g", imu_accel_z, &imu);
     register_field("imu_status", imu_status, &imu);
-    register_field("vision_has_target", vision_has_target, &crimson_cam);
-    register_field("vision_tag_count", vision_tag_count, &crimson_cam);
-    register_field("vision_primary_tag_id", vision_primary_tag_id, &crimson_cam);
-    register_field("vision_tx_deg", vision_tx, &crimson_cam);
-    register_field("vision_ty_deg", vision_ty, &crimson_cam);
-    register_field("vision_data_age_ms", vision_data_age_ms, &crimson_cam);
-    register_field("vision_pose_x_in", vision_pose_x, &crimson_cam);
-    register_field("vision_pose_y_in", vision_pose_y, &crimson_cam);
-    register_field("vision_pose_theta_deg", vision_pose_theta, &crimson_cam);
+    register_field("vision_locked", vision_locked);
+    register_field("vision_tag_count", vision_tag_count);
+    register_field("vision_tag_id", vision_tag_id);
+    register_field("vision_range_in", vision_range_in);
+    register_field("vision_error_px", vision_error_px);
+    register_field("vision_pose_x_in", vision_pose_x);
+    register_field("vision_pose_y_in", vision_pose_y);
+    register_field("vision_pose_theta_deg", vision_pose_theta);
     register_field("stick_throttle", controller_axis, &controls::kThrottle);
     register_field("stick_turn", controller_axis, &controls::kTurn);
 }

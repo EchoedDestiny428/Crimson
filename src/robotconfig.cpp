@@ -4,7 +4,6 @@
 
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 pros::Imu imu(ports::kImu);
-crimson::Crimson crimson_cam(ports::kVision);
 display::Dashboard dashboard;
 
 // Encoder units are set explicitly: left unset, a motor keeps whatever units the last

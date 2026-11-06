@@ -9,6 +9,55 @@ namespace crimson {
 
 namespace {
 
+struct LemlibPoint {
+    float x;
+    float y;
+};
+
+// Both frames turn clockwise and share the origin, so field (x, y) sits at LemLib (-y, x).
+LemlibPoint to_lemlib(float x, float y) {
+    return {-y, x};
+}
+
+}
+
+lemlib::Pose Chassis::getPose(bool radians, bool standardPos) {
+    const lemlib::Pose lemlib_pose = lemlib::Chassis::getPose(radians);
+    return {lemlib_pose.y, -lemlib_pose.x, standardPos ? -lemlib_pose.theta : lemlib_pose.theta};
+}
+
+void Chassis::setPose(float x, float y, float theta, bool radians) {
+    const LemlibPoint point = to_lemlib(x, y);
+    lemlib::Chassis::setPose(point.x, point.y, theta, radians);
+}
+
+void Chassis::setPose(lemlib::Pose pose, bool radians) {
+    setPose(pose.x, pose.y, pose.theta, radians);
+}
+
+void Chassis::turnToPoint(float x, float y, int timeout, lemlib::TurnToPointParams params, bool async) {
+    const LemlibPoint point = to_lemlib(x, y);
+    lemlib::Chassis::turnToPoint(point.x, point.y, timeout, params, async);
+}
+
+void Chassis::swingToPoint(float x, float y, lemlib::DriveSide lockedSide, int timeout,
+                           lemlib::SwingToPointParams params, bool async) {
+    const LemlibPoint point = to_lemlib(x, y);
+    lemlib::Chassis::swingToPoint(point.x, point.y, lockedSide, timeout, params, async);
+}
+
+void Chassis::moveToPose(float x, float y, float theta, int timeout, lemlib::MoveToPoseParams params, bool async) {
+    const LemlibPoint point = to_lemlib(x, y);
+    lemlib::Chassis::moveToPose(point.x, point.y, theta, timeout, params, async);
+}
+
+void Chassis::moveToPoint(float x, float y, int timeout, lemlib::MoveToPointParams params, bool async) {
+    const LemlibPoint point = to_lemlib(x, y);
+    lemlib::Chassis::moveToPoint(point.x, point.y, timeout, params, async);
+}
+
+namespace {
+
 constexpr std::uint32_t kPeriodMs = 10;
 constexpr float kSettleWindowDeg = 90.0f;
 
@@ -82,8 +131,8 @@ bool Chassis::setPoseFromGoal(float goalX, float goalY, GoalPoseParams params) {
     const float side = params.forwards ? -1.0f : 1.0f;
     const float distance =
         params.distance > 0.0f ? params.distance : (params.forwards ? kGoalResetFrontIn : kGoalResetBackIn);
-    const float x = goalX + side * distance * std::sin(heading);
-    const float y = goalY + side * distance * std::cos(heading);
+    const float x = goalX + side * distance * std::cos(heading);
+    const float y = goalY - side * distance * std::sin(heading);
     if (std::hypot(x - now.x, y - now.y) > params.maxCorrection) {
         return false;
     }

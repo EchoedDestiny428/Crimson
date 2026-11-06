@@ -23,9 +23,21 @@ struct GoalPoseParams {
     float maxCorrection = 10;
 };
 
+// Every pose and target here is in the field frame from field_constants.hpp, where heading 0 faces +X. LemLib's
+// heading 0 faces its own +Y, so poses are turned a quarter turn on the way in and out.
 class Chassis : public lemlib::Chassis {
 public:
     using lemlib::Chassis::Chassis;
+
+    lemlib::Pose getPose(bool radians = false, bool standardPos = false);
+    void setPose(float x, float y, float theta, bool radians = false);
+    void setPose(lemlib::Pose pose, bool radians = false);
+    void turnToPoint(float x, float y, int timeout, lemlib::TurnToPointParams params = {}, bool async = true);
+    void swingToPoint(float x, float y, lemlib::DriveSide lockedSide, int timeout,
+                      lemlib::SwingToPointParams params = {}, bool async = true);
+    void moveToPose(float x, float y, float theta, int timeout, lemlib::MoveToPoseParams params = {},
+                    bool async = true);
+    void moveToPoint(float x, float y, int timeout, lemlib::MoveToPointParams params = {}, bool async = true);
 
     void donut(float theta, int timeout, DonutParams params = {}, bool async = true);
     bool setPoseFromGoal(float goalX, float goalY, GoalPoseParams params = {});

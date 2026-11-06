@@ -85,8 +85,7 @@ void select() {
 }
 
 void draw_selector() {
-    const lemlib::Pose pose = chassis.getPose();
-    dashboard.show_autons(kNames, selected, {pose.x, pose.y, pose.theta});
+    dashboard.show_autons(kNames, selected, chassis.getPose());
 }
 
 void run_selected() {
