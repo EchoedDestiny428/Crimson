@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 namespace subsystems::elevator::macros {
 
@@ -158,18 +159,33 @@ bool release_if(bool reached) {
     if (!reached) {
         return false;
     }
+    return drop();
+}
+
+}
+
+bool settled() {
+    return extension::is_settled() && arm_pivot::is_settled();
+}
+
+void aim(Pose pose) {
+    mode = Mode::Deployed;
+    tilted = false;
+    set_lift(pose.lift_cm);
+    set_arm(pose.arm_deg);
+}
+
+bool drop() {
     const Run run;
     claw::release();
     return run.pause(kGripMs);
-}
-
 }
 
 bool go_to_pose(Pose pose) {
     const Run run;
     extension::set_target(constants::extension_cm_to_motor_deg(pose.lift_cm));
     set_arm(pose.arm_deg);
-    return run.wait_for([] { return extension::is_settled() && arm_pivot::is_settled(); }, kMoveTimeoutMs);
+    return run.wait_for(settled, kMoveTimeoutMs);
 }
 
 namespace {
@@ -226,7 +242,7 @@ bool move_to(double tip_cm) {
     set_lift(pose.lift_cm);
     set_arm(pose.arm_deg);
     const auto timeout_ms = static_cast<std::uint32_t>(seconds * 1000.0 * kMoveTimeoutScale) + kMoveTimeoutPadMs;
-    return run.wait_for([] { return extension::is_settled() && arm_pivot::is_settled(); }, timeout_ms);
+    return run.wait_for(settled, timeout_ms);
 }
 
 bool flip_out(double lift_cm, double arm_deg) {
@@ -313,6 +329,36 @@ double claw_offset_in(const Pose& pose) {
     return (reach_cm - constants::kPivotBehindCenterCm + constants::kClawReleaseOffsetCm) / constants::kCmPerInch;
 }
 
+double travel_seconds(const Pose& to) {
+    return move_seconds(current_pose(), to);
+}
+
+std::optional<Approach> approach(const Pose& pose, float goal_x_in, float goal_y_in) {
+    const lemlib::Pose robot = chassis.getPose();
+    const double dx = goal_x_in - robot.x;
+    const double dy = goal_y_in - robot.y;
+    const double distance = std::hypot(dx, dy);
+    if (distance <= 1e-6) {
+        return std::nullopt;
+    }
+    const double offset = claw_offset_in(pose);
+    const double standoff = std::fabs(offset);
+    const bool claw_in_front = offset >= 0.0;
+    const bool toward_goal = distance >= standoff;
+    return Approach{static_cast<float>(goal_x_in - dx / distance * standoff),
+                    static_cast<float>(goal_y_in - dy / distance * standoff), claw_in_front == toward_goal};
+}
+
+bool reach(const Pose& pose, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms) {
+    if (const auto stop = approach(pose, goal_x_in, goal_y_in)) {
+        chassis.moveToPoint(stop->x, stop->y, static_cast<int>(timeout_ms), {.forwards = stop->forwards});
+    }
+
+    const Run run;
+    aim(pose);
+    return run.wait_for([] { return !chassis.isInMotion() && settled(); }, timeout_ms);
+}
+
 namespace {
 
 bool score_in_range(constants::Goal goal, int level, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms,
@@ -324,29 +370,7 @@ bool score_in_range(constants::Goal goal, int level, float goal_x_in, float goal
     if (!solve(constants::release_cm(goal, level), pose, arm_min_deg, arm_max_deg)) {
         return false;
     }
-
-    const lemlib::Pose robot = chassis.getPose();
-    const double dx = goal_x_in - robot.x;
-    const double dy = goal_y_in - robot.y;
-    const double distance = std::hypot(dx, dy);
-    const double offset = claw_offset_in(pose);
-    const double standoff = std::fabs(offset);
-    if (distance > 1e-6) {
-        const bool claw_in_front = offset >= 0.0;
-        const bool toward_goal = distance >= standoff;
-        const float stop_x = static_cast<float>(goal_x_in - dx / distance * standoff);
-        const float stop_y = static_cast<float>(goal_y_in - dy / distance * standoff);
-        chassis.moveToPoint(stop_x, stop_y, static_cast<int>(timeout_ms), {.forwards = claw_in_front == toward_goal});
-    }
-
-    const Run run;
-    mode = Mode::Deployed;
-    tilted = false;
-    set_lift(pose.lift_cm);
-    set_arm(pose.arm_deg);
-    const bool reached = run.wait_for(
-        [] { return !chassis.isInMotion() && extension::is_settled() && arm_pivot::is_settled(); }, timeout_ms);
-    return release_if(reached);
+    return release_if(reach(pose, goal_x_in, goal_y_in, timeout_ms));
 }
 
 }

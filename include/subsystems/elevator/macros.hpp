@@ -2,6 +2,7 @@
 
 #include "subsystems/elevator/constants.hpp"
 #include <cstdint>
+#include <optional>
 
 namespace subsystems::elevator::macros {
 
@@ -11,6 +12,9 @@ struct Pose {
 };
 
 bool go_to_pose(Pose pose);
+void aim(Pose pose);
+bool settled();
+bool drop();
 
 inline constexpr double kArmMinFromDownDeg = 25.0;
 inline constexpr double kArmFrontMinDeg = kArmMinFromDownDeg;
@@ -33,6 +37,16 @@ bool dual_pickup_height(double lift_cm);
 bool pickup(std::uint32_t timeout_ms = 5000);
 
 bool score(constants::Goal goal, int level);
+
+struct Approach {
+    float x;
+    float y;
+    bool forwards;
+};
+
+double travel_seconds(const Pose& to);
+std::optional<Approach> approach(const Pose& pose, float goal_x_in, float goal_y_in);
+bool reach(const Pose& pose, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms);
 
 bool score(constants::Goal goal, int level, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms = 3000);
 bool score_front(constants::Goal goal, int level, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms = 3000);

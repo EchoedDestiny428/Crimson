@@ -1,4 +1,5 @@
 #include "autons/autons.hpp"
+#include "chaos/chaos.hpp"
 #include "pros/screen.hpp"
 #include "robotconfig.hpp"
 #include <array>
@@ -91,6 +92,7 @@ void run_selected() {
     prepare();
     prepared = false;
     auton_ran = true;
+    chaos.reset();
 
     if (kRoutines[selected].run != nullptr) {
         kRoutines[selected].run();
