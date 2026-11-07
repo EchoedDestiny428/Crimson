@@ -65,10 +65,6 @@ void stop() {
     motor.holdCurrent();
 }
 
-void set_pos(double motor_deg) {
-    motor.setPosition(static_cast<float>(motor_deg));
-}
-
 void set_slow_zone(bool enabled) {
     motor.setSlowZone(enabled ? kSlowRangeDeg : 0.0f, kSlowPower);
 }
@@ -79,14 +75,6 @@ void set_power(int power) {
 
 void move_to(double motor_deg) {
     motor.setTarget(static_cast<float>(motor_deg));
-}
-
-bool is_settled() {
-    return motor.isSettled();
-}
-
-bool wait_until_settled(std::uint32_t timeout_ms) {
-    return motor.waitUntilSettled(timeout_ms);
 }
 
 double get_pos() {
