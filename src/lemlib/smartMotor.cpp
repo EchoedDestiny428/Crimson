@@ -196,6 +196,15 @@ void SmartMotor::setSettleTime(std::uint32_t ms) {
     settleTimeMs = ms;
 }
 
+void SmartMotor::setRampPowers(float startPower, float endPower) {
+    rampEndPower = std::clamp(endPower, 0.0f, kMaxPower);
+    rampStartPower = std::clamp(startPower, 0.0f, kMaxPower);
+}
+
+void SmartMotor::setOutputFilter(std::function<float(float position, float output)> filter) {
+    outputFilter = std::move(filter);
+}
+
 void SmartMotor::setFeedforward(std::function<float(float position)> feedforwardFn) {
     positionFeedforward = std::move(feedforwardFn);
 }
@@ -216,7 +225,11 @@ void SmartMotor::controlLoop() {
         if (manual) {
             positionCommanded = false;
             const float cap = maxPower;
-            actuator->move(static_cast<std::int32_t>(std::clamp(static_cast<float>(manualPower.load()), -cap, cap)));
+            float output = std::clamp(static_cast<float>(manualPower.load()), -cap, cap);
+            if (outputFilter) {
+                output = outputFilter(position, output);
+            }
+            actuator->move(static_cast<std::int32_t>(output));
         } else if (usesMotorEncoders() && !motorEncoderPid) {
             const float distance = decelerationDistance;
             if (distance > settleRange) {
@@ -226,10 +239,26 @@ void SmartMotor::controlLoop() {
                     positionCommanded = true;
                 } else {
                     const float top = error < 0.0f ? std::min(kMaxPower, maxReversePower.load()) : kMaxPower;
-                    const float power = std::max(std::min(kMinimumProfilePower, top),
-                                                 std::clamp(std::fabs(error) / distance, 0.0f, 1.0f) * top);
-                    const auto output = static_cast<std::int32_t>(std::copysign(power, error));
-                    actuator->move(output);
+                    const float fraction = std::clamp(std::fabs(error) / distance, 0.0f, 1.0f);
+                    const float rampStart = rampStartPower;
+                    float power = 0.0f;
+                    if (rampStart > 0.0f) {
+                        // Stepped ramp: full power outside the deceleration distance, then
+                        // rampStart at its edge, linear down to rampEnd at the target.
+                        const float rampEnd = rampEndPower;
+                        power = fraction >= 1.0f ? top : std::min(top, rampEnd + (rampStart - rampEnd) * fraction);
+                    } else {
+                        power = std::max(std::min(kMinimumProfilePower, top), fraction * top);
+                    }
+                    float output = std::copysign(power, error);
+                    if (std::fabs(error) < slowZoneRange) {
+                        const float slow = slowZonePower;
+                        output = std::clamp(output, -slow, slow);
+                    }
+                    if (outputFilter) {
+                        output = outputFilter(position, output);
+                    }
+                    actuator->move(static_cast<std::int32_t>(output));
                     positionCommanded = true;
                 }
             } else if (newTarget || !positionCommanded) {
@@ -285,7 +314,11 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
         output = std::clamp(output, -slow, slow);
     }
     const float cap = maxPower;
-    actuator->move(static_cast<std::int32_t>(std::clamp(output, -cap, cap)));
+    output = std::clamp(output, -std::min(cap, maxReversePower.load()), cap);
+    if (outputFilter) {
+        output = outputFilter(position, output);
+    }
+    actuator->move(static_cast<std::int32_t>(output));
 }
 
 void SmartMotor::log(float goal, float position) const {

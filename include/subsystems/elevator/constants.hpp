@@ -8,66 +8,57 @@
 namespace subsystems::elevator::constants {
 
 // Geometry and gearing.
-inline constexpr double kArmLengthCm = 31.0;                         // arm pivot axis to claw
+inline constexpr double kArmLengthCm = 29.0;                         // arm pivot axis to claw
 inline constexpr double kArmPivotMotorRotationsPerArmRotation = 1.0; // direct drive
-inline constexpr double kExtensionMotorRotationsPerCm = 1.0 / 6.0;   // string lift: one motor rotation raises it 6 cm
+inline constexpr double kExtensionMotorRotationsPerCm = (1100.0 / 360.0) / 33.0; // measured: 1100 motor deg raises it 33 cm (10.8 cm/rev)
 
 // Commanded speeds (motor rpm).
 inline constexpr int kExtensionMaxRpm = 600;
-inline constexpr int kExtensionDownPower = 44; // 35% of 127: the lift never comes down faster than this
-inline constexpr int kArmPivotMoveRpm = 100; // red cartridge
+inline constexpr int kExtensionDownPower = 89; // 70% of 127: the lift never comes down faster than this
 
-// Starting pose (robot at power-on, before anything moves).
-// Pivot height fitted to measured claw heights (27 / 41.8 / 56.6 cm at arm 68 / 94.2 / 122.2 deg
-// on the old 25.4 deg start), within 0.5 cm. Tape measure said 42.
-inline constexpr double kPivotStartHeightCm = 45.9; // arm pivot height above the ground
+// Starting pose: the arm is set at 90 deg (horizontal) before every power-on, so the
+// encoder's zero is 90 deg. The pivot height and setpoints are still from the 32 deg /
+// 29 cm solve.
+inline constexpr double kArmStartDeg = 90.0;
 inline constexpr double kClawStartHeightCm = 15.0;  // claw height above the ground
+inline constexpr double kPivotStartHeightCm = 39.6; // arm pivot height above the ground (15 + 29 * cos(32))
 // Slack adjustment: every arm setpoint is commanded this much higher than planned, to take
 // up slack in the arm so it ends where it was meant to.
 inline constexpr double kArmSlackAdjustmentDeg = 2.0;
-// Calculated from the measurements: acos((pivot height - claw height) / arm length),
-// acos((45.9 - 15) / 31) = 4.6 deg off straight down. Change a length and this follows.
-inline constexpr double kArmStartDeg =
-    std::acos((kPivotStartHeightCm - kClawStartHeightCm) / kArmLengthCm) * 180.0 / 3.14159265358979323846;
+// The piece releases this far toward the robot's front from the arm tip, so behind the
+// pivot only once arm length * sin(arm) < -kClawReleaseOffsetCm: arm >= 180 + asin(7 / 29)
+// = 194.0 deg. Straight up (180) would drop it 7 cm in front of the pivot.
+inline constexpr double kClawReleaseOffsetCm = 7.0;
 
-// Arm-tip heights above the ground for releasing onto a goal.
-// Level 1 is the first pin, scored alone into the goal. Every level after that is a
-// cup/pin combo scored at once.
-// Measured on the alliance goal: 17.5, 34.5, 51.5, 68.5 cm for levels 1-4. Levels past
-// 4 repeat the last measured step (+17 cm), which is not measured.
-// Each taller goal tier adds kGoalTierStepCm: neutral = alliance + 7, center = alliance + 14.
-inline constexpr std::array kAllianceReleaseCm{17.5, 34.5, 51.5, 68.5};
+// Driver scoring stages, all behind (reverse scoring): {lift cm, arm deg from straight down}.
+// The arm has two hard scoring angles, mirrored about horizontal behind (270 deg), so the
+// claw is the same distance behind the pivot at both (29 * sin(40) - 7 = 15.2 cm) and the
+// piece releases in the same spot; the lift makes up the rest of the height.
+//   L1-L3 at kArmScoreLowDeg (310): tip 39.6 - 29 * cos(310) = 21.0 cm with the lift down.
+//   L4+ at kArmScoreHighDeg (230): tip 39.6 - 29 * cos(230) = 58.2 cm with the lift down.
+// Lift = release height - that tip height. L1 can't go lower than 21 cm.
+// Release heights (alliance goal): L1 17.5 cm (the first pin alone), L2 36 cm, then
+// +17 cm per stage. L3 (53 cm) is below the high angle's 58.2 cm, so it stays low; the
+// arm flips to the high angle from L4.
+inline constexpr double kArmScoreLowDeg = 310.0;
+inline constexpr double kArmScoreHighDeg = 230.0;
+struct Setpoint {
+    double lift_cm;
+    double arm_deg;
+};
+inline constexpr std::array<Setpoint, 8> kStageSetpoints{{
+    {0.0, 35.0},               // home / intake: the 35 deg soft limit
+    {0.0, kArmScoreLowDeg},    // L1  17.5 cm (ends ~21 cm: lift already down)
+    {15.0, kArmScoreLowDeg},   // L2  36.0 cm
+    {32.0, kArmScoreLowDeg},   // L3  53.0 cm
+    {11.8, kArmScoreHighDeg},  // L4  70.0 cm
+    {28.8, kArmScoreHighDeg},  // L5  87.0 cm
+    {45.8, kArmScoreHighDeg},  // L6 104.0 cm
+    {62.8, kArmScoreHighDeg},  // L7 121.0 cm
+}};
+inline constexpr int kTopStage = static_cast<int>(kStageSetpoints.size()) - 1;
+// Right cycles the goal: neutral = alliance + 7 cm of lift, center = alliance + 14.
 inline constexpr double kGoalTierStepCm = 7.0;
-
-enum class Goal { Alliance, Neutral, Center };
-
-constexpr int goal_tier(Goal goal) {
-    switch (goal) {
-    case Goal::Alliance:
-        return 0;
-    case Goal::Neutral:
-        return 1;
-    case Goal::Center:
-        return 2;
-    }
-    return 0;
-}
-
-constexpr double release_cm(Goal goal, int level) {
-    const int measured = static_cast<int>(kAllianceReleaseCm.size());
-    if (level < 1) {
-        level = 1;
-    }
-    double alliance = 0.0;
-    if (level <= measured) {
-        alliance = kAllianceReleaseCm[level - 1];
-    } else {
-        const double step = kAllianceReleaseCm[measured - 1] - kAllianceReleaseCm[measured - 2];
-        alliance = kAllianceReleaseCm[measured - 1] + (level - measured) * step;
-    }
-    return alliance + goal_tier(goal) * kGoalTierStepCm;
-}
-// Alliance: 17.5, 34.5, 51.5, 68.5 cm  Neutral: 24.5, 41.5, 58.5, 75.5  Center: 31.5, 48.5, 65.5, 82.5
 
 // Unit conversions.
 constexpr double extension_cm_to_motor_deg(double cm) {

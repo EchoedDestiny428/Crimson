@@ -44,10 +44,10 @@ public:
     void useRawCounts(float degreesPerCount);
     /** Cap on every output (manual, PID, profile), in motor power 0..127. Default 127. */
     void setMaxPower(float power);
-    /** Cap on ramp-mode output going negative (e.g. a lift coming down), 0..127. Default 127. */
+    /** Cap on ramp and PID output going negative (e.g. a lift coming down), 0..127. Default 127. */
     void setMaxReversePower(float power);
     /**
-     * PID mode: once a move is within range of its target, cap its output at power
+     * PID and ramp modes: once a move is within range of its target, cap its output at power
      * (0..127), either direction. Range 0 (the default) turns it off.
      */
     void setSlowZone(float range, float power);
@@ -58,6 +58,17 @@ public:
     void setSettleTime(std::uint32_t ms);
     /** Extra PID output from the current position, e.g. gravity on an arm (kG * sin(angle)). */
     void setFeedforward(std::function<float(float position)> positionFeedforward);
+    /**
+     * Ramp mode: instead of scaling full power down to the target, drop to startPower at
+     * the deceleration distance and go linearly from there to endPower at the target
+     * (0..127). Default (0): the plain ramp.
+     */
+    void setRampPowers(float startPower, float endPower);
+    /**
+     * Last say on manual and PID output: called with the position and the output about to
+     * be sent, returns what is sent (e.g. slowing down near a soft limit). Set before start().
+     */
+    void setOutputFilter(std::function<float(float position, float output)> filter);
     /** Enable or disable SmartMotor diagnostics through the configured info sink. */
     void setLogging(bool enabled);
 
@@ -76,8 +87,11 @@ private:
     std::int32_t maxVelocity = 0;
     bool motorEncoderPid = false;
     std::function<float(float)> positionFeedforward;
+    std::function<float(float, float)> outputFilter;
     std::atomic<float> maxPower{127.0f};
     std::atomic<float> maxReversePower{127.0f};
+    std::atomic<float> rampStartPower{0.0f};
+    std::atomic<float> rampEndPower{0.0f};
     std::atomic<float> slowZoneRange{0.0f};
     std::atomic<float> slowZonePower{127.0f};
     std::atomic<std::uint32_t> settleTimeMs{0};
