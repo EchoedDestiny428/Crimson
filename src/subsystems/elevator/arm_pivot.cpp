@@ -25,9 +25,10 @@ constexpr std::uint32_t kSettleTimeMs = 150;     // brakes (HOLD) after this lon
 // Red cartridge: 1800 raw encoder counts per output turn, independent of the gearset
 // setting (which wasn't taking, so PROS degrees read wrong).
 constexpr float kDegreesPerCount = 360.0f / 1800.0f;
-// Slow zone going down: the last kDownSlowRangeDeg of a downward move capped at 35%.
-constexpr float kDownSlowRangeDeg = 30.0f;
-constexpr float kDownSlowPower = 44.0f; // 35% of 127
+// Slow zone: the last kSlowRangeDeg of a move capped at 35%, either direction (the arm
+// falls into stage 1 behind going forward, and into home going back).
+constexpr float kSlowRangeDeg = 30.0f;
+constexpr float kSlowPower = 44.0f; // 35% of 127
 
 lemlib::SmartMotor motor(&arm_pivot_motor, lemlib::PID(kP, kI, kD, kWindupDeg, true), kSettleRange);
 bool manual_active = false;
@@ -68,8 +69,8 @@ void set_pos(double motor_deg) {
     motor.setPosition(static_cast<float>(motor_deg));
 }
 
-void set_down_slow_zone(bool enabled) {
-    motor.setReverseSlowZone(enabled ? kDownSlowRangeDeg : 0.0f, kDownSlowPower);
+void set_slow_zone(bool enabled) {
+    motor.setSlowZone(enabled ? kSlowRangeDeg : 0.0f, kSlowPower);
 }
 
 void set_power(int power) {

@@ -170,9 +170,9 @@ void SmartMotor::setMaxReversePower(float power) {
     maxReversePower = std::clamp(power, 0.0f, kMaxPower);
 }
 
-void SmartMotor::setReverseSlowZone(float range, float power) {
-    reverseSlowRange = std::max(0.0f, range);
-    reverseSlowPower = std::clamp(power, 0.0f, kMaxPower);
+void SmartMotor::setSlowZone(float range, float power) {
+    slowZoneRange = std::max(0.0f, range);
+    slowZonePower = std::clamp(power, 0.0f, kMaxPower);
 }
 
 void SmartMotor::useRawCounts(float countsToDegrees) {
@@ -280,8 +280,9 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
     if (positionFeedforward) {
         output += positionFeedforward(position);
     }
-    if (error < 0.0f && -error < reverseSlowRange) {
-        output = std::max(output, -reverseSlowPower.load());
+    if (std::fabs(error) < slowZoneRange) {
+        const float slow = slowZonePower;
+        output = std::clamp(output, -slow, slow);
     }
     const float cap = maxPower;
     actuator->move(static_cast<std::int32_t>(std::clamp(output, -cap, cap)));

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mcl-viewer",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-I", "-m", "http.server", "8770", "--bind", "127.0.0.1", "--directory", "/tmp/claude-1000/-home-jarddoeswork-crimson/dd0aa9fa-8feb-4bc1-9fd6-ee8e3baf9751/scratchpad/mcl"],
+      "port": 8770
+    }
+  ]
+}

@@ -47,10 +47,10 @@ public:
     /** Cap on ramp-mode output going negative (e.g. a lift coming down), 0..127. Default 127. */
     void setMaxReversePower(float power);
     /**
-     * PID mode: once a move going negative is within range of its target, cap its output at
-     * power (0..127). Range 0 (the default) turns it off.
+     * PID mode: once a move is within range of its target, cap its output at power
+     * (0..127), either direction. Range 0 (the default) turns it off.
      */
-    void setReverseSlowZone(float range, float power);
+    void setSlowZone(float range, float power);
     /**
      * PID mode: keep running the PID inside settleRange and only brake once the error has
      * stayed inside it this long. 0 (the default) brakes as soon as it enters the range.
@@ -78,8 +78,8 @@ private:
     std::function<float(float)> positionFeedforward;
     std::atomic<float> maxPower{127.0f};
     std::atomic<float> maxReversePower{127.0f};
-    std::atomic<float> reverseSlowRange{0.0f};
-    std::atomic<float> reverseSlowPower{127.0f};
+    std::atomic<float> slowZoneRange{0.0f};
+    std::atomic<float> slowZonePower{127.0f};
     std::atomic<std::uint32_t> settleTimeMs{0};
     std::uint32_t inRangeSince = 0; // control task only; 0 = not inside settleRange
     float degreesPerCount = 0.0f; // > 0: read raw counts (see useRawCounts)

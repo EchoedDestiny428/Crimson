@@ -20,7 +20,8 @@ bool go_to_pose(Pose pose);
 // 360 carries it over the top to behind. The solver keeps the arm at least
 // kArmMinFromDownDeg from straight down, so it reaches the back by swinging up and
 // over, never down through 0. Manual control is not limited by this.
-inline constexpr double kArmMinFromDownDeg = 25.0;
+// 20 so stage 1 (17.5 cm) is reachable with the lift down: it needs 23.6 deg off down.
+inline constexpr double kArmMinFromDownDeg = 20.0;
 inline constexpr double kArmFrontMinDeg = kArmMinFromDownDeg;
 inline constexpr double kArmFrontMaxDeg = 180.0;
 inline constexpr double kArmBehindMinDeg = 180.0;
@@ -87,6 +88,7 @@ Pose pose_now();
 double tip_now();
 int snap_stage_now();
 int goal_tier_now(); // 0 alliance, 1 neutral, 2 center
+bool behind_now();   // side swap: true when snaps score behind
 Pose target_now();   // lift and arm setpoints currently commanded
 int target_stage();  // stage of the last snap, -1 before the first
 

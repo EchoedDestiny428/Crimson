@@ -12,14 +12,9 @@ std::atomic<State> current_state{State::Empty};
 }
 
 void update() {
-    if (controller.get_digital_new_press(controls::kClawPiston)) {
+    if (controller.get_digital_new_press(controls::kClawPiston) ||
+        controller.get_digital_new_press(controls::kClawToggle)) {
         toggle();
-    }
-    if (controller.get_digital_new_press(controls::kClawExtend)) {
-        release();
-    }
-    if (controller.get_digital_new_press(controls::kClawRetract)) {
-        grab();
     }
 }
 

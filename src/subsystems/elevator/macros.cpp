@@ -395,8 +395,10 @@ constexpr int kArmUpPower = 89;   // 70% of full, arm only, while L1 is held
 constexpr int kArmDownPower = 44; // 35% of full, arm only, while L2 is held
 
 int dir = 0;          // +1 while L1 is held, -1 while L2 is held
+bool lift_manual = false; // R1/R2 driving the lift by hand
 int goal_tier = 0;    // 0 alliance, 1 neutral, 2 center: lifts the elevator kGoalTierStepCm per tier
 int snapped_stage = -1; // stage of the last snap, so the offset can move the lift there
+bool behind = false;    // side swap (Y): snaps score behind (reverse dump) and L1/L2 flip the arm
 
 double tip_cm(const Pose& pose) {
     return constants::kPivotStartHeightCm + pose.lift_cm - constants::kArmLengthCm * std::cos(pose.arm_deg * kPi / 180.0);
@@ -406,20 +408,24 @@ double stage_tip_cm(int stage) {
     return constants::release_cm(kStageGoal, stage);
 }
 
-// Precomputed stage setpoints: stage 0 is home; each stage after it is the solver's
-// fastest pose from the stage before, claw in front of the pivot.
-const std::array<Pose, kTopStage + 1>& stage_poses() {
-    static const auto poses = [] {
-        std::array<Pose, kTopStage + 1> out{};
-        out[0] = {0.0, constants::kArmStartDeg};
-        for (int stage = 1; stage <= kTopStage; ++stage) {
-            if (!solve_from(out[stage - 1], stage_tip_cm(stage), out[stage], kArmFrontMinDeg, kArmFrontMaxDeg)) {
-                out[stage] = out[stage - 1];
-            }
+// Precomputed stage setpoints, one table per side: stage 0 is home; each stage after it
+// is the solver's fastest pose from the stage before, claw in front of the pivot, or
+// behind it (reverse dump: the arm goes up and over the top and drops the piece behind).
+std::array<Pose, kTopStage + 1> solve_stages(double arm_min_deg, double arm_max_deg) {
+    std::array<Pose, kTopStage + 1> out{};
+    out[0] = {0.0, constants::kArmStartDeg};
+    for (int stage = 1; stage <= kTopStage; ++stage) {
+        if (!solve_from(out[stage - 1], stage_tip_cm(stage), out[stage], arm_min_deg, arm_max_deg)) {
+            out[stage] = out[stage - 1];
         }
-        return out;
-    }();
-    return poses;
+    }
+    return out;
+}
+
+const std::array<Pose, kTopStage + 1>& stage_poses() {
+    static const auto front = solve_stages(kArmFrontMinDeg, kArmFrontMaxDeg);
+    static const auto back = solve_stages(kArmBehindMinDeg, kArmBehindMaxDeg);
+    return behind ? back : front;
 }
 
 double offset_cm() {
@@ -452,8 +458,8 @@ void snap(int stage) {
     mode = Mode::Deployed;
     tilted = false;
     snapped_stage = std::clamp(stage, 0, kTopStage);
-    // Coming down to stage 1 or home: the arm's last 30 deg at 35%.
-    arm_pivot::set_down_slow_zone(snapped_stage <= 1);
+    // Stage 1 or home: the arm's last 30 deg (falling, on either side) at 35%.
+    arm_pivot::set_slow_zone(snapped_stage <= 1);
     set_lift(pose.lift_cm + (snapped_stage > 0 ? offset_cm() : 0.0));
     set_arm(pose.arm_deg);
 }
@@ -474,13 +480,29 @@ void update() {
     const bool down = controller.get_digital(controls::kExtensionDown) && !up;
     const int held = up ? 1 : down ? -1 : 0;
 
+    // R1/R2: the lift by hand, no snap; it holds where it is let go. L1/L2 take priority.
+    const bool lift_up = controller.get_digital(controls::kLiftManualUp);
+    const bool lift_down = controller.get_digital(controls::kLiftManualDown) && !lift_up;
+    if (held == 0 && dir == 0 && (lift_up || lift_down)) {
+        if (!lift_manual) {
+            cancel();
+            lift_manual = true;
+        }
+        extension::set_manual(lift_up ? kFullPower : -constants::kExtensionDownPower);
+    } else if (lift_manual) {
+        lift_manual = false;
+        extension::hold();
+    }
+
     if (held != 0) {
-        // Hold: lift 100% up / 35% down, arm 70% up / 35% down, no control loop.
+        // Hold: lift 100% up / 35% down, arm 70% up / 35% down, no control loop. Behind,
+        // the arm's directions flip.
         if (held != dir) {
             cancel();
         }
         extension::set_manual(held > 0 ? kFullPower : -constants::kExtensionDownPower);
-        arm_pivot::set_power(held > 0 ? kArmUpPower : -kArmDownPower);
+        const int arm_power = held > 0 ? kArmUpPower : -kArmDownPower;
+        arm_pivot::set_power(behind ? -arm_power : arm_power);
     } else if (dir != 0) {
         // Release: the only place motor control runs.
         snap(closest_stage(tip_cm(current_pose())));
@@ -489,6 +511,15 @@ void update() {
 
     if (controller.get_digital_new_press(controls::kHome)) {
         snap(0);
+    }
+
+    // Y swaps front <-> back: the arm goes to the same stage on the other side (stage 1
+    // from home or between stages). Swapping to the front at home stays home.
+    if (controller.get_digital_new_press(controls::kSideSwap)) {
+        behind = !behind;
+        if (held == 0 && (behind || snapped_stage != 0)) {
+            snap(snapped_stage > 0 ? snapped_stage : closest_stage(tip_cm(current_pose())));
+        }
     }
 
     // Right cycles the goal (alliance -> neutral -> center): only the elevator moves, right
@@ -509,6 +540,7 @@ void update() {
 
 void stop() {
     dir = 0;
+    lift_manual = false;
     snapped_stage = -1;
     cancel();
     extension::hold();
@@ -525,6 +557,10 @@ double tip_now() {
 
 int snap_stage_now() {
     return closest_stage(tip_now());
+}
+
+bool behind_now() {
+    return behind;
 }
 
 int goal_tier_now() {
