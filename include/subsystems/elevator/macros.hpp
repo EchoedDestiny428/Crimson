@@ -19,6 +19,12 @@ struct Pose {
 void update();
 void stop();
 
+// Fastest-pose solver for autons (not used by driver control): the lift + arm angle in
+// [arm_min_deg, arm_max_deg] that puts the arm tip at tip_cm and is reached soonest from
+// `from`. False if no pose in range reaches it with the lift at or above 0.
+bool solve_from(const Pose& from, double tip_cm, Pose& out, double arm_min_deg, double arm_max_deg);
+double move_seconds(const Pose& from, const Pose& to); // the slower of the lift and arm moves
+
 // Live readings for the controller readout.
 Pose pose_now();
 double tip_now();    // piece height (cm) from the lift and arm

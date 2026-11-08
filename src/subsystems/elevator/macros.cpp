@@ -42,52 +42,51 @@ void go_to_stage(int next) {
 
 }
 
-// Fastest-pose solver, kept for autons (commented out: the driver stages are a hard arm
-// flip plus lift). tip height = pivot height + lift - arm length * cos(arm). Tries every
-// arm angle in [arm_min_deg, arm_max_deg], solves the lift that reaches tip_cm, and keeps
-// the pose both reach soonest from `from` (lift 60 cm/s, arm 600 deg/s); a coarse 0.5 deg
-// sweep, then a 0.01 deg one around the best. Behind with the release point behind the
-// pivot is arm 194.0-340 deg.
-//
-// double move_seconds(const Pose& from, const Pose& to) {
-//     constexpr double kLiftCmPerS = constants::kExtensionMaxRpm / 60.0 / constants::kExtensionMotorRotationsPerCm;
-//     constexpr double kArmDegPerS = 100 * 360.0 / 60.0 / constants::kArmPivotMotorRotationsPerArmRotation;
-//     return std::max(std::fabs(to.lift_cm - from.lift_cm) / kLiftCmPerS,
-//                     std::fabs(to.arm_deg - from.arm_deg) / kArmDegPerS);
-// }
-//
-// bool solve_from(const Pose& from, double tip_cm, Pose& out, double arm_min_deg, double arm_max_deg) {
-//     constexpr double kSolveStepDeg = 0.5;
-//     constexpr double kSolveFineStepDeg = 0.01;
-//     bool found = false;
-//     double best_s = 0.0;
-//     const auto consider = [&](double arm) {
-//         const double lift =
-//             tip_cm - constants::kPivotStartHeightCm + constants::kArmLengthCm * std::cos(arm * kPi / 180.0);
-//         if (lift < 0.0) {
-//             return;
-//         }
-//         const Pose pose{lift, arm};
-//         const double s = move_seconds(from, pose);
-//         if (!found || s < best_s) {
-//             out = pose;
-//             best_s = s;
-//             found = true;
-//         }
-//     };
-//     for (double arm = arm_min_deg; arm <= arm_max_deg; arm += kSolveStepDeg) {
-//         consider(arm);
-//     }
-//     if (found) {
-//         const double center = out.arm_deg;
-//         const double lo = std::max(arm_min_deg, center - kSolveStepDeg);
-//         const double hi = std::min(arm_max_deg, center + kSolveStepDeg);
-//         for (double arm = lo; arm <= hi; arm += kSolveFineStepDeg) {
-//             consider(arm);
-//         }
-//     }
-//     return found;
-// }
+// Fastest-pose solver, kept for autons (the driver stages don't use it: they are hard
+// setpoints). tip height = pivot height + lift - arm length * cos(arm). Tries every arm
+// angle in [arm_min_deg, arm_max_deg], solves the lift that reaches tip_cm, and keeps the
+// pose both reach soonest from `from` (lift at kExtensionMaxRpm, arm at 100 rpm); a coarse
+// 0.5 deg sweep, then a 0.01 deg one around the best. Behind with the release point behind
+// the pivot is arm 194.0 deg up to the 315 deg soft limit.
+double move_seconds(const Pose& from, const Pose& to) {
+    constexpr double kLiftCmPerS = constants::kExtensionMaxRpm / 60.0 / constants::kExtensionMotorRotationsPerCm;
+    constexpr double kArmDegPerS = 100 * 360.0 / 60.0 / constants::kArmPivotMotorRotationsPerArmRotation;
+    return std::max(std::fabs(to.lift_cm - from.lift_cm) / kLiftCmPerS,
+                    std::fabs(to.arm_deg - from.arm_deg) / kArmDegPerS);
+}
+
+bool solve_from(const Pose& from, double tip_cm, Pose& out, double arm_min_deg, double arm_max_deg) {
+    constexpr double kSolveStepDeg = 0.5;
+    constexpr double kSolveFineStepDeg = 0.01;
+    bool found = false;
+    double best_s = 0.0;
+    const auto consider = [&](double arm) {
+        const double lift =
+            tip_cm - constants::kPivotStartHeightCm + constants::kArmLengthCm * std::cos(arm * kPi / 180.0);
+        if (lift < 0.0) {
+            return;
+        }
+        const Pose pose{lift, arm};
+        const double s = move_seconds(from, pose);
+        if (!found || s < best_s) {
+            out = pose;
+            best_s = s;
+            found = true;
+        }
+    };
+    for (double arm = arm_min_deg; arm <= arm_max_deg; arm += kSolveStepDeg) {
+        consider(arm);
+    }
+    if (found) {
+        const double center = out.arm_deg;
+        const double lo = std::max(arm_min_deg, center - kSolveStepDeg);
+        const double hi = std::min(arm_max_deg, center + kSolveStepDeg);
+        for (double arm = lo; arm <= hi; arm += kSolveFineStepDeg) {
+            consider(arm);
+        }
+    }
+    return found;
+}
 
 void update() {
     if (controller.get_digital_new_press(controls::kStageDown)) {
