@@ -10,5 +10,6 @@ void set_target(double height);
 void set_manual(int power);
 double height();
 double target();
+bool settled(); // within the lift's settle band of its target
 
 }

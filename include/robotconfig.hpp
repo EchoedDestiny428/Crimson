@@ -21,6 +21,7 @@ extern pros::Rotation vertical_odom;
 extern pros::Rotation horizontal_odom;
 
 extern pros::Distance claw_distance;
+extern pros::Distance score_distance; // scoring side, facing the goal; not installed
 extern pros::adi::Pneumatics claw_piston;
 
 extern crimson::Chassis chassis;

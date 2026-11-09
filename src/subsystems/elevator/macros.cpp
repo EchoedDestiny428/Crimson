@@ -43,7 +43,9 @@ void go_to_stage(int next) {
 }
 
 // Fastest-pose solver, kept for autons (the driver stages don't use it: they are hard
-// setpoints). tip height = pivot height + lift - arm length * cos(arm). Tries every arm
+// setpoints). Height only: whichever arm angle reaches tip_cm soonest, so the horizontal
+// reach changes with the angle. ik::solve hits a measured horizontal distance and a height.
+// tip height = pivot height + lift - arm length * cos(arm). Tries every arm
 // angle in [arm_min_deg, arm_max_deg], solves the lift that reaches tip_cm, and keeps the
 // pose both reach soonest from `from` (lift at kExtensionMaxRpm, arm at 100 rpm); a coarse
 // 0.5 deg sweep, then a 0.01 deg one around the best. Behind with the release point behind

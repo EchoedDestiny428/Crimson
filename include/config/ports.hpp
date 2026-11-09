@@ -23,6 +23,10 @@ inline constexpr std::int8_t kArmPivot = 7;     // from newbot-mechanism_tests (
 
 inline constexpr std::int8_t kClawDistance = 12; // placeholder: 4 is now the vertical wheel
 
+// Scoring side, facing the goal. Not installed. The IK reads this as the gap past the
+// rammed pose; the claw sensor above looks at the piece, not the goal.
+inline constexpr std::int8_t kScoreDistance = 5;
+
 inline constexpr std::int8_t kSideToggle = 6;   // side toggle (flex wheels), from newbot-mechanism_tests; not wired yet
 
 inline constexpr char kClawPiston = 'A';

@@ -40,10 +40,8 @@ constexpr float kDegreesPerCount = 360.0f / 1800.0f;
 constexpr float kSlowRangeDeg = 30.0f;
 constexpr float kSlowPower = 44.0f; // 35% of 127
 
-// Soft limits, arm degrees from straight down: setpoints are clamped into this range, and
-// manual power that would push past a limit holds at the limit instead.
-constexpr double kMinArmDeg = 35.0;
-constexpr double kMaxArmDeg = 315.0;
+// Soft limits live in constants (shared with the IK). Setpoints are clamped into that
+// range, and manual power that would push past a limit holds at the limit instead.
 // Hard slowdown: within kLimitSlowRangeDeg of a soft limit, anything driving toward it
 // (manual or ramp) is capped at kLimitSlowPower.
 constexpr double kLimitSlowRangeDeg = 15.0;
@@ -53,16 +51,16 @@ lemlib::SmartMotor motor(&arm_pivot_motor, kMaxVelocity, kSettleRange, kDecelera
 bool manual_active = false;
 
 double clamp_motor_deg(double motor_deg) {
-    return std::clamp(motor_deg, constants::arm_deg_to_motor_deg(kMinArmDeg), constants::arm_deg_to_motor_deg(kMaxArmDeg));
+    return std::clamp(motor_deg, constants::arm_deg_to_motor_deg(constants::kMinArmDeg), constants::arm_deg_to_motor_deg(constants::kMaxArmDeg));
 }
 
 // Open-loop power unless it pushes past a soft limit; then hold at that limit.
 void drive(int power) {
     const double arm_deg = constants::arm_motor_deg_to_deg(motor.getRotation());
-    if (power > 0 && arm_deg >= kMaxArmDeg) {
-        motor.setTarget(static_cast<float>(constants::arm_deg_to_motor_deg(kMaxArmDeg)));
-    } else if (power < 0 && arm_deg <= kMinArmDeg) {
-        motor.setTarget(static_cast<float>(constants::arm_deg_to_motor_deg(kMinArmDeg)));
+    if (power > 0 && arm_deg >= constants::kMaxArmDeg) {
+        motor.setTarget(static_cast<float>(constants::arm_deg_to_motor_deg(constants::kMaxArmDeg)));
+    } else if (power < 0 && arm_deg <= constants::kMinArmDeg) {
+        motor.setTarget(static_cast<float>(constants::arm_deg_to_motor_deg(constants::kMinArmDeg)));
     } else {
         motor.setManual(power);
     }
@@ -77,10 +75,10 @@ void init() {
     motor.reset(); // motor 0 = constants::kArmStartDeg; the conversions add the offset
     motor.setOutputFilter([](float motor_deg, float output) {
         const double arm_deg = constants::arm_motor_deg_to_deg(motor_deg);
-        if (output > 0.0f && arm_deg >= kMaxArmDeg - kLimitSlowRangeDeg) {
+        if (output > 0.0f && arm_deg >= constants::kMaxArmDeg - kLimitSlowRangeDeg) {
             return std::min(output, kLimitSlowPower);
         }
-        if (output < 0.0f && arm_deg <= kMinArmDeg + kLimitSlowRangeDeg) {
+        if (output < 0.0f && arm_deg <= constants::kMinArmDeg + kLimitSlowRangeDeg) {
             return std::max(output, -kLimitSlowPower);
         }
         return output;
@@ -138,6 +136,10 @@ double get_pos() {
 
 double target() {
     return motor.getTarget();
+}
+
+bool settled() {
+    return motor.isSettled();
 }
 
 }

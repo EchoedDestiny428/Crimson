@@ -29,6 +29,13 @@ inline constexpr double kArmSlackAdjustmentDeg = 2.0;
 // pivot only once arm length * sin(arm) < -kClawReleaseOffsetCm: arm >= 180 + asin(7 / 29)
 // = 194.0 deg. Straight up (180) would drop it 7 cm in front of the pivot.
 inline constexpr double kClawReleaseOffsetCm = 7.0;
+// Soft limits, degrees from straight down. 315 is the rear crossbar.
+inline constexpr double kMinArmDeg = 35.0;
+inline constexpr double kMaxArmDeg = 315.0;
+// Scoring-side distance sensor, facing back. Not installed. A reading equal to this is
+// the rammed pose (release at the 230/310 point). 0 until the mount is measured, so a
+// 0 cm reading is treated as flush and any larger reading as that many cm short of the goal.
+inline constexpr double kScoreRangeAtRammedCm = 0.0;
 
 // Driver scoring stages, all behind (reverse scoring): {lift cm, arm deg from straight down}.
 // The arm has two hard scoring angles, mirrored about horizontal behind (270 deg), so the
@@ -57,8 +64,17 @@ inline constexpr std::array<Setpoint, 8> kStageSetpoints{{
     {62.8, kArmScoreHighDeg},  // L7 121.0 cm
 }};
 inline constexpr int kTopStage = static_cast<int>(kStageSetpoints.size()) - 1;
+// Pin height above the ground on an alliance goal. Index matches kStageSetpoints.
+// L1 (17.5) is below the arm at the design distance (the lift would have to go
+// negative), so the IK refuses it. Neutral and center add kGoalTierStepCm on top.
+inline constexpr std::array<double, 8> kStageReleaseCm{{
+    0.0, 17.5, 36.0, 53.0, 70.0, 87.0, 104.0, 121.0,
+}};
 // Right cycles the goal: neutral = alliance + 7 cm of lift, center = alliance + 14.
 inline constexpr double kGoalTierStepCm = 7.0;
+// Highest lift the IK will command: L7 on the center goal. The extension motor still
+// has no software stop; this only rejects a solved pose.
+inline constexpr double kMaxLiftCm = kStageSetpoints[kTopStage].lift_cm + 2.0 * kGoalTierStepCm;
 
 // Unit conversions.
 constexpr double extension_cm_to_motor_deg(double cm) {
