@@ -24,7 +24,7 @@ inline constexpr double kClawStartHeightCm = 15.0;  // claw height above the gro
 inline constexpr double kPivotStartHeightCm = 39.6; // arm pivot height above the ground (15 + 29 * cos(32))
 // Slack adjustment: every arm setpoint is commanded this much higher than planned, to take
 // up slack in the arm so it ends where it was meant to.
-inline constexpr double kArmSlackAdjustmentDeg = 2.0;
+inline constexpr double kArmSlackAdjustmentDeg = 0.0;
 // The piece releases this far toward the robot's front from the arm tip, so behind the
 // pivot only once arm length * sin(arm) < -kClawReleaseOffsetCm: arm >= 180 + asin(7 / 29)
 // = 194.0 deg. Straight up (180) would drop it 7 cm in front of the pivot.
@@ -40,8 +40,8 @@ inline constexpr double kClawReleaseOffsetCm = 7.0;
 // Release heights (alliance goal): L1 17.5 cm (the first pin alone), L2 36 cm, then
 // +17 cm per stage. L3 (53 cm) is below the high angle's 58.2 cm, so it stays low; the
 // arm flips to the high angle from L4.
-inline constexpr double kArmScoreLowDeg = 310.0;
-inline constexpr double kArmScoreHighDeg = 230.0;
+inline constexpr double kArmScoreLowDeg = 312.0;
+inline constexpr double kArmScoreHighDeg = 228.0;
 struct Setpoint {
     double lift_cm;
     double arm_deg;
@@ -49,12 +49,12 @@ struct Setpoint {
 inline constexpr std::array<Setpoint, 8> kStageSetpoints{{
     {0.0, 35.0},               // home / intake: the 35 deg soft limit
     {0.0, kArmScoreLowDeg},    // L1  17.5 cm (ends ~21 cm: lift already down)
-    {15.0, kArmScoreLowDeg},   // L2  36.0 cm
-    {32.0, kArmScoreLowDeg},   // L3  53.0 cm
-    {11.8, kArmScoreHighDeg},  // L4  70.0 cm
-    {28.8, kArmScoreHighDeg},  // L5  87.0 cm
-    {45.8, kArmScoreHighDeg},  // L6 104.0 cm
-    {62.8, kArmScoreHighDeg},  // L7 121.0 cm
+    {20.0, kArmScoreLowDeg},   // L2  36.0 cm
+    {37.0, kArmScoreLowDeg},   // L3  53.0 cm
+    {16.8, kArmScoreHighDeg},  // L4  70.0 cm
+    {33.8, kArmScoreHighDeg},  // L5  87.0 cm
+    {50.8, kArmScoreHighDeg},  // L6 104.0 cm
+    {67.8, kArmScoreHighDeg},  // L7 121.0 cm
 }};
 inline constexpr int kTopStage = static_cast<int>(kStageSetpoints.size()) - 1;
 // Right cycles the goal: neutral = alliance + 7 cm of lift, center = alliance + 14.
