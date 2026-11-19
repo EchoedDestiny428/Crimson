@@ -16,9 +16,9 @@ namespace {
 // kMinPowerRangeDeg of it (and outside the deadband) the push is never below kMinPower
 // (kNearMinPower once within kNearRangeDeg).
 // No kI, no kG (the arm is counterbanded).
-constexpr float kP = 1.4f;
+constexpr float kP = 1.35f;
 constexpr float kD = 6.0f;
-constexpr float kMinPower = 50.0f; // well above gravity + friction (20 stalled at ~235 climbing toward 180)
+constexpr float kMinPower = 35.0f; // well above gravity + friction (20 stalled at ~235 climbing toward 180)
 constexpr float kMinPowerRangeDeg = 20.0f;
 // Inside kNearRangeDeg of the target the floor drops to kNearMinPower, so the last couple of
 // degrees are gentler.
@@ -36,7 +36,7 @@ constexpr float kDegreesPerCount = 360.0f / 1800.0f;
 // Slow zone: the last kSlowRangeDeg of a move capped at 35%, either direction (the arm
 // falls into stage 1 behind going forward, and into home going back).
 constexpr float kSlowRangeDeg = 30.0f;
-constexpr float kSlowPower = 44.0f; // 35% of 127
+constexpr float kSlowPower = 30.0f; // 35% of 127
 
 // Soft limits, arm degrees from straight down: setpoints are clamped into this range, and
 // manual power that would push past a limit holds at the limit instead.

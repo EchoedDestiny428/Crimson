@@ -35,12 +35,13 @@ inline constexpr double kClawReleaseOffsetCm = 7.0;
 // The arm has two hard scoring angles, mirrored about horizontal behind (270 deg), so the
 // claw is the same distance behind the pivot at both (29 * sin(40) - 7 = 15.2 cm) and the
 // piece releases in the same spot; the lift makes up the rest of the height.
-//   L1-L3 at kArmScoreLowDeg (310): tip 39.6 - 29 * cos(310) = 21.0 cm with the lift down.
-//   L4+ at kArmScoreHighDeg (230): tip 39.6 - 29 * cos(230) = 58.2 cm with the lift down.
-// Lift = release height - that tip height. L1 can't go lower than 21 cm.
+//   L1-L2 at kArmScoreLowDeg (312): claw tip about 20 cm up with the lift down.
+//   L3+ at kArmScoreHighDeg (228): claw tip about 59 cm up with the lift down.
+// Lift = release height - that tip height, plus about 5 cm found on the robot (the lifts below
+// are the measured ones). L1 can't go lower than the low angle's ~20 cm.
 // Release heights (alliance goal): L1 17.5 cm (the first pin alone), L2 36 cm, then
-// +17 cm per stage. L3 (53 cm) is below the high angle's 58.2 cm, so it stays low; the
-// arm flips to the high angle from L4.
+// +17 cm per stage. L3 (53 cm) is about what the high angle already reaches with the lift
+// down, so it uses the high angle with no lift.
 inline constexpr double kArmScoreLowDeg = 312.0;
 inline constexpr double kArmScoreHighDeg = 228.0;
 struct Setpoint {
@@ -51,7 +52,7 @@ inline constexpr std::array<Setpoint, 8> kStageSetpoints{{
     {0.0, 30.0},               // home / intake: 30 deg, just above the 27 deg lower stop
     {0.0, kArmScoreLowDeg},    // L1  17.5 cm (ends ~21 cm: lift already down)
     {20.0, kArmScoreLowDeg},   // L2  36.0 cm
-    {37.0, kArmScoreLowDeg},   // L3  53.0 cm
+    {0.0, kArmScoreHighDeg},   // L3  53.0 cm (the high angle already reaches it, lift stays down)
     {16.8, kArmScoreHighDeg},  // L4  70.0 cm
     {33.8, kArmScoreHighDeg},  // L5  87.0 cm
     {50.8, kArmScoreHighDeg},  // L6 104.0 cm
