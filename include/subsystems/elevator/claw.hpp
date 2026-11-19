@@ -2,8 +2,10 @@
 
 namespace subsystems::elevator::claw {
 
-void update(); // A / X toggle the claw piston
+void update(); // A and X toggle the claw piston
 void toggle();
-void grab(); // close on a piece
+void open();  // hard-set open (outtake), not a toggle
+void close(); // hard-set closed
+void grab();  // close on a piece
 
 }

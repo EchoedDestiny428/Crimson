@@ -1,11 +1,14 @@
 #include "subsystems/elevator/macros.hpp"
 #include "config/controls.hpp"
+#include "pros/rtos.hpp"
 #include "robotconfig.hpp"
 #include "subsystems/elevator/arm_pivot.hpp"
+#include "subsystems/elevator/claw.hpp"
 #include "subsystems/elevator/constants.hpp"
 #include "subsystems/elevator/extension.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace subsystems::elevator::macros {
 
@@ -17,6 +20,16 @@ constexpr int kFullPower = 127;
 int stage = -1;           // stage last commanded: 0 home, 1-7 scoring, -1 none yet
 int goal_tier = 0;        // 0 alliance, 1 neutral, 2 center
 bool lift_manual = false; // R1/R2 driving the lift by hand
+int selected = 1;         // stage Up/Down have selected (1-7); L1 goes there
+bool score_held = false;  // L1 was held on the last tick
+
+// Scoring after L1 is released: the claw opens, kOuttakeRaiseDelayMs later the lift goes up
+// kOuttakeRaiseCm, and once it is up (or kRaiseTimeoutMs passes) everything goes home.
+enum class Score { Idle, Opened, Raising };
+constexpr double kRaiseDoneCm = 1.5;
+constexpr std::uint32_t kRaiseTimeoutMs = 1000;
+Score score = Score::Idle;
+std::uint32_t score_at_ms = 0;
 
 double offset_cm() {
     return goal_tier * constants::kGoalTierStepCm;
@@ -28,7 +41,7 @@ Pose current_pose() {
 }
 
 // Lift and arm to a stage's setpoint. Scoring stages get the goal offset on the lift and
-// the slack adjustment on the arm; home gets neither. Going to L1 or home,
+// the slack adjustment on the arm (toward 180 deg); home gets neither. Going to L1 or home,
 // the arm's last 30 deg runs at 35%.
 void go_to_stage(int next) {
     stage = std::clamp(next, 0, constants::kTopStage);
@@ -37,7 +50,7 @@ void go_to_stage(int next) {
     arm_pivot::set_slow_zone(stage <= 1);
     extension::set_target(constants::extension_cm_to_motor_deg(setpoint.lift_cm + (scoring ? offset_cm() : 0.0)));
     arm_pivot::move_to(constants::arm_deg_to_motor_deg(
-        setpoint.arm_deg + (scoring ? constants::kArmSlackAdjustmentDeg : 0.0)));
+        setpoint.arm_deg - (scoring ? constants::kArmSlackAdjustmentDeg : 0.0)));
 }
 
 }
@@ -89,13 +102,45 @@ bool solve_from(const Pose& from, double tip_cm, Pose& out, double arm_min_deg, 
 }
 
 void update() {
-    if (controller.get_digital_new_press(controls::kStageDown)) {
-        go_to_stage(stage < 1 ? 1 : std::max(1, stage - 1));
+    // Up/Down pick the stage (shown on the controller); nothing moves until L1.
+    if (controller.get_digital_new_press(controls::kStageSelectUp)) {
+        selected = std::min(selected + 1, constants::kTopStage);
     }
-    if (controller.get_digital_new_press(controls::kStageUp)) {
-        go_to_stage(stage < 1 ? 1 : stage + 1);
+    if (controller.get_digital_new_press(controls::kStageSelectDown)) {
+        selected = std::max(selected - 1, 1);
     }
+
+    const std::uint32_t now = pros::millis();
+    const bool go = controller.get_digital(controls::kScore);
+    if (go) {
+        // Held: go to the selected stage (and follow it if it changes), cancelling any score.
+        score = Score::Idle;
+        if (stage != selected) {
+            go_to_stage(selected);
+        }
+    } else if (score_held) {
+        // Released: score. Hard-set the claw open (an outtake, not a toggle), then the
+        // sequence below raises the lift and homes.
+        claw::open();
+        score = Score::Opened;
+        score_at_ms = now;
+    }
+    score_held = go;
+
+    if (score == Score::Opened && now - score_at_ms >= static_cast<std::uint32_t>(constants::kOuttakeRaiseDelayMs)) {
+        extension::set_target(extension::target() + constants::extension_cm_to_motor_deg(constants::kOuttakeRaiseCm));
+        score = Score::Raising;
+        score_at_ms = now;
+    } else if (score == Score::Raising) {
+        const double gap_cm = std::fabs(constants::extension_motor_deg_to_cm(extension::target() - extension::height()));
+        if (gap_cm < kRaiseDoneCm || now - score_at_ms >= kRaiseTimeoutMs) {
+            score = Score::Idle;
+            go_to_stage(0);
+        }
+    }
+
     if (controller.get_digital_new_press(controls::kHome)) {
+        score = Score::Idle;
         go_to_stage(0);
     }
 
@@ -103,6 +148,7 @@ void update() {
     const bool lift_up = controller.get_digital(controls::kLiftManualUp);
     const bool lift_down = controller.get_digital(controls::kLiftManualDown) && !lift_up;
     if (lift_up || lift_down) {
+        score = Score::Idle; // the driver has the lift
         lift_manual = true;
         extension::set_manual(lift_up ? kFullPower : -constants::kExtensionDownPower);
     } else if (lift_manual) {
@@ -125,6 +171,8 @@ void update() {
 }
 
 void stop() {
+    score = Score::Idle;
+    score_held = false;
     stage = -1;
     lift_manual = false;
     extension::hold();
@@ -139,6 +187,10 @@ double tip_now() {
     const Pose pose = current_pose();
     return constants::kPivotStartHeightCm + pose.lift_cm -
            constants::kArmLengthCm * std::cos(pose.arm_deg * kPi / 180.0);
+}
+
+int selected_stage_now() {
+    return selected;
 }
 
 int goal_tier_now() {

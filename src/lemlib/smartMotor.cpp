@@ -196,9 +196,19 @@ void SmartMotor::setSettleTime(std::uint32_t ms) {
     settleTimeMs = ms;
 }
 
-void SmartMotor::setRampPowers(float startPower, float endPower) {
-    rampEndPower = std::clamp(endPower, 0.0f, kMaxPower);
-    rampStartPower = std::clamp(startPower, 0.0f, kMaxPower);
+void SmartMotor::setSettleHold(float range, std::uint32_t ms) {
+    holdSettleRange = std::max(0.0f, range);
+    holdSettleTimeMs = ms;
+}
+
+void SmartMotor::setMinPowerNear(float power, float range) {
+    minPowerNear = std::clamp(power, 0.0f, kMaxPower);
+    minPowerNearRange = std::max(0.0f, range);
+}
+
+void SmartMotor::setMinPower(float power, float range) {
+    minPower = std::clamp(power, 0.0f, kMaxPower);
+    minPowerRange = std::max(0.0f, range);
 }
 
 void SmartMotor::setOutputFilter(std::function<float(float position, float output)> filter) {
@@ -239,17 +249,8 @@ void SmartMotor::controlLoop() {
                     positionCommanded = true;
                 } else {
                     const float top = error < 0.0f ? std::min(kMaxPower, maxReversePower.load()) : kMaxPower;
-                    const float fraction = std::clamp(std::fabs(error) / distance, 0.0f, 1.0f);
-                    const float rampStart = rampStartPower;
-                    float power = 0.0f;
-                    if (rampStart > 0.0f) {
-                        // Stepped ramp: full power outside the deceleration distance, then
-                        // rampStart at its edge, linear down to rampEnd at the target.
-                        const float rampEnd = rampEndPower;
-                        power = fraction >= 1.0f ? top : std::min(top, rampEnd + (rampStart - rampEnd) * fraction);
-                    } else {
-                        power = std::max(std::min(kMinimumProfilePower, top), fraction * top);
-                    }
+                    const float power = std::max(std::min(kMinimumProfilePower, top),
+                                                 std::clamp(std::fabs(error) / distance, 0.0f, 1.0f) * top);
                     float output = std::copysign(power, error);
                     if (std::fabs(error) < slowZoneRange) {
                         const float slow = slowZonePower;
@@ -282,6 +283,7 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
     if (newTarget) {
         controller.reset();
         inRangeSince = 0;
+        holdInRangeSince = 0;
     }
 
     if (!std::isfinite(error)) {
@@ -291,23 +293,50 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
     }
     // Inside settleRange: keep running the PID until it has stayed there settleTimeMs,
     // then brake. Leaving the range (or sagging out after braking) restarts the timer.
+    // A second, wider range (setSettleHold) brakes too, after its own (usually longer) time.
+    // Each timer runs while the error stays inside its range; leaving it restarts it.
+    const std::uint32_t now = pros::millis();
+    const std::uint32_t stamp = now == 0 ? 1 : now;
+    bool settled = false;
     if (std::fabs(error) < settleRange) {
-        const std::uint32_t now = pros::millis();
         if (inRangeSince == 0) {
-            inRangeSince = now == 0 ? 1 : now;
+            inRangeSince = stamp;
         }
-        if (now - inRangeSince >= settleTimeMs) {
-            controller.reset();
-            actuator->brake();
-            return;
-        }
+        settled = now - inRangeSince >= settleTimeMs;
     } else {
         inRangeSince = 0;
+    }
+    const float holdRange = holdSettleRange;
+    if (holdRange > 0.0f && std::fabs(error) < holdRange) {
+        if (holdInRangeSince == 0) {
+            holdInRangeSince = stamp;
+        }
+        settled = settled || now - holdInRangeSince >= holdSettleTimeMs;
+    } else {
+        holdInRangeSince = 0;
+    }
+    if (settled) {
+        controller.reset();
+        actuator->brake();
+        return;
     }
 
     float output = controller.update(error) + feedforward;
     if (positionFeedforward) {
         output += positionFeedforward(position);
+    }
+    // Minimum power: outside settleRange, a push toward the target is raised to at least
+    // minPower so friction can't stall it short. A push away from the target (the D term
+    // braking) is left alone.
+    float floorPower = minPower;
+    const float nearRange = minPowerNearRange;
+    if (nearRange > 0.0f && std::fabs(error) < nearRange) {
+        floorPower = minPowerNear; // the last stretch has its own (usually lower) floor
+    }
+    const float floorRange = minPowerRange;
+    if (floorPower > 0.0f && std::fabs(error) >= settleRange && (floorRange <= 0.0f || std::fabs(error) < floorRange) &&
+        output * error >= 0.0f && std::fabs(output) < floorPower) {
+        output = std::copysign(floorPower, error);
     }
     if (std::fabs(error) < slowZoneRange) {
         const float slow = slowZonePower;

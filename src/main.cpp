@@ -47,7 +47,6 @@ void autonomous() {
 void opcontrol() {
     chassis.cancelAllMotions();
     util::start_driver_task("Elevator stages", elevator::macros::update, elevator::macros::stop);
-    util::start_driver_task("Arm pivot", elevator::arm_pivot::update, elevator::arm_pivot::stop);
     util::start_driver_task("Claw", elevator::claw::update);
     util::start_driver_task("HUD", display::controller_hud::update);
 

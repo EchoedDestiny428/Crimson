@@ -5,7 +5,6 @@
 namespace subsystems::elevator::arm_pivot {
 
 void init();
-void update();
 void stop();
 void move_to(double motor_deg);
 void set_power(int power); // open loop, -127..127

@@ -22,9 +22,10 @@ inline constexpr int kExtensionDownPower = 89; // 70% of 127: the lift never com
 inline constexpr double kArmStartDeg = 90.0;
 inline constexpr double kClawStartHeightCm = 15.0;  // claw height above the ground
 inline constexpr double kPivotStartHeightCm = 39.6; // arm pivot height above the ground (15 + 29 * cos(32))
-// Slack adjustment: every arm setpoint is commanded this much higher than planned, to take
-// up slack in the arm so it ends where it was meant to.
-inline constexpr double kArmSlackAdjustmentDeg = 0.0;
+// Slack adjustment: every scoring arm setpoint is commanded this many degrees closer to
+// straight up (180) than planned: behind the pivot (angles over 180) the slack lets the claw
+// sag toward more angle, so it is commanded to less angle to end where it was meant to.
+inline constexpr double kArmSlackAdjustmentDeg = 3.0;
 // The piece releases this far toward the robot's front from the arm tip, so behind the
 // pivot only once arm length * sin(arm) < -kClawReleaseOffsetCm: arm >= 180 + asin(7 / 29)
 // = 194.0 deg. Straight up (180) would drop it 7 cm in front of the pivot.
@@ -47,7 +48,7 @@ struct Setpoint {
     double arm_deg;
 };
 inline constexpr std::array<Setpoint, 8> kStageSetpoints{{
-    {0.0, 35.0},               // home / intake: the 35 deg soft limit
+    {0.0, 30.0},               // home / intake: 30 deg, just above the 27 deg lower stop
     {0.0, kArmScoreLowDeg},    // L1  17.5 cm (ends ~21 cm: lift already down)
     {20.0, kArmScoreLowDeg},   // L2  36.0 cm
     {37.0, kArmScoreLowDeg},   // L3  53.0 cm
@@ -57,6 +58,9 @@ inline constexpr std::array<Setpoint, 8> kStageSetpoints{{
     {67.8, kArmScoreHighDeg},  // L7 121.0 cm
 }};
 inline constexpr int kTopStage = static_cast<int>(kStageSetpoints.size()) - 1;
+// Scoring (L1 release): after the claw opens, wait this long and raise the lift this far.
+inline constexpr int kOuttakeRaiseDelayMs = 300;
+inline constexpr double kOuttakeRaiseCm = 11.0;
 // Right cycles the goal: neutral = alliance + 7 cm of lift, center = alliance + 14.
 inline constexpr double kGoalTierStepCm = 7.0;
 

@@ -56,19 +56,30 @@ public:
      * stayed inside it this long. 0 (the default) brakes as soon as it enters the range.
      */
     void setSettleTime(std::uint32_t ms);
+    /**
+     * PID mode: also brake once the error has stayed inside this wider range (> settleRange)
+     * for ms. Whichever of the two settle conditions is met first brakes; once braked it
+     * holds until the error leaves the wider range. 0 range (the default) turns it off.
+     */
+    void setSettleHold(float range, std::uint32_t ms);
     /** Extra PID output from the current position, e.g. gravity on an arm (kG * sin(angle)). */
     void setFeedforward(std::function<float(float position)> positionFeedforward);
-    /**
-     * Ramp mode: instead of scaling full power down to the target, drop to startPower at
-     * the deceleration distance and go linearly from there to endPower at the target
-     * (0..127). Default (0): the plain ramp.
-     */
-    void setRampPowers(float startPower, float endPower);
     /**
      * Last say on manual and PID output: called with the position and the output about to
      * be sent, returns what is sent (e.g. slowing down near a soft limit). Set before start().
      */
     void setOutputFilter(std::function<float(float position, float output)> filter);
+    /**
+     * PID mode: while outside settleRange and closer than `range` to the target (0: no
+     * limit), never push toward the target with less than this power (0..127), so friction
+     * can't stall it short. Default 0 (off).
+     */
+    void setMinPower(float power, float range = 0.0f);
+    /**
+     * PID mode: inside `range` of the target, the minimum power from setMinPower is replaced
+     * by this one (e.g. a gentler floor for the last degrees). 0 range (the default) off.
+     */
+    void setMinPowerNear(float power, float range);
     /** Enable or disable SmartMotor diagnostics through the configured info sink. */
     void setLogging(bool enabled);
 
@@ -90,12 +101,17 @@ private:
     std::function<float(float, float)> outputFilter;
     std::atomic<float> maxPower{127.0f};
     std::atomic<float> maxReversePower{127.0f};
-    std::atomic<float> rampStartPower{0.0f};
-    std::atomic<float> rampEndPower{0.0f};
+    std::atomic<float> minPower{0.0f};
+    std::atomic<float> minPowerRange{0.0f};
+    std::atomic<float> minPowerNear{0.0f};
+    std::atomic<float> minPowerNearRange{0.0f};
     std::atomic<float> slowZoneRange{0.0f};
     std::atomic<float> slowZonePower{127.0f};
     std::atomic<std::uint32_t> settleTimeMs{0};
     std::uint32_t inRangeSince = 0; // control task only; 0 = not inside settleRange
+    std::atomic<float> holdSettleRange{0.0f};
+    std::atomic<std::uint32_t> holdSettleTimeMs{0};
+    std::uint32_t holdInRangeSince = 0; // control task only; 0 = not inside holdSettleRange
     float degreesPerCount = 0.0f; // > 0: read raw counts (see useRawCounts)
     std::atomic<float> rawZero{0.0f};
     float averageRawCounts() const;
