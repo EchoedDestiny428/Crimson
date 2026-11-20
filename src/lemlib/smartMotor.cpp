@@ -201,11 +201,6 @@ void SmartMotor::setSettleHold(float range, std::uint32_t ms) {
     holdSettleTimeMs = ms;
 }
 
-void SmartMotor::setMinPowerNear(float power, float range) {
-    minPowerNear = std::clamp(power, 0.0f, kMaxPower);
-    minPowerNearRange = std::max(0.0f, range);
-}
-
 void SmartMotor::setMinPower(float power, float range) {
     minPower = std::clamp(power, 0.0f, kMaxPower);
     minPowerRange = std::max(0.0f, range);
@@ -328,11 +323,7 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
     // Minimum power: outside settleRange, a push toward the target is raised to at least
     // minPower so friction can't stall it short. A push away from the target (the D term
     // braking) is left alone.
-    float floorPower = minPower;
-    const float nearRange = minPowerNearRange;
-    if (nearRange > 0.0f && std::fabs(error) < nearRange) {
-        floorPower = minPowerNear; // the last stretch has its own (usually lower) floor
-    }
+    const float floorPower = minPower;
     const float floorRange = minPowerRange;
     if (floorPower > 0.0f && std::fabs(error) >= settleRange && (floorRange <= 0.0f || std::fabs(error) < floorRange) &&
         output * error >= 0.0f && std::fabs(output) < floorPower) {

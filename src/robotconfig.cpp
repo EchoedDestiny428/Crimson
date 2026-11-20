@@ -15,6 +15,9 @@ pros::MotorGroup extension_motors({ports::kExtensionA, ports::kExtensionB}, pros
                                   pros::MotorUnits::degrees);
 pros::MotorGroup arm_pivot_motor({ports::kArmPivot}, pros::MotorGears::red,
                                  pros::MotorUnits::degrees); // a group so SmartMotor can drive it
+// Right side toggle: a 5.5W motor (fixed 200 rpm, no cartridge to set), driven open loop, so
+// it is left out of apply_motor_config() and keeps its own current limit.
+pros::Motor side_toggle_right_motor(ports::kSideToggleRight, pros::MotorGears::green);
 telemetry::Logger logger;
 pros::Rotation vertical_odom(ports::kVerticalOdom);
 pros::Rotation horizontal_odom(ports::kHorizontalOdom);

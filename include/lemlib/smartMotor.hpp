@@ -75,11 +75,6 @@ public:
      * can't stall it short. Default 0 (off).
      */
     void setMinPower(float power, float range = 0.0f);
-    /**
-     * PID mode: inside `range` of the target, the minimum power from setMinPower is replaced
-     * by this one (e.g. a gentler floor for the last degrees). 0 range (the default) off.
-     */
-    void setMinPowerNear(float power, float range);
     /** Enable or disable SmartMotor diagnostics through the configured info sink. */
     void setLogging(bool enabled);
 

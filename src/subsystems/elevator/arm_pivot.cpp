@@ -9,23 +9,17 @@ namespace subsystems::elevator::arm_pivot {
 
 namespace {
 
-// SmartMotor PID on the motor's encoder, in arm degrees (direct drive); no motion profile.
-// Gains were fitted by simulation to the old ramp's timing: kP 1.4 is full power until ~90 deg
-// out; kD 6 (per 10 ms tick) damps the approach so home <-> L1 doesn't overshoot into the
-// crossbar at 315. kP alone is too weak near the target to move the arm, so within
-// kMinPowerRangeDeg of it (and outside the deadband) the push is never below kMinPower
-// (kNearMinPower once within kNearRangeDeg).
-// No kI, no kG (the arm is counterbanded).
-constexpr float kP = 1.35f;
+// PID on the motor's encoder, in arm degrees (direct drive), with a minimum speed that stays
+// on the whole move: the PID is the main controller (kP 1.15 is full power until ~110 deg out;
+// kD 6 per 10 ms tick damps the approach so home <-> L1 doesn't run into the crossbar at 315),
+// and whenever it asks for less than kMinPower toward the target (outside the deadband) the
+// push is raised to kMinPower, a bang-bang that finishes the move and keeps friction and
+// gravity from stalling it short. No handoffs or ranges. No kI, no kG (counterbanded).
+constexpr float kP = 1.15f;
 constexpr float kD = 6.0f;
-constexpr float kMinPower = 35.0f; // well above gravity + friction (20 stalled at ~235 climbing toward 180)
-constexpr float kMinPowerRangeDeg = 20.0f;
-// Inside kNearRangeDeg of the target the floor drops to kNearMinPower, so the last couple of
-// degrees are gentler.
-constexpr float kNearMinPower = 30.0f;
-constexpr float kNearRangeDeg = 2.0f;
+constexpr float kMinPower = 30.0f; // above gravity + friction (20 stalled at ~235 climbing toward 180)
 // Two ways to settle: inside kSettleRange (1 deg) for kSettleTimeMs, or inside the wider
-// kHoldRange (2 deg) for kHoldTimeMs. Either brakes (HOLD); the floor stops at kSettleRange.
+// kHoldRange (2 deg) for kHoldTimeMs. Either brakes (HOLD); the minimum speed stops at kSettleRange.
 constexpr float kSettleRange = 1.0f;         // motor deg
 constexpr std::uint32_t kSettleTimeMs = 150;
 constexpr float kHoldRange = 2.0f;           // motor deg
@@ -35,7 +29,7 @@ constexpr std::uint32_t kHoldTimeMs = 350;
 constexpr float kDegreesPerCount = 360.0f / 1800.0f;
 // Slow zone: the last kSlowRangeDeg of a move capped at 35%, either direction (the arm
 // falls into stage 1 behind going forward, and into home going back).
-constexpr float kSlowRangeDeg = 30.0f;
+constexpr float kSlowRangeDeg = 35.0f;
 constexpr float kSlowPower = 30.0f; // 35% of 127
 
 // Soft limits, arm degrees from straight down: setpoints are clamped into this range, and
@@ -72,8 +66,7 @@ void init() {
     motor.useRawCounts(kDegreesPerCount);
     motor.setSettleTime(kSettleTimeMs);
     motor.setSettleHold(kHoldRange, kHoldTimeMs);
-    motor.setMinPower(kMinPower, kMinPowerRangeDeg);
-    motor.setMinPowerNear(kNearMinPower, kNearRangeDeg);
+    motor.setMinPower(kMinPower);
     motor.reset(); // motor 0 = constants::kArmStartDeg; the conversions add the offset
     motor.setOutputFilter([](float motor_deg, float output) {
         const double arm_deg = constants::arm_motor_deg_to_deg(motor_deg);

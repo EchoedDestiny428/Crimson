@@ -17,6 +17,9 @@ inline constexpr Button kScore = pros::E_CONTROLLER_DIGITAL_L1; // hold: go to t
 
 inline constexpr Button kClawPiston = pros::E_CONTROLLER_DIGITAL_A;
 
+inline constexpr Button kSideToggleRightForward = pros::E_CONTROLLER_DIGITAL_L2; // hold: right side toggle spins forward
+inline constexpr Button kSideToggleRightReverse = pros::E_CONTROLLER_DIGITAL_Y;  // hold: spins reverse
+
 inline constexpr Button kHome = pros::E_CONTROLLER_DIGITAL_B; // home = intake pose
 inline constexpr Button kOuttake = pros::E_CONTROLLER_DIGITAL_X; // claw toggle, same as A
 inline constexpr Button kLiftManualUp = pros::E_CONTROLLER_DIGITAL_R1;   // hold: lift only, 100% up

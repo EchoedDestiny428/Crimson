@@ -25,7 +25,7 @@ inline constexpr double kPivotStartHeightCm = 39.6; // arm pivot height above th
 // Slack adjustment: every scoring arm setpoint is commanded this many degrees closer to
 // straight up (180) than planned: behind the pivot (angles over 180) the slack lets the claw
 // sag toward more angle, so it is commanded to less angle to end where it was meant to.
-inline constexpr double kArmSlackAdjustmentDeg = 3.0;
+inline constexpr double kArmSlackAdjustmentDeg = 3.5;
 // The piece releases this far toward the robot's front from the arm tip, so behind the
 // pivot only once arm length * sin(arm) < -kClawReleaseOffsetCm: arm >= 180 + asin(7 / 29)
 // = 194.0 deg. Straight up (180) would drop it 7 cm in front of the pivot.
