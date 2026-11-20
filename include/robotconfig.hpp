@@ -16,7 +16,7 @@ extern pros::MotorGroup left_motors;
 extern pros::MotorGroup right_motors;
 extern pros::MotorGroup extension_motors;
 extern pros::MotorGroup arm_pivot_motor;
-extern pros::Motor side_toggle_right_motor;
+extern pros::MotorGroup side_toggle_motors; // left and right side toggle
 extern telemetry::Logger logger;
 extern pros::Rotation vertical_odom;
 extern pros::Rotation horizontal_odom;

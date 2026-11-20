@@ -3,6 +3,7 @@
 #include "lemlib/smartMotor.hpp"
 #include "robotconfig.hpp"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 
 namespace subsystems::elevator::arm_pivot {
@@ -34,7 +35,7 @@ constexpr float kSlowPower = 30.0f; // 35% of 127
 
 // Soft limits, arm degrees from straight down: setpoints are clamped into this range, and
 // manual power that would push past a limit holds at the limit instead.
-constexpr double kMinArmDeg = 27.0; // the lower hard stop
+constexpr double kMinArmDeg = constants::kArmHardstopDeg; // the lower hardstop
 constexpr double kMaxArmDeg = 315.0;
 // Hard slowdown: within kLimitSlowRangeDeg of a soft limit, anything driving toward it
 // (manual or PID) is capped at kLimitSlowPower.
@@ -42,6 +43,51 @@ constexpr double kLimitSlowRangeDeg = 15.0;
 constexpr float kLimitSlowPower = 25.0f; // ~20% of 127
 
 lemlib::SmartMotor motor(&arm_pivot_motor, lemlib::PID(kP, 0.0f, kD), kSettleRange);
+
+// Homing: PID to the home angle, then once within kHomeHandoffDeg of it, push down at
+// kHomePushPower until the arm sits on the hardstop: it has moved less than kStallDeg over
+// kStallWindowMs (or kHomePushTimeoutMs passed), then hold there.
+constexpr float kHomeHandoffDeg = 2.0f;
+constexpr int kHomePushPower = -20; // of 127, ~1.9 V
+constexpr float kStallDeg = 0.5f;
+constexpr std::uint32_t kStallWindowMs = 100;
+constexpr std::uint32_t kHomePushTimeoutMs = 1500;
+constexpr std::uint32_t kHomeLoopMs = 10;
+
+enum class Home { Idle, Approach, Push };
+std::atomic<Home> home_state{Home::Idle};
+
+void home_loop() {
+    std::uint32_t push_start = 0;
+    std::uint32_t window_start = 0;
+    float window_pos = 0.0f;
+    std::uint32_t now = pros::millis();
+    while (true) {
+        const Home state = home_state.load();
+        const float pos = motor.getRotation();
+        if (state == Home::Approach && std::isfinite(pos) && pos - motor.getTarget() < kHomeHandoffDeg) {
+            Home expected = Home::Approach; // unless a new command cancelled homing meanwhile
+            if (home_state.compare_exchange_strong(expected, Home::Push)) {
+                motor.setManual(kHomePushPower);
+                push_start = window_start = now;
+                window_pos = pos;
+            }
+        } else if (state == Home::Push && std::isfinite(pos)) {
+            if (now - window_start >= kStallWindowMs) {
+                const bool stalled = std::fabs(pos - window_pos) < kStallDeg;
+                if (stalled || now - push_start >= kHomePushTimeoutMs) {
+                    Home expected = Home::Push;
+                    if (home_state.compare_exchange_strong(expected, Home::Idle)) {
+                        motor.holdCurrent(); // brakes (HOLD) on the hardstop
+                    }
+                }
+                window_start = now;
+                window_pos = pos;
+            }
+        }
+        pros::Task::delay_until(&now, kHomeLoopMs);
+    }
+}
 
 double clamp_motor_deg(double motor_deg) {
     return std::clamp(motor_deg, constants::arm_deg_to_motor_deg(kMinArmDeg), constants::arm_deg_to_motor_deg(kMaxArmDeg));
@@ -62,7 +108,7 @@ void drive(int power) {
 }
 
 void init() {
-    arm_pivot_motor.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
+    arm_pivot_motor.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST); // starts disabled: coast until auton/driver
     motor.useRawCounts(kDegreesPerCount);
     motor.setSettleTime(kSettleTimeMs);
     motor.setSettleHold(kHoldRange, kHoldTimeMs);
@@ -79,10 +125,25 @@ void init() {
         return output;
     });
     motor.start();
+    pros::Task home_task(home_loop, "Arm home");
 }
 
 void stop() {
+    home_state = Home::Idle;
     motor.holdCurrent();
+}
+
+void set_hold(bool hold) {
+    home_state = Home::Idle;
+    arm_pivot_motor.set_brake_mode_all(hold ? pros::E_MOTOR_BRAKE_HOLD : pros::E_MOTOR_BRAKE_COAST);
+    if (hold) {
+        motor.holdCurrent();
+    }
+}
+
+void home(double motor_deg) {
+    motor.setTarget(static_cast<float>(clamp_motor_deg(motor_deg)));
+    home_state = Home::Approach;
 }
 
 void set_slow_zone(bool enabled) {
@@ -90,10 +151,12 @@ void set_slow_zone(bool enabled) {
 }
 
 void set_power(int power) {
+    home_state = Home::Idle;
     drive(power);
 }
 
 void move_to(double motor_deg) {
+    home_state = Home::Idle;
     motor.setTarget(static_cast<float>(clamp_motor_deg(motor_deg)));
 }
 

@@ -16,10 +16,11 @@ inline constexpr double kExtensionMotorRotationsPerCm = (1100.0 / 360.0) / 33.0;
 inline constexpr int kExtensionMaxRpm = 600;
 inline constexpr int kExtensionDownPower = 89; // 70% of 127: the lift never comes down faster than this
 
-// Starting pose: the arm is set at 90 deg (horizontal) before every power-on, so the
-// encoder's zero is 90 deg. The pivot height and setpoints are still from the 32 deg /
-// 29 cm solve.
-inline constexpr double kArmStartDeg = 90.0;
+// Lower hardstop: the arm rests on it at every power-on, so the encoder's zero is this angle,
+// and homing drives into it. TODO: 25 is a placeholder until the real angle is measured.
+// The pivot height and setpoints are still from the 32 deg / 29 cm solve.
+inline constexpr double kArmHardstopDeg = 25.0;
+inline constexpr double kArmStartDeg = kArmHardstopDeg;
 inline constexpr double kClawStartHeightCm = 15.0;  // claw height above the ground
 inline constexpr double kPivotStartHeightCm = 39.6; // arm pivot height above the ground (15 + 29 * cos(32))
 // Slack adjustment: every scoring arm setpoint is commanded this many degrees closer to
@@ -49,7 +50,7 @@ struct Setpoint {
     double arm_deg;
 };
 inline constexpr std::array<Setpoint, 8> kStageSetpoints{{
-    {0.0, 30.0},               // home / intake: 30 deg, just above the 27 deg lower stop
+    {0.0, 30.0},               // home / intake: PID to 30 deg, then pushed onto the hardstop
     {0.0, kArmScoreLowDeg},    // L1  17.5 cm (ends ~21 cm: lift already down)
     {20.0, kArmScoreLowDeg},   // L2  36.0 cm
     {0.0, kArmScoreHighDeg},   // L3  53.0 cm (the high angle already reaches it, lift stays down)

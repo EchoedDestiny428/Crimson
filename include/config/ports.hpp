@@ -23,7 +23,9 @@ inline constexpr std::int8_t kArmPivot = 7;     // from newbot-mechanism_tests (
 
 inline constexpr std::int8_t kClawDistance = 12; // placeholder: 4 is now the vertical wheel
 
-inline constexpr std::int8_t kSideToggleRight = 2; // right side toggle, a 5.5W motor; negate to reverse which way L2 spins it
+// Side toggle, one 5.5W motor per side, spun together. Negate one to reverse which way Y spins it.
+inline constexpr std::int8_t kSideToggleLeft = 2;
+inline constexpr std::int8_t kSideToggleRight = 1; // placeholder: unused port until the right motor is wired
 
 inline constexpr char kClawPiston = 'A';
 

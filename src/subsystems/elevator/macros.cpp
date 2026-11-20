@@ -49,8 +49,11 @@ void go_to_stage(int next) {
     const bool scoring = stage > 0;
     arm_pivot::set_slow_zone(stage <= 1);
     extension::set_target(constants::extension_cm_to_motor_deg(setpoint.lift_cm + (scoring ? offset_cm() : 0.0)));
-    arm_pivot::move_to(constants::arm_deg_to_motor_deg(
-        setpoint.arm_deg - (scoring ? constants::kArmSlackAdjustmentDeg : 0.0)));
+    if (scoring) {
+        arm_pivot::move_to(constants::arm_deg_to_motor_deg(setpoint.arm_deg - constants::kArmSlackAdjustmentDeg));
+    } else {
+        arm_pivot::home(constants::arm_deg_to_motor_deg(setpoint.arm_deg)); // then into the hardstop
+    }
 }
 
 }

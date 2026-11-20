@@ -27,7 +27,7 @@ void initialize() {
     logger.attach(&right_motors);
     logger.attach(&extension_motors);
     logger.attach(&arm_pivot_motor);
-    logger.attach(&side_toggle_right_motor);
+    logger.attach(&side_toggle_motors);
     logger.register_robot_fields();
     logger.start();
 
@@ -35,6 +35,7 @@ void initialize() {
 }
 
 void disabled() {
+    elevator::arm_pivot::set_hold(false);
     elevator::extension::hold();
     autons::select();
 }
@@ -44,11 +45,13 @@ void competition_initialize() {
 }
 
 void autonomous() {
+    elevator::arm_pivot::set_hold(true);
     autons::run_selected();
 }
 
 void opcontrol() {
     chassis.cancelAllMotions();
+    elevator::arm_pivot::set_hold(true);
     util::start_driver_task("Elevator stages", elevator::macros::update, elevator::macros::stop);
     util::start_driver_task("Claw", elevator::claw::update);
     util::start_driver_task("Side toggle", side_toggle::update, side_toggle::stop);
