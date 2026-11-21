@@ -11,7 +11,7 @@ namespace autons {
 
 namespace {
 
-constexpr std::string_view kDefaultRoutine = "ShortStage1";
+constexpr std::string_view kDefaultRoutine = "Skills";
 
 struct Routine {
     const char* name;
@@ -22,6 +22,7 @@ struct Routine {
 // Add the new robot's routines here.
 constexpr std::array kRoutines{
     Routine{"ShortStage1", match::short_stage1::setup, match::short_stage1::run},
+    Routine{"Skills", skills::setup, skills::run},
     Routine{"None", nullptr, nullptr},
 };
 

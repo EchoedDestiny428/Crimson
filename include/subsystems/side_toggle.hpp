@@ -8,7 +8,7 @@ inline constexpr int kForwardPower = 100; // negate a ports::kSideToggle* port t
 inline constexpr int kReversePower = -100;
 
 void init();
-void update(); // Y held spins forward, L2 held spins reverse, release brakes
+void update(); // L2 held spins forward, Y held spins reverse, release brakes
 void stop();
 void spin(int power);
 

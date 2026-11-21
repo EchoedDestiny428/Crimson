@@ -78,6 +78,8 @@ void home_loop() {
                 if (stalled || now - push_start >= kHomePushTimeoutMs) {
                     Home expected = Home::Push;
                     if (home_state.compare_exchange_strong(expected, Home::Idle)) {
+                        motor.setPosition(static_cast<float>(
+                            constants::arm_deg_to_motor_deg(constants::kArmHardstopDeg)));
                         motor.holdCurrent(); // brakes (HOLD) on the hardstop
                     }
                 }
