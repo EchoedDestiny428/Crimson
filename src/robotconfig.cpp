@@ -17,7 +17,9 @@ pros::MotorGroup arm_pivot_motor({ports::kArmPivot}, pros::MotorGears::red,
 // Side toggle: two 5.5W motors (fixed 200 rpm, no cartridge to set), driven open loop together,
 // so they are left out of apply_motor_config() and keep their own current limit.
 pros::MotorGroup side_toggle_motors({ports::kSideToggleLeft, ports::kSideToggleRight}, pros::MotorGears::green);
-telemetry::Logger logger;
+// latency-testing: sample every 10 ms (prelude-to-chaos uses 20) so acceleration and latency have finer timing.
+// Each row carries its own time_ms, so a late write only spaces the rows unevenly.
+telemetry::Logger logger("/usd", 10);
 pros::Rotation vertical_odom(ports::kVerticalOdom);
 pros::Rotation horizontal_odom(ports::kHorizontalOdom);
 

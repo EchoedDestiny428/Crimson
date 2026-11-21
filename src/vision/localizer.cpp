@@ -248,6 +248,7 @@ void run() {
 
             Snapshot next;
             next.correction_in = published.correction_in;
+            next.read_ms = now_ms;
             if (count) {
                 const auto seen = std::span<const Detection>(tags).first(*count);
                 const bool repeat = same_view(seen, std::span<const Detection>(last_tags).first(last_count));

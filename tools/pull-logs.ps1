@@ -6,6 +6,12 @@ param(
 $ErrorActionPreference = "Stop"
 $capturePath = Join-Path $env:TEMP ("crimson-log-dump-" + [guid]::NewGuid().ToString() + ".txt")
 
+# pros.exe ships with the VS Code PROS extension but isn't on PATH outside its terminal (same lookup as deploy.ps1).
+if (-not (Get-Command pros.exe -ErrorAction SilentlyContinue)) {
+    $inst = Join-Path $env:APPDATA 'Code\User\globalStorage\sigbots.pros\install'
+    $env:PATH = (Join-Path $inst 'pros-cli-windows') + ';' + (Join-Path $inst 'vex-vexcom-windows') + ';' + $env:PATH
+}
+
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 Write-Host "Make sure the updated Crimson program is already running on the Brain."
 Write-Host "The Brain must be connected to this computer over USB."

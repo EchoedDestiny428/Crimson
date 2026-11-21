@@ -22,6 +22,7 @@ struct Routine {
 // Add the new robot's routines here.
 constexpr std::array kRoutines{
     Routine{"Skills", skills::setup, skills::run},
+    Routine{"Latency test", latency_test::setup, latency_test::run},
     Routine{"None", nullptr, nullptr},
 };
 

@@ -63,6 +63,12 @@ void opcontrol() {
 
     std::uint32_t now = pros::millis();
     while (true) {
+        // latency-testing branch: LEFT runs the test here, so it needs no competition switch. It blocks the drive loop
+        // while it runs, so the sticks don't fight it.
+        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
+            autons::latency_test::run();
+            now = pros::millis();
+        }
         drive::update();
         pros::Task::delay_until(&now, util::kLoopMs);
     }

@@ -1,4 +1,5 @@
 #include "telemetry/logger.hpp"
+#include "autons/autons.hpp"
 #include "lemlib/logger/logger.hpp"
 #include "robotconfig.hpp"
 #include "config/controls.hpp"
@@ -122,6 +123,25 @@ double vision_correction_in(const void*) {
     return vision::localizer::snapshot().correction_in;
 }
 
+// latency-testing: when the camera fields were read, and the raw centre of the largest tag at that read.
+double vision_read_ms(const void*) {
+    return static_cast<double>(vision::localizer::snapshot().read_ms);
+}
+
+double vision_raw_u(const void*) {
+    const auto raw = vision::localizer::snapshot().raw;
+    return raw ? raw->u : NAN;
+}
+
+double vision_raw_v(const void*) {
+    const auto raw = vision::localizer::snapshot().raw;
+    return raw ? raw->v : NAN;
+}
+
+double test_phase(const void*) {
+    return autons::latency_test::phase();
+}
+
 // Raw driver stick, -127..127, before the drive curve, slew and arcade mixing.
 double controller_axis(const void* context) {
     const auto axis = *static_cast<const controls::Axis*>(context);
@@ -203,6 +223,10 @@ void Logger::register_robot_fields() {
     register_field("vision_pose_theta_deg", vision_pose_theta);
     register_field("vision_outcome", vision_outcome);
     register_field("vision_correction_in", vision_correction_in);
+    register_field("vision_read_ms", vision_read_ms);
+    register_field("vision_raw_u_px", vision_raw_u);
+    register_field("vision_raw_v_px", vision_raw_v);
+    register_field("test_phase", test_phase);
     register_field("stick_throttle", controller_axis, &controls::kThrottle);
     register_field("stick_turn", controller_axis, &controls::kTurn);
 }

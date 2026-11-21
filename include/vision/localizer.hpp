@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vision/tag_solver.hpp"
+#include <cstdint>
 #include <optional>
 
 namespace vision::localizer {
@@ -46,6 +47,7 @@ struct Snapshot {
     std::optional<RawTag> raw;
     Outcome outcome = Outcome::NoTags;
     double correction_in = 0.0; // how far the last accepted picture moved the estimate
+    std::uint32_t read_ms = 0;  // latency-testing: pros::millis() when these camera fields were read
 };
 
 void start();
