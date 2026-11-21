@@ -25,7 +25,7 @@ inline constexpr std::int8_t kClawDistance = 12; // placeholder: 4 is now the ve
 
 // Side toggle, one 5.5W motor per side, spun together. Negate one to reverse which way Y spins it.
 inline constexpr std::int8_t kSideToggleLeft = 2;
-inline constexpr std::int8_t kSideToggleRight = 3; // placeholder: unused port until the right motor is wired
+inline constexpr std::int8_t kSideToggleRight = -3; // placeholder: unused port until the right motor is wired
 
 inline constexpr char kClawPiston = 'A';
 
