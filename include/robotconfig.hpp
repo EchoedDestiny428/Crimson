@@ -5,11 +5,9 @@
 #include "lemlib/api.hpp"
 #include "motion/chassis.hpp"
 #include "telemetry/logger.hpp"
-#include "vision/crimson.hpp"
 
 extern pros::Controller controller;
 extern pros::Imu imu;
-extern crimson::Crimson crimson_cam;
 extern display::Dashboard dashboard;
 
 extern pros::MotorGroup left_motors;
@@ -26,4 +24,4 @@ extern pros::adi::Pneumatics claw_piston;
 
 extern crimson::Chassis chassis;
 
-void apply_motor_config(); // cartridges, degrees, current limits; call first in initialize()
+void apply_motor_config();

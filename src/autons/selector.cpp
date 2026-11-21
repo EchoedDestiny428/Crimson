@@ -19,7 +19,6 @@ struct Routine {
     void (*run)();
 };
 
-// Add the new robot's routines here.
 constexpr std::array kRoutines{
     Routine{"ShortStage1", match::short_stage1::setup, match::short_stage1::run},
     Routine{"Skills", skills::setup, skills::run},
@@ -86,8 +85,7 @@ void select() {
 }
 
 void draw_selector() {
-    const lemlib::Pose pose = chassis.getPose();
-    dashboard.show_autons(kNames, selected, {pose.x, pose.y, pose.theta});
+    dashboard.show_autons(kNames, selected, chassis.getPose());
 }
 
 void run_selected() {

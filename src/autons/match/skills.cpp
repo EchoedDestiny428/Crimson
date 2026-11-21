@@ -6,10 +6,10 @@ namespace autons::skills {
 
 namespace {
 
-constexpr float kStartX = 62.75f;
-constexpr float kStartY = 0.0f;
-constexpr float kStartHeading = 90.0f;
-constexpr float kTurnHeading = 80.0f;
+constexpr float kStartX = 9.25f;
+constexpr float kStartY = 72.0f;
+constexpr float kStartHeading = 180.0f;
+constexpr float kTurnHeading = 170.0f;
 constexpr double kToggleRotations = 3.0;
 
 }
@@ -21,7 +21,7 @@ void run() {
     side_toggle_motors.move_relative(kToggleRotations * 360.0, subsystems::side_toggle::kForwardPower);
     pros::delay(1800);
     side_toggle_motors.brake();
-    chassis.moveToPoint(-16, -56, 800, {.forwards=false});
+    chassis.moveToPoint(88, 128, 800, {.forwards=false});
 }
 
 }
