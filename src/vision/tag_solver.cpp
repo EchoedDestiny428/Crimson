@@ -25,6 +25,7 @@ constexpr double kMaxYawCorrectionDeg = 20.0;
 constexpr double kRivalMarginPx = 0.3;
 constexpr double kMaxYawSpreadDeg = 1.0;
 constexpr double kMinDepthMm = 50.0;
+constexpr double kMinForwardRay = 0.05;
 constexpr double kFieldMarginMm = 75.0;
 constexpr double kGoalKeepoutMm = 100.0;
 constexpr double kMergeRadiusMm = 150.0;
@@ -87,6 +88,26 @@ double pixel_height(const Corners& ordered) {
 
 bool known_id(int id) {
     return std::ranges::any_of(field::kGoals, [id](const field::Goal& goal) { return goal.tag_id == id; });
+}
+
+// The rest of the solver assumes a level camera. Turning each pixel's ray back up by the pitch gives the pixel a level
+// camera at the same spot would have seen, so the pixel limits below are in those level-camera pixels.
+std::optional<Corners> level_corners(const Corners& seen, const Camera& camera) {
+    const double pitch = deg_to_rad(camera.pitch_deg);
+    const double c = std::cos(pitch);
+    const double s = std::sin(pitch);
+    Corners level{};
+    for (std::size_t i = 0; i < kCornersPerTag; ++i) {
+        const double right = (seen[i].u - camera.cx) / camera.fx;
+        const double down = (seen[i].v - camera.cy) / camera.fy;
+        const double forward = c - down * s;
+        const double drop = s + down * c;
+        if (forward < kMinForwardRay) {
+            return std::nullopt;
+        }
+        level[i] = {camera.cx + camera.fx * right / forward, camera.cy + camera.fy * drop / forward};
+    }
+    return level;
 }
 
 // Corners match order_corners as seen by a camera facing the plate, so right is measured from that side.
@@ -511,7 +532,11 @@ Solution solve(std::span<const Detection> detections, double heading_deg, const 
         if (count == tags.size()) {
             break;
         }
-        const Corners ordered = order_corners(detection.corners);
+        const std::optional<Corners> level = level_corners(detection.corners, camera);
+        if (!level) {
+            continue;
+        }
+        const Corners ordered = order_corners(*level);
         if (known_id(detection.id) && pixel_height(ordered) >= kMinTagHeightPx) {
             tags[count++] = {detection.id, ordered};
         }

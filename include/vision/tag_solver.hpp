@@ -28,6 +28,8 @@ struct Camera {
     double fy;
     double cx;
     double cy;
+    // How far the lens points below level, in degrees. 0 is a level camera.
+    double pitch_deg = 0.0;
 };
 
 struct Candidate {
