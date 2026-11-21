@@ -4,9 +4,8 @@ namespace config {
 
 // Lens height above the field tiles. With one tag in view, range comes mostly from this number. Stay well clear of the
 // tag heights (37.8, 101.8 and 178.0 mm): level with a tag, range becomes unusable.
-// Measured 282.5 mm to the middle of the lens glass on the robot mount. On the old level rig, the same measurement was
-// 264 mm, but fitting the centre and red goal readings put the effective height about 19 mm higher (283.4 mm). If
-// tuning kCameraPitchDeg can't get both a near and a far taped distance right, try adding that 19 mm here.
+// Measured 282.5 mm to the middle of the lens glass on the robot mount. The 2026-11-21 robot calibration (see
+// kCameraPitchDeg) fits this height as measured, so the 19 mm the old level rig needed on top does not apply here.
 inline constexpr double kCameraHeightMm = 282.5;
 
 // kFocalYPx, kCenterYPx and the extra camera height are fitted together from the centre tag at 35 to 65 cm and the red
@@ -19,10 +18,12 @@ inline constexpr double kCenterXPx = 170.0;
 // old mount had: 1 degree of tilt moves it by about 3.8 px. Leave it alone when changing kCameraPitchDeg.
 inline constexpr double kCenterYPx = 115.3;
 
-// How far the lens points below level, in degrees. 0 is level. Set it to the angle measured on the mount, then fine
-// tune it (not kCenterYPx) until the range to a tag at a taped-out distance reads right. On a pitched camera the
-// horizon sits fy * tan(pitch) rows above kCenterYPx.
-inline constexpr double kCameraPitchDeg = 35.0; // approximate, measured on the robot mount
+// How far the lens points below level, in degrees. 0 is level. Tune this (not kCenterYPx) against taped-out distances.
+// On a pitched camera the horizon sits fy * tan(pitch) rows above kCenterYPx.
+// Fitted 2026-11-21 on the robot: the turning centre 17, 24 and 31 in from the centre of a neutral goal (tag 4) and an
+// alliance goal (tag 3), facing it. All six tag rows agree on 41.2 deg to within 0.9 deg, and the lens-to-tag ranges
+// then come out within 0.3 in. The mount was estimated at 35 deg by eye, which read ranges up to 14 in long.
+inline constexpr double kCameraPitchDeg = 41.2;
 
 // Where the lens sits relative to the robot's turning centre, and which way it faces (clockwise from the robot's
 // front; 180 looks out the back). The solver fits the lens, then steps back to the turning centre with these.
