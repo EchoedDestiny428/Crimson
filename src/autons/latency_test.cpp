@@ -1,6 +1,8 @@
+#include "autons/latency_analysis.hpp"
 #include "autons/routine.hpp"
 #include "config/controls.hpp"
 #include "pros/misc.hpp"
+#include "pros/screen.hpp"
 #include "vision/localizer.hpp"
 #include <atomic>
 #include <cmath>
@@ -16,11 +18,15 @@
 // Run: pick "Latency test" in the selector (competition switch / field), or press LEFT in driver control.
 // Abort: push either stick past half; the driver gets the robot back.
 //
-// Recording: only while the test runs, every 10 ms, just the columns the analysis needs. Each row goes two places:
+// Results: when the test ends, the brain works them out itself (src/autons/latency_analysis.cpp) and shows them on
+// its screen until the screen is touched. No laptop or SD card needed.
+//
+// Recording: only while the test runs, every 10 ms, just the columns the analysis needs. Each row is kept in memory
+// for the on-brain results, and also goes:
 //   - live down the program's terminal ("LT," lines; USB cable or the controller's radio), which
 //     tools/latency-capture.ps1 turns into logs/latency_*.csv as the test runs;
-//   - /usd/latency_NNN.csv on the SD card, in case the live copy drops lines. Hold UP and press DOWN in driver control
-//     to send the newest one down the terminal (tools/pull-logs.ps1 catches it).
+//   - to /usd/latency_NNN.csv if there is an SD card. Hold UP and press DOWN in driver control to send the newest one
+//     down the terminal (tools/pull-logs.ps1 catches it).
 //
 // Phases (logged as test_phase):
 //   1 settle            still, camera locks
@@ -66,15 +72,18 @@ constexpr std::uint32_t kRecordMs = 10;
 // Live rows go out every kStreamEveryRows-th sample. Raise it (2 = every 20 ms) if the radio drops lines.
 constexpr std::uint32_t kStreamEveryRows = 1;
 constexpr std::uint32_t kFlushEveryRows = 25;
-constexpr std::uint32_t kStopWaitMs = 300;
 constexpr const char* kColumns = "time_ms,pose_x_in,pose_y_in,pose_theta_deg,vision_tag_count,vision_read_ms,"
                                  "vision_raw_u_px,vision_raw_v_px,test_phase,left_motor_rpm,right_motor_rpm";
+
+constexpr std::size_t kMaxSamples = 9000; // 90 s at 10 ms; the test takes about 35 s
+constexpr std::uint32_t kStopWaitMs = 1000;
 
 std::atomic<bool> recording{false};
 std::atomic<bool> recorder_done{true};
 std::FILE* record_file = nullptr;
 char record_name[32] = "";
 char last_name[32] = "";
+std::vector<latency_analysis::Sample> samples;
 
 double average(const std::vector<double>& values) {
     double sum = 0.0;
@@ -88,14 +97,26 @@ double average(const std::vector<double>& values) {
     return count > 0 ? sum / count : NAN;
 }
 
-void format_row(char* out, std::size_t size) {
+latency_analysis::Sample take_sample() {
     const lemlib::Pose pose = chassis.getPose();
     const vision::localizer::Snapshot camera = vision::localizer::snapshot();
-    std::snprintf(out, size, "%lu,%.3f,%.3f,%.3f,%d,%lu,%.2f,%.2f,%d,%.1f,%.1f",
-                  static_cast<unsigned long>(pros::millis()), pose.x, pose.y, pose.theta, camera.tags,
-                  static_cast<unsigned long>(camera.read_ms), camera.raw ? camera.raw->u : NAN,
-                  camera.raw ? camera.raw->v : NAN, current_phase.load(), average(left_motors.get_actual_velocity_all()),
-                  average(right_motors.get_actual_velocity_all()));
+    return {pros::millis(),
+            pose.x,
+            pose.y,
+            pose.theta,
+            camera.tags,
+            camera.read_ms,
+            camera.raw ? camera.raw->u : NAN,
+            camera.raw ? camera.raw->v : NAN,
+            current_phase.load(),
+            average(left_motors.get_actual_velocity_all()),
+            average(right_motors.get_actual_velocity_all())};
+}
+
+void format_row(const latency_analysis::Sample& s, char* out, std::size_t size) {
+    std::snprintf(out, size, "%lu,%.3f,%.3f,%.3f,%d,%lu,%.2f,%.2f,%d,%.1f,%.1f", static_cast<unsigned long>(s.ms),
+                  s.x_in, s.y_in, s.heading_deg, s.tags, static_cast<unsigned long>(s.read_ms), s.u_px, s.v_px,
+                  s.phase, s.left_rpm, s.right_rpm);
 }
 
 // Picks /usd/latency_NNN.csv with the next free number; false if there is no SD card.
@@ -122,7 +143,11 @@ void record_loop() {
     std::uint32_t rows = 0;
     char row[192];
     while (recording) {
-        format_row(row, sizeof(row));
+        const latency_analysis::Sample sample = take_sample();
+        if (samples.size() < kMaxSamples) {
+            samples.push_back(sample);
+        }
+        format_row(sample, row, sizeof(row));
         if (record_file != nullptr) {
             std::fputs(row, record_file);
             std::fputc('\n', record_file);
@@ -146,6 +171,8 @@ void record_loop() {
 }
 
 void start_recording() {
+    samples.clear();
+    samples.reserve(kMaxSamples);
     record_name[0] = '\0';
     if (open_record_file()) {
         std::fprintf(record_file, "%s\n", kColumns);
@@ -156,12 +183,107 @@ void start_recording() {
     pros::Task task(record_loop, "Latency rec");
 }
 
-void stop_recording() {
+// True once the recorder task has finished, so `samples` is safe to read.
+bool stop_recording() {
     recording = false;
     const std::uint32_t start = pros::millis();
     while (!recorder_done && pros::millis() - start < kStopWaitMs) {
         pros::delay(kRecordMs);
     }
+    return recorder_done;
+}
+
+// ---- Results on the brain screen ----
+
+constexpr std::uint32_t kBackground = 0x1E1E24;
+constexpr std::uint32_t kText = 0xF8F9FA;
+constexpr std::uint32_t kAccent = 0x00F0B5;
+constexpr std::uint32_t kWarn = 0xFBBF24;
+constexpr int kLineX = 12;
+constexpr int kLineY = 6;
+constexpr int kLineStep = 23;
+constexpr double kFlatSharpness = 1.1;
+
+std::atomic<bool> results_shown{false};
+std::int32_t results_presses = 0;
+
+void line(int row, std::uint32_t color, const char* text) {
+    pros::screen::set_pen(color);
+    pros::screen::print(pros::E_TEXT_MEDIUM, kLineX, kLineY + row * kLineStep, "%s", text);
+}
+
+void latency_text(char* out, std::size_t size, const char* name, const latency_analysis::Latency& l) {
+    if (!l.valid) {
+        std::snprintf(out, size, "%s --", name);
+    } else {
+        std::snprintf(out, size, "%s %d ms x%.1f%s", name, l.ms, l.sharpness, l.sharpness < kFlatSharpness ? "?" : "");
+    }
+}
+
+void show_results(const latency_analysis::Results& r) {
+    results_presses = pros::screen::touch_status().press_count;
+    results_shown = true;
+    pros::screen::set_eraser(kBackground);
+    pros::screen::erase();
+
+    char text[96];
+    char turning[40];
+    char driving[40];
+    if (r.completed) {
+        std::snprintf(text, sizeof(text), "LATENCY TEST: DONE (%zu rows)", samples.size());
+    } else {
+        std::snprintf(text, sizeof(text), "LATENCY TEST: ABORTED in phase %d", r.last_phase);
+    }
+    line(0, r.completed ? kText : kWarn, text);
+
+    if (r.latency_valid) {
+        std::snprintf(text, sizeof(text), "kCameraLatencyMs = %d", r.latency_ms);
+        line(1, kAccent, text);
+    } else {
+        line(1, kWarn, "Camera delay: too few tag views");
+    }
+    latency_text(turning, sizeof(turning), "turn", r.turning);
+    latency_text(driving, sizeof(driving), "drive", r.driving);
+    std::snprintf(text, sizeof(text), "%s  %s", turning, driving);
+    line(2, kText, text);
+
+    if (r.drive_valid) {
+        std::snprintf(text, sizeof(text), "DRIVE top %.1f fwd / %.1f rev in/s", r.top_forward, r.top_reverse);
+        line(3, kAccent, text);
+        std::snprintf(text, sizeof(text), "accel %.0f/%.0f  brake %.0f/%.0f in/s2", r.accel_forward,
+                      r.accel_reverse, r.brake_forward, r.brake_reverse);
+        line(4, kText, text);
+        std::snprintf(text, sizeof(text), "90%% speed in %.0f ms  motors %.1f in/s", r.ms_to_90, r.motors_forward);
+        line(5, kText, text);
+    } else {
+        line(3, kWarn, "DRIVE: bursts did not run");
+    }
+    if (r.turn_valid) {
+        std::snprintf(text, sizeof(text), "TURN top %.0f R / %.0f L deg/s", r.turn_right, r.turn_left);
+        line(6, kAccent, text);
+        std::snprintf(text, sizeof(text), "accel %.0f/%.0f  brake %.0f/%.0f deg/s2", r.turn_accel_right,
+                      r.turn_accel_left, r.turn_brake_right, r.turn_brake_left);
+        line(7, kText, text);
+        std::snprintf(text, sizeof(text), "90%% turn rate in %.0f ms", r.turn_ms_to_90);
+        line(8, kText, text);
+    } else {
+        line(6, kWarn, "TURN: spins did not run");
+    }
+    line(9, kWarn, "Touch the screen to go back");
+}
+
+void print_results(const latency_analysis::Results& r) {
+    std::printf("LT_RESULT,completed=%d,rows=%zu,latency_ms=%d,turn_ms=%d,turn_x=%.2f,drive_ms=%d,drive_x=%.2f\n",
+                r.completed, samples.size(), r.latency_valid ? r.latency_ms : -1, r.turning.ms, r.turning.sharpness,
+                r.driving.ms, r.driving.sharpness);
+    std::printf("LT_RESULT,top_fwd=%.1f,top_rev=%.1f,accel_fwd=%.1f,accel_rev=%.1f,brake_fwd=%.1f,brake_rev=%.1f,"
+                "ms_to_90=%.0f,motors_fwd=%.1f\n",
+                r.top_forward, r.top_reverse, r.accel_forward, r.accel_reverse, r.brake_forward, r.brake_reverse,
+                r.ms_to_90, r.motors_forward);
+    std::printf("LT_RESULT,turn_right=%.0f,turn_left=%.0f,turn_accel_right=%.0f,turn_accel_left=%.0f,"
+                "turn_brake_right=%.0f,turn_brake_left=%.0f,turn_ms_to_90=%.0f\n",
+                r.turn_right, r.turn_left, r.turn_accel_right, r.turn_accel_left, r.turn_brake_right,
+                r.turn_brake_left, r.turn_ms_to_90);
 }
 
 // ---- The test ----
@@ -317,7 +439,7 @@ void run() {
     drive(0, 0);
     current_phase = done ? 17 : -1;
     pause(500);
-    stop_recording();
+    const bool recorded = stop_recording();
     current_phase = 0;
 
     if (!left_brake.empty()) {
@@ -326,7 +448,23 @@ void run() {
     if (!right_brake.empty()) {
         right_motors.set_brake_mode_all(right_brake.front());
     }
+    if (recorded) {
+        const latency_analysis::Results results = latency_analysis::analyze(samples);
+        print_results(results);
+        show_results(results);
+    }
     controller.rumble(done ? "." : "-");
+}
+
+bool keep_results_on_screen() {
+    if (!results_shown) {
+        return false;
+    }
+    if (pros::screen::touch_status().press_count != results_presses) {
+        results_shown = false;
+        return false;
+    }
+    return true;
 }
 
 int phase() {
