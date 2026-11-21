@@ -499,6 +499,16 @@ void add_candidate(Solution& solution, const Candidate& candidate) {
               [](const Candidate& a, const Candidate& b) { return a.error_px < b.error_px; });
 }
 
+// The fit is of the lens. Steps back from the lens to the turning centre along the robot's own heading.
+Pose robot_pose(const Pose& lens, const Camera& camera) {
+    const double heading = lens.heading_deg - camera.yaw_deg;
+    const double yaw = deg_to_rad(heading);
+    const double c = std::cos(yaw);
+    const double s = std::sin(yaw);
+    return {lens.x_mm - camera.forward_mm * c + camera.right_mm * s,
+            lens.y_mm + camera.forward_mm * s + camera.right_mm * c, heading};
+}
+
 }
 
 std::array<Pixel, 4> order_corners(std::array<Pixel, 4> corners) {
@@ -550,20 +560,25 @@ Solution solve(std::span<const Detection> detections, double heading_deg, const 
         return pixel_height(a.corners) > pixel_height(b.corners);
     });
 
+    const double lens_heading_deg = heading_deg + camera.yaw_deg;
     const Tag& largest = usable.front();
     for (std::size_t goal = 0; goal < field::kGoals.size(); ++goal) {
         if (field::kGoals[goal].tag_id != largest.id) {
             continue;
         }
         for (const double face : field::kTagFacesDeg) {
-            if (!can_see_face(largest, heading_deg, face, camera)) {
+            if (!can_see_face(largest, lens_heading_deg, face, camera)) {
                 continue;
             }
-            const std::optional<Candidate> candidate = try_placement(usable, {goal, face}, heading_deg, camera);
+            const std::optional<Candidate> candidate = try_placement(usable, {goal, face}, lens_heading_deg, camera);
             if (candidate) {
                 add_candidate(solution, *candidate);
             }
         }
+    }
+
+    for (std::size_t i = 0; i < solution.count; ++i) {
+        solution.candidates[i].pose = robot_pose(solution.candidates[i].pose, camera);
     }
     return solution;
 }

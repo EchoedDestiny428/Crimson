@@ -20,8 +20,15 @@ constexpr std::uint32_t kPeriodMs = 33;
 constexpr std::uint32_t kImuRetryMs = 500;
 constexpr std::uint32_t kLockHoldMs = 500;
 
-constexpr Camera kCamera{config::kCameraHeightMm, config::kFocalXPx, config::kFocalYPx, config::kCenterXPx,
-                         config::kCenterYPx, config::kCameraPitchDeg};
+constexpr Camera kCamera{config::kCameraHeightMm,
+                         config::kFocalXPx,
+                         config::kFocalYPx,
+                         config::kCenterXPx,
+                         config::kCenterYPx,
+                         config::kCameraPitchDeg,
+                         config::kCameraForwardIn * field::kMmPerInch,
+                         config::kCameraRightIn * field::kMmPerInch,
+                         config::kCameraYawDeg};
 
 constexpr Pose kStartPose{config::kStartXIn * field::kMmPerInch, config::kStartYIn * field::kMmPerInch,
                           config::kStartHeadingDeg};
