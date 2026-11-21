@@ -28,4 +28,16 @@ void grab() {
     close();
 }
 
+void prime() {
+    open();
+}
+
+void release() {
+    open();
+}
+
+std::int32_t distance_mm() {
+    return claw_distance.get_distance();
+}
+
 }

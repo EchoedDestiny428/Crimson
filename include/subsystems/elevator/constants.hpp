@@ -2,8 +2,10 @@
 
 // Shared by the elevator extension and arm pivot.
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 
 namespace subsystems::elevator::constants {
 
@@ -65,6 +67,42 @@ inline constexpr int kOuttakeRaiseDelayMs = 300;
 inline constexpr double kOuttakeRaiseCm = 11.0;
 // Right cycles the goal: neutral = alliance + 7 cm of lift, center = alliance + 14.
 inline constexpr double kGoalTierStepCm = 7.0;
+
+// Auton scoring (chaos planner and the score_* macros). Those solve a lift + arm pose for a
+// release height instead of using the driver's hard setpoints.
+inline constexpr double kCmPerInch = 2.54;
+inline constexpr double kPivotBehindCenterCm = 3.5; // elevator pivot shaft, behind the robot's center
+inline constexpr double kPinHeightCm = 16.5;        // one pin added to a stack
+inline constexpr double kAllianceGoalHeightCm = 8.25;
+inline constexpr double kNeutralGoalHeightCm = 14.65; // neutral quadrant goals ("short" in the manual)
+inline constexpr double kCenterGoalHeightCm = 22.27;  // center goal ("tall" in the manual)
+// Alliance goal release heights per level, the same ones the driver stages above aim for.
+inline constexpr std::array kAllianceReleaseCm{17.5, 36.0, 53.0, 70.0, 87.0, 104.0, 121.0};
+inline constexpr std::int32_t kPickupDistanceMm = 50; // TODO: guess, tune on the robot
+
+enum class Goal { Alliance, Neutral, Center }; // 8.25, 14.65 and 22.27 cm tall
+
+constexpr double goal_height_cm(Goal goal) {
+    switch (goal) {
+    case Goal::Neutral:
+        return kNeutralGoalHeightCm;
+    case Goal::Center:
+        return kCenterGoalHeightCm;
+    default:
+        return kAllianceGoalHeightCm;
+    }
+}
+
+// Release height for the level-th piece on a goal: the alliance table plus kGoalTierStepCm
+// per tier, extrapolated past the last measured level.
+constexpr double release_cm(Goal goal, int level) {
+    const int measured = static_cast<int>(kAllianceReleaseCm.size());
+    level = std::max(level, 1);
+    const double step = kAllianceReleaseCm[measured - 1] - kAllianceReleaseCm[measured - 2];
+    const double alliance = level <= measured ? kAllianceReleaseCm[level - 1]
+                                              : kAllianceReleaseCm[measured - 1] + (level - measured) * step;
+    return alliance + static_cast<int>(goal) * kGoalTierStepCm;
+}
 
 // Unit conversions.
 constexpr double extension_cm_to_motor_deg(double cm) {

@@ -170,4 +170,8 @@ double target() {
     return motor.getTarget();
 }
 
+bool is_settled() {
+    return home_state == Home::Idle && motor.isSettled();
+}
+
 }

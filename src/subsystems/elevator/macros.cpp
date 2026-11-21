@@ -7,8 +7,10 @@
 #include "subsystems/elevator/constants.hpp"
 #include "subsystems/elevator/extension.hpp"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <optional>
 
 namespace subsystems::elevator::macros {
 
@@ -28,7 +30,7 @@ bool score_held = false;  // L1 was held on the last tick
 enum class Score { Idle, Opened, Raising };
 constexpr double kRaiseDoneCm = 1.5;
 constexpr std::uint32_t kRaiseTimeoutMs = 1000;
-Score score = Score::Idle;
+Score score_state = Score::Idle;
 std::uint32_t score_at_ms = 0;
 
 double offset_cm() {
@@ -117,7 +119,7 @@ void update() {
     const bool go = controller.get_digital(controls::kScore);
     if (go) {
         // Held: go to the selected stage (and follow it if it changes), cancelling any score.
-        score = Score::Idle;
+        score_state = Score::Idle;
         if (stage != selected) {
             go_to_stage(selected);
         }
@@ -125,25 +127,25 @@ void update() {
         // Released: score. Hard-set the claw open (an outtake, not a toggle), then the
         // sequence below raises the lift and homes.
         claw::open();
-        score = Score::Opened;
+        score_state = Score::Opened;
         score_at_ms = now;
     }
     score_held = go;
 
-    if (score == Score::Opened && now - score_at_ms >= static_cast<std::uint32_t>(constants::kOuttakeRaiseDelayMs)) {
+    if (score_state == Score::Opened && now - score_at_ms >= static_cast<std::uint32_t>(constants::kOuttakeRaiseDelayMs)) {
         extension::set_target(extension::target() + constants::extension_cm_to_motor_deg(constants::kOuttakeRaiseCm));
-        score = Score::Raising;
+        score_state = Score::Raising;
         score_at_ms = now;
-    } else if (score == Score::Raising) {
+    } else if (score_state == Score::Raising) {
         const double gap_cm = std::fabs(constants::extension_motor_deg_to_cm(extension::target() - extension::height()));
         if (gap_cm < kRaiseDoneCm || now - score_at_ms >= kRaiseTimeoutMs) {
-            score = Score::Idle;
+            score_state = Score::Idle;
             go_to_stage(0);
         }
     }
 
     if (controller.get_digital_new_press(controls::kHome)) {
-        score = Score::Idle;
+        score_state = Score::Idle;
         go_to_stage(0);
     }
 
@@ -151,7 +153,7 @@ void update() {
     const bool lift_up = controller.get_digital(controls::kLiftManualUp);
     const bool lift_down = controller.get_digital(controls::kLiftManualDown) && !lift_up;
     if (lift_up || lift_down) {
-        score = Score::Idle; // the driver has the lift
+        score_state = Score::Idle; // the driver has the lift
         lift_manual = true;
         extension::set_manual(lift_up ? kFullPower : -constants::kExtensionDownPower);
     } else if (lift_manual) {
@@ -173,8 +175,142 @@ void update() {
     }
 }
 
+namespace {
+
+constexpr std::uint32_t kPollMs = 10;
+constexpr std::uint32_t kGripMs = 250;
+constexpr std::uint32_t kHomeTimeoutMs = 2000;
+
+// Each blocking auton motion takes a generation; stop() bumps it, which ends every wait.
+std::atomic<std::uint32_t> generation{0};
+
+template <typename Done>
+bool wait_for(Done done, std::uint32_t timeout_ms) {
+    const std::uint32_t mine = generation;
+    const std::uint32_t start = pros::millis();
+    while (generation == mine && !done()) {
+        if (pros::millis() - start >= timeout_ms) {
+            return false;
+        }
+        pros::delay(kPollMs);
+    }
+    return generation == mine;
+}
+
+// Waits ms; false only if stop() cancelled it.
+bool pause(std::uint32_t ms) {
+    const std::uint32_t mine = generation;
+    const std::uint32_t start = pros::millis();
+    while (generation == mine && pros::millis() - start < ms) {
+        pros::delay(kPollMs);
+    }
+    return generation == mine;
+}
+
+// Same slack adjustment as the driver stages, toward straight up (180) on either side.
+double slack_adjusted(double arm_deg) {
+    if (arm_deg > 180.0) {
+        return arm_deg - constants::kArmSlackAdjustmentDeg;
+    }
+    if (arm_deg < 180.0) {
+        return arm_deg + constants::kArmSlackAdjustmentDeg;
+    }
+    return arm_deg;
+}
+
+bool score_in_range(constants::Goal goal, int level, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms,
+                    double arm_min_deg, double arm_max_deg) {
+    Pose pose{};
+    if (level < 1 || !solve(constants::release_cm(goal, level), pose, arm_min_deg, arm_max_deg)) {
+        return false;
+    }
+    return reach(pose, goal_x_in, goal_y_in, timeout_ms) && drop();
+}
+
+}
+
+bool solve(double tip_cm, Pose& out, double arm_min_deg, double arm_max_deg) {
+    return solve_from(current_pose(), tip_cm, out, arm_min_deg, arm_max_deg);
+}
+
+void aim(Pose pose) {
+    stage = -1; // off the driver stages
+    arm_pivot::set_slow_zone(false);
+    extension::set_target(constants::extension_cm_to_motor_deg(pose.lift_cm));
+    arm_pivot::move_to(constants::arm_deg_to_motor_deg(slack_adjusted(pose.arm_deg)));
+}
+
+bool settled() {
+    return extension::is_settled() && arm_pivot::is_settled();
+}
+
+bool drop() {
+    claw::release();
+    return pause(kGripMs);
+}
+
+bool home() {
+    go_to_stage(0);
+    return wait_for(settled, kHomeTimeoutMs);
+}
+
+bool pickup(std::uint32_t timeout_ms) {
+    claw::prime();
+    if (!wait_for([] { return claw::distance_mm() < constants::kPickupDistanceMm; }, timeout_ms)) {
+        return false;
+    }
+    claw::grab();
+    return pause(kGripMs);
+}
+
+double travel_seconds(const Pose& to) {
+    return move_seconds(current_pose(), to);
+}
+
+double claw_offset_in(const Pose& pose) {
+    const double reach_cm = constants::kArmLengthCm * std::sin(pose.arm_deg * kPi / 180.0);
+    return (reach_cm - constants::kPivotBehindCenterCm + constants::kClawReleaseOffsetCm) / constants::kCmPerInch;
+}
+
+std::optional<Approach> approach(const Pose& pose, float goal_x_in, float goal_y_in) {
+    const lemlib::Pose robot = chassis.getPose();
+    const double dx = goal_x_in - robot.x;
+    const double dy = goal_y_in - robot.y;
+    const double distance = std::hypot(dx, dy);
+    if (distance <= 1e-6) {
+        return std::nullopt;
+    }
+    const double offset = claw_offset_in(pose);
+    const double standoff = std::fabs(offset);
+    const bool claw_in_front = offset >= 0.0;
+    const bool toward_goal = distance >= standoff;
+    return Approach{static_cast<float>(goal_x_in - dx / distance * standoff),
+                    static_cast<float>(goal_y_in - dy / distance * standoff), claw_in_front == toward_goal};
+}
+
+bool reach(const Pose& pose, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms) {
+    if (const auto stop = approach(pose, goal_x_in, goal_y_in)) {
+        chassis.moveToPoint(stop->x, stop->y, static_cast<int>(timeout_ms), {.forwards = stop->forwards});
+    }
+    aim(pose);
+    return wait_for([] { return !chassis.isInMotion() && settled(); }, timeout_ms);
+}
+
+bool score(constants::Goal goal, int level, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms) {
+    return score_in_range(goal, level, goal_x_in, goal_y_in, timeout_ms, kArmFrontMinDeg, kArmBehindMaxDeg);
+}
+
+bool score_front(constants::Goal goal, int level, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms) {
+    return score_in_range(goal, level, goal_x_in, goal_y_in, timeout_ms, kArmFrontMinDeg, kArmFrontMaxDeg);
+}
+
+bool score_behind(constants::Goal goal, int level, float goal_x_in, float goal_y_in, std::uint32_t timeout_ms) {
+    return score_in_range(goal, level, goal_x_in, goal_y_in, timeout_ms, kArmBehindMinDeg, kArmBehindMaxDeg);
+}
+
 void stop() {
-    score = Score::Idle;
+    ++generation;
+    score_state = Score::Idle;
     score_held = false;
     stage = -1;
     lift_manual = false;

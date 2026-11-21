@@ -55,4 +55,8 @@ double target() {
     return motor.getTarget();
 }
 
+bool is_settled() {
+    return motor.isSettled();
+}
+
 }
