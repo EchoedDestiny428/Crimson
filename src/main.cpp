@@ -1,5 +1,6 @@
 #include "main.h"
 #include "autons/autons.hpp"
+#include "config/camera.hpp"
 #include "display/controller_hud.hpp"
 #include "robotconfig.hpp"
 #include "subsystems/drive.hpp"
@@ -7,19 +8,21 @@
 #include "subsystems/elevator/extension.hpp"
 #include "subsystems/elevator/macros.hpp"
 #include "subsystems/elevator/arm_pivot.hpp"
+#include "subsystems/screen.hpp"
 #include "subsystems/side_toggle.hpp"
-#include "subsystems/vision.hpp"
 #include "util/driver_task.hpp"
+#include "vision/localizer.hpp"
 
 using namespace subsystems;
 
 void initialize() {
     controller.clear();
     apply_motor_config();
-    vision::init();
+    dashboard.initialize();
     dashboard.show_status("CALIBRATING");
 
     drive::init();
+    chassis.setPose(config::kStartXIn, config::kStartYIn, config::kStartHeadingDeg);
     elevator::extension::init();
     elevator::arm_pivot::init();
     side_toggle::init();
@@ -31,7 +34,8 @@ void initialize() {
     logger.register_robot_fields();
     logger.start();
 
-    vision::start();
+    screen::start();
+    ::vision::localizer::start();
 }
 
 void disabled() {

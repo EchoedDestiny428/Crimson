@@ -23,9 +23,24 @@ struct GoalPoseParams {
     float maxCorrection = 10;
 };
 
+// Every pose in and out of this class is in the field frame of constants/field_constants.hpp, the one the camera and
+// PointWeaver use: (0, 0) is the corner on blue's right, +X runs from the blue wall to the red wall, and heading 0
+// faces red, turning clockwise. LemLib's own frame (heading 0 along its +Y) is kept inside: the overrides below turn
+// field (x, y) into LemLib (-y, x) and back. Headings are the same number in both frames, so turnToHeading,
+// swingToHeading and donut need no override.
 class Chassis : public lemlib::Chassis {
 public:
     using lemlib::Chassis::Chassis;
+
+    lemlib::Pose getPose(bool radians = false, bool standardPos = false);
+    void setPose(float x, float y, float theta, bool radians = false);
+    void setPose(lemlib::Pose pose, bool radians = false);
+    void turnToPoint(float x, float y, int timeout, lemlib::TurnToPointParams params = {}, bool async = true);
+    void swingToPoint(float x, float y, lemlib::DriveSide lockedSide, int timeout,
+                      lemlib::SwingToPointParams params = {}, bool async = true);
+    void moveToPose(float x, float y, float theta, int timeout, lemlib::MoveToPoseParams params = {},
+                    bool async = true);
+    void moveToPoint(float x, float y, int timeout, lemlib::MoveToPointParams params = {}, bool async = true);
 
     void donut(float theta, int timeout, DonutParams params = {}, bool async = true);
     bool setPoseFromGoal(float goalX, float goalY, GoalPoseParams params = {});
