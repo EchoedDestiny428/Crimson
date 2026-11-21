@@ -1,4 +1,5 @@
 #include "display/controller_hud.hpp"
+#include "autons/autons.hpp"
 #include "robotconfig.hpp"
 #include "subsystems/elevator/macros.hpp"
 
@@ -18,7 +19,7 @@ int line = 0;
 void update() {
     if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_UP) &&
         controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {
-        logger.dump();
+        autons::latency_test::dump_latest(); // latency-testing: only the newest test recording
     }
 
     const std::uint32_t now = pros::millis();

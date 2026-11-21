@@ -32,7 +32,8 @@ void initialize() {
     logger.attach(&arm_pivot_motor);
     logger.attach(&side_toggle_motors);
     logger.register_robot_fields();
-    logger.start();
+    // latency-testing: the general telemetry log stays off, so the SD card only gets the test's own recording
+    // (src/autons/latency_test.cpp), which is small enough to stream live.
 
     screen::start();
     ::vision::localizer::start();

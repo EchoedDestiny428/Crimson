@@ -1,9 +1,10 @@
 """Camera latency and drivetrain limits from one latency-test log (src/autons/latency_test.cpp).
 
-    python tools/latency_test.py                      # newest CSV in logs/
-    python tools/latency_test.py logs/telemetry_000123.csv
+    python tools/latency_test.py                      # newest logs/latency_*.csv
+    python tools/latency_test.py logs/latency_004_live.csv
 
-Get the log off the brain with tools/pull-logs.ps1 (USB cable, SD card stays in).
+Get the recording with tools/latency-capture.ps1 (live, while the test runs), or afterwards from the SD card with
+tools/pull-logs.ps1 and UP+DOWN on the controller (USB cable or the controller's radio; the card stays in).
 
 Latency: while the robot wiggles and drives, the tag moves across the picture. The camera reports it a little late, so
 the picture lines up best with odometry from slightly earlier. This tries every delay from 0 to 250 ms and keeps the one
@@ -159,8 +160,9 @@ def report_latency(log, rows, reads):
         print("     A sharpness under about x1.10 means the curve is flat there: the run moved too little to tell.")
 
 
-def motor_wheel_speed(log, rows, ports):
-    cols = [f"port_{p}_velocity" for p in ports if f"port_{p}_velocity" in log]
+def motor_wheel_speed(log, rows, ports, side):
+    cols = [f"{side}_motor_rpm"] if f"{side}_motor_rpm" in log else [
+        f"port_{p}_velocity" for p in ports if f"port_{p}_velocity" in log]
     if not cols:
         return None
     rpm = np.nanmean(np.vstack([log[c][rows] for c in cols]), axis=0)
@@ -194,8 +196,8 @@ def report_limits(log, rows):
         hit = idx[np.abs(values[idx]) >= frac * peak]
         return (t[hit[0]] - t[idx[0]]) * 1000.0 if len(hit) else math.nan
 
-    left = motor_wheel_speed(log, rows, LEFT_PORTS)
-    right = motor_wheel_speed(log, rows, RIGHT_PORTS)
+    left = motor_wheel_speed(log, rows, LEFT_PORTS, "left")
+    right = motor_wheel_speed(log, rows, RIGHT_PORTS, "right")
 
     print("\nDriving (odometry; full power, then BRAKE; accelerations are peaks averaged over about 50 ms)")
     print(f"  top speed forward   {in_phase(speed, 8, 9):6.1f} in/s   reverse {-in_phase(speed, 10, 11, pick=np.min):6.1f}"
@@ -222,9 +224,9 @@ def main():
     if len(sys.argv) > 1:
         path = Path(sys.argv[1])
     else:
-        logs = sorted(Path("logs").glob("telemetry_*.csv"), key=lambda p: p.stat().st_mtime)
+        logs = sorted(Path("logs").glob("latency_*.csv"), key=lambda p: p.stat().st_mtime)
         if not logs:
-            sys.exit("No CSVs in logs/. Run tools/pull-logs.ps1 first, or pass a path.")
+            sys.exit("No logs/latency_*.csv. Run tools/latency-capture.ps1 during the test, or pass a path.")
         path = logs[-1]
     log = load(path)
     rows = last_run(log)

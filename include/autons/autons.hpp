@@ -15,6 +15,8 @@ namespace latency_test {
 void setup();
 void run();
 int phase(); // what the test is doing, for the log; 0 when it isn't running
+// Sends the newest test recording on the SD card down the terminal, framed for tools/pull-logs.ps1.
+void dump_latest();
 
 }
 
