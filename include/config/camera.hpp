@@ -5,8 +5,11 @@
 namespace config {
 
 // How old a picture is by the time the code reads it. Each picture is solved with odometry from that moment, then
-// moved forward by however far odometry has driven since. 0 until it is measured on a latency-testing branch.
-inline constexpr std::uint32_t kCameraLatencyMs = 0;
+// moved forward by however far odometry has driven since.
+// Measured 2026-11-21 on the robot (latency-testing branch): 254 ms overall; turning slow / medium / fast 227, 270,
+// 276 and driving slow / fast 239, 231; an earlier run gave 250+ and 218. About 250 +- 25 ms. Keep it under the
+// localizer's odometry history (1.28 s).
+inline constexpr std::uint32_t kCameraLatencyMs = 250;
 
 // Lens height above the field tiles. With one tag in view, range comes mostly from this number. Stay well clear of the
 // tag heights (37.8, 101.8 and 178.0 mm): level with a tag, range becomes unusable.
