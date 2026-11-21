@@ -6,11 +6,14 @@
 
 namespace crimson {
 
+// At full turn one side drives +fastSpeed and the other -slowSpeed (out of 127). 127 / 30 is what every donut in the
+// old autons used (partially-beneficial: snacky, teambad). PointWeaver's DEFAULTS (src/editor/types.ts) must match:
+// it leaves speeds out of the code when they equal its defaults.
 struct DonutParams {
     lemlib::AngularDirection direction = lemlib::AngularDirection::AUTO;
     bool forwards = true;
-    int fastSpeed = 100;
-    int slowSpeed = 75;
+    int fastSpeed = 127;
+    int slowSpeed = 30;
     float earlyExitRange = 0;
 };
 
