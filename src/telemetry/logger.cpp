@@ -113,6 +113,15 @@ double vision_pose_theta(const void*) {
     return vision::localizer::snapshot().pose.heading_deg;
 }
 
+// 0 no tags, 1 no fit, 2 accepted, 3 ambiguous, 4 rejected, 5 stale, 6 turning, 7 no history (vision::localizer::Outcome)
+double vision_outcome(const void*) {
+    return static_cast<double>(static_cast<int>(vision::localizer::snapshot().outcome));
+}
+
+double vision_correction_in(const void*) {
+    return vision::localizer::snapshot().correction_in;
+}
+
 // Raw driver stick, -127..127, before the drive curve, slew and arcade mixing.
 double controller_axis(const void* context) {
     const auto axis = *static_cast<const controls::Axis*>(context);
@@ -192,6 +201,8 @@ void Logger::register_robot_fields() {
     register_field("vision_pose_x_in", vision_pose_x);
     register_field("vision_pose_y_in", vision_pose_y);
     register_field("vision_pose_theta_deg", vision_pose_theta);
+    register_field("vision_outcome", vision_outcome);
+    register_field("vision_correction_in", vision_correction_in);
     register_field("stick_throttle", controller_axis, &controls::kThrottle);
     register_field("stick_turn", controller_axis, &controls::kTurn);
 }

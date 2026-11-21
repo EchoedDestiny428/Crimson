@@ -8,6 +8,7 @@
 #include "robotconfig.hpp"
 #include "vision/pose_filter.hpp"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <mutex>
@@ -16,8 +17,19 @@ namespace vision::localizer {
 
 namespace {
 
-constexpr std::uint32_t kPeriodMs = 33;
+// Odometry is followed every tick; the camera is read every kCameraEveryTicks ticks (30 ms).
+constexpr std::uint32_t kTickMs = 10;
+constexpr std::uint32_t kCameraEveryTicks = 3;
 constexpr std::uint32_t kLockHoldMs = 500;
+// How far off the estimate may be at boot, and after a setPose the code made on purpose.
+constexpr double kBootSigmaMm = 300.0;
+constexpr double kResetSigmaMm = 100.0;
+// Turning faster than this blurs the picture, and it is where an error in kCameraLatencyMs costs the most.
+constexpr double kMaxTurnRateDegPerS = 120.0;
+// The same corners as the last read although odometry moved this much: the sensor handed back an old picture.
+constexpr double kStaleMoveMm = 5.0;
+constexpr double kStaleTurnDeg = 0.5;
+constexpr std::size_t kHistorySize = 128; // 1.28 s of odometry at kTickMs
 
 constexpr Camera kCamera{config::kCameraHeightMm,
                          config::kFocalXPx,
@@ -94,67 +106,216 @@ Pose chassis_pose() {
     return {pose.x * field::kMmPerInch, pose.y * field::kMmPerInch, pose.theta};
 }
 
+bool finite(const Pose& pose) {
+    return std::isfinite(pose.x_mm) && std::isfinite(pose.y_mm) && std::isfinite(pose.heading_deg);
+}
+
+// Odometry poses since the last setPose, so a picture can be matched to where the robot was when it was taken.
+class History {
+public:
+    void clear() {
+        start_ = 0;
+        count_ = 0;
+    }
+
+    void add(std::uint32_t ms, const Pose& pose) {
+        entries_[(start_ + count_) % kHistorySize] = {ms, pose};
+        if (count_ < kHistorySize) {
+            ++count_;
+        } else {
+            start_ = (start_ + 1) % kHistorySize;
+        }
+    }
+
+    // Odometry at `ms`, straight-line between samples. Nothing if `ms` is older than everything kept.
+    std::optional<Pose> at(std::uint32_t ms) const {
+        if (count_ == 0 || ms < get(0).ms) {
+            return std::nullopt;
+        }
+        for (std::size_t i = count_ - 1; i > 0; --i) {
+            const Stamped& before = get(i - 1);
+            const Stamped& after = get(i);
+            if (ms >= after.ms) {
+                return after.pose;
+            }
+            if (ms >= before.ms) {
+                const double f = static_cast<double>(ms - before.ms) / static_cast<double>(after.ms - before.ms);
+                return Pose{before.pose.x_mm + f * (after.pose.x_mm - before.pose.x_mm),
+                            before.pose.y_mm + f * (after.pose.y_mm - before.pose.y_mm),
+                            before.pose.heading_deg + f * (after.pose.heading_deg - before.pose.heading_deg)};
+            }
+        }
+        return get(0).pose;
+    }
+
+private:
+    struct Stamped {
+        std::uint32_t ms;
+        Pose pose;
+    };
+
+    const Stamped& get(std::size_t i) const {
+        return entries_[(start_ + i) % kHistorySize];
+    }
+
+    std::array<Stamped, kHistorySize> entries_{};
+    std::size_t start_ = 0;
+    std::size_t count_ = 0;
+};
+
+bool same_view(std::span<const Detection> a, std::span<const Detection> b) {
+    if (a.size() != b.size()) {
+        return false;
+    }
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        if (a[i].id != b[i].id) {
+            return false;
+        }
+        for (std::size_t k = 0; k < a[i].corners.size(); ++k) {
+            if (a[i].corners[k].u != b[i].corners[k].u || a[i].corners[k].v != b[i].corners[k].v) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+// Moves each candidate from where the robot was when the picture was taken to where odometry says it is now.
+void move_forward(Solution& solution, const Pose& then, const Pose& now) {
+    for (std::size_t i = 0; i < solution.count; ++i) {
+        Pose& pose = solution.candidates[i].pose;
+        pose.x_mm += now.x_mm - then.x_mm;
+        pose.y_mm += now.y_mm - then.y_mm;
+        pose.heading_deg += now.heading_deg - then.heading_deg;
+    }
+}
+
 void run() {
     pros::AIVision sensor(ports::kVision);
 
     // main.cpp has already put odometry at config::kStart*, so that is where the estimate starts too.
-    const Pose start = chassis_pose();
-    Snapshot starting;
-    starting.pose = to_field_pose(start);
-    publish(starting);
-
+    Pose odom = chassis_pose();
+    std::uint32_t resets = chassis.poseResets();
     PoseFilter filter;
-    filter.reset(start);
+    filter.reset(odom, kBootSigmaMm);
 
+    Snapshot published;
+    published.pose = to_field_pose(odom);
+    publish(published);
+
+    History history;
     std::array<Detection, kMaxDetections> tags{};
+    std::array<Detection, kMaxDetections> last_tags{};
+    std::size_t last_count = 0;
+    Pose last_read_odom = odom;
+    std::uint32_t last_read_ms = pros::millis();
     bool configured = false;
-    double last_heading = start.heading_deg;
     std::optional<std::uint32_t> last_fix_ms;
+    std::uint32_t tick = 0;
     std::uint32_t last_ms = pros::millis();
     std::uint32_t wake_ms = last_ms;
 
     while (true) {
         const std::uint32_t now_ms = pros::millis();
-        const double heading = chassis.getPose().theta;
-        const bool imu_ok = std::isfinite(heading);
-        const double turned = imu_ok && std::isfinite(last_heading) ? heading - last_heading : 0.0;
-        last_heading = heading;
-        filter.predict(static_cast<double>(now_ms - last_ms) / 1000.0, turned);
+        const Pose now = chassis_pose();
+        const bool odom_ok = finite(now);
+        const double dt_s = static_cast<double>(now_ms - last_ms) / 1000.0;
         last_ms = now_ms;
 
-        configured = configured || configure(sensor);
-        const std::optional<std::size_t> count = configured ? read_tags(sensor, tags) : std::nullopt;
-        configured = count.has_value();
-
-        Snapshot next;
-        if (count) {
-            const auto seen = std::span<const Detection>(tags).first(*count);
-            const Solution solution = solve(seen, filter.pose().heading_deg, kCamera);
-            const Fix fix = filter.update(solution);
-            if (fix == Fix::Accepted) {
-                last_fix_ms = now_ms;
-            }
-
-            const bool recent = last_fix_ms && now_ms - *last_fix_ms <= kLockHoldMs;
-            next.status = fix == Fix::Ambiguous ? Status::Ambiguous : recent ? Status::Locked : Status::Searching;
-            next.tags = static_cast<int>(*count);
-            next.candidates = static_cast<int>(solution.count);
-            next.raw = largest_tag(seen);
-            if (solution.count > 0) {
-                next.goals = solution.candidates[0].goals;
-                next.error_px = solution.candidates[0].error_px;
-                next.range_in = solution.candidates[0].range_mm / field::kMmPerInch;
-            }
+        // Follow odometry. A setPose is a teleport, not driving: start the estimate over at the new pose.
+        const std::uint32_t now_resets = chassis.poseResets();
+        if (now_resets != resets && odom_ok) {
+            resets = now_resets;
+            filter.reset(now, kResetSigmaMm);
+            history.clear();
+            last_fix_ms.reset();
+            last_count = 0;
+            last_read_odom = now;
+        } else if (odom_ok && finite(odom)) {
+            filter.predict(now.x_mm - odom.x_mm, now.y_mm - odom.y_mm, now.heading_deg - odom.heading_deg, dt_s);
         } else {
-            next.status = Status::NoSensor;
+            filter.predict(0.0, 0.0, 0.0, dt_s);
         }
-        if (!imu_ok) {
-            next.status = Status::NoImu;
+        if (odom_ok) {
+            odom = now;
+            history.add(now_ms, now);
         }
-        next.pose = to_field_pose(filter.pose());
-        publish(next);
 
-        pros::Task::delay_until(&wake_ms, kPeriodMs);
+        if (++tick % kCameraEveryTicks == 0) {
+            configured = configured || configure(sensor);
+            const std::optional<std::size_t> count = configured ? read_tags(sensor, tags) : std::nullopt;
+            configured = count.has_value();
+
+            Snapshot next;
+            next.correction_in = published.correction_in;
+            if (count) {
+                const auto seen = std::span<const Detection>(tags).first(*count);
+                const bool repeat = same_view(seen, std::span<const Detection>(last_tags).first(last_count));
+                const bool moved = std::hypot(odom.x_mm - last_read_odom.x_mm, odom.y_mm - last_read_odom.y_mm) >
+                                       kStaleMoveMm ||
+                                   std::fabs(odom.heading_deg - last_read_odom.heading_deg) > kStaleTurnDeg;
+                const double read_gap_s = std::max(static_cast<double>(now_ms - last_read_ms) / 1000.0, 1e-3);
+                const double turn_rate = std::fabs(odom.heading_deg - last_read_odom.heading_deg) / read_gap_s;
+                const std::optional<Pose> then = history.at(now_ms - config::kCameraLatencyMs);
+
+                Solution solution;
+                Fix fix = Fix::None;
+                if (*count == 0) {
+                    next.outcome = Outcome::NoTags;
+                } else if (repeat && moved) {
+                    next.outcome = Outcome::Stale;
+                } else if (turn_rate > kMaxTurnRateDegPerS) {
+                    next.outcome = Outcome::Turning;
+                } else if (!then) {
+                    next.outcome = Outcome::NoHistory;
+                } else {
+                    // Solve with the heading the robot had when the picture was taken, then bring the answer up to now.
+                    const Pose before = filter.pose();
+                    const double heading_then = before.heading_deg - (odom.heading_deg - then->heading_deg);
+                    solution = solve(seen, heading_then, kCamera);
+                    move_forward(solution, *then, odom);
+                    fix = filter.update(solution);
+                    if (fix == Fix::Accepted) {
+                        last_fix_ms = now_ms;
+                        const Pose after = filter.pose();
+                        next.correction_in =
+                            std::hypot(after.x_mm - before.x_mm, after.y_mm - before.y_mm) / field::kMmPerInch;
+                    }
+                    next.outcome = fix == Fix::Accepted    ? Outcome::Accepted
+                                   : fix == Fix::Ambiguous ? Outcome::Ambiguous
+                                   : fix == Fix::Rejected  ? Outcome::Rejected
+                                                           : Outcome::NoFit;
+                }
+
+                const bool recent = last_fix_ms && now_ms - *last_fix_ms <= kLockHoldMs;
+                next.status = fix == Fix::Ambiguous ? Status::Ambiguous : recent ? Status::Locked : Status::Searching;
+                next.tags = static_cast<int>(*count);
+                next.candidates = static_cast<int>(solution.count);
+                next.raw = largest_tag(seen);
+                if (solution.count > 0) {
+                    next.goals = solution.candidates[0].goals;
+                    next.error_px = solution.candidates[0].error_px;
+                    next.range_in = solution.candidates[0].range_mm / field::kMmPerInch;
+                }
+
+                std::copy(seen.begin(), seen.end(), last_tags.begin());
+                last_count = seen.size();
+                last_read_odom = odom;
+                last_read_ms = now_ms;
+            } else {
+                next.status = Status::NoSensor;
+            }
+            if (!odom_ok) {
+                next.status = Status::NoImu;
+            }
+            published = next;
+        }
+
+        // The pose moves with odometry every tick; the camera fields change on reads.
+        published.pose = to_field_pose(filter.pose());
+        publish(published);
+
+        pros::Task::delay_until(&wake_ms, kTickMs);
     }
 }
 

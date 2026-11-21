@@ -32,6 +32,11 @@ lemlib::Pose Chassis::getPose(bool radians, bool standardPos) {
 void Chassis::setPose(float x, float y, float theta, bool radians) {
     const LemlibPoint point = to_lemlib(x, y);
     lemlib::Chassis::setPose(point.x, point.y, theta, radians);
+    ++pose_resets_;
+}
+
+std::uint32_t Chassis::poseResets() const {
+    return pose_resets_;
 }
 
 void Chassis::setPose(lemlib::Pose pose, bool radians) {

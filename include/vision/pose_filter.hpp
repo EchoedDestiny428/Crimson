@@ -21,12 +21,14 @@ private:
 
 enum class Fix { None, Accepted, Ambiguous, Rejected };
 
-// X and Y each run a 1D filter, and heading runs a third with the IMU as its feedforward. X and Y have no feedforward
-// source on this rig, so they predict no motion and lean on process noise.
+// X, Y and heading each run a 1D filter. Odometry is the feedforward for all three: each step moves the estimate by
+// however far odometry moved, and uncertainty grows with the distance driven (odometry drifts as it goes), plus a
+// little with time. The camera then only has to correct odometry's drift.
 class PoseFilter {
 public:
-    void reset(const Pose& start);
-    void predict(double dt_s, double imu_delta_deg);
+    // sigma_mm: how far off `start` may be. Boot uses a wide default; a setPose the robot trusts can pass less.
+    void reset(const Pose& start, double sigma_mm = 300.0);
+    void predict(double dx_mm, double dy_mm, double dheading_deg, double dt_s);
     Fix update(const Solution& solution);
 
     Pose pose() const;

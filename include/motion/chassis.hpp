@@ -1,6 +1,8 @@
 #pragma once
 
 #include "lemlib/api.hpp"
+#include <atomic>
+#include <cstdint>
 
 namespace crimson {
 
@@ -42,12 +44,19 @@ public:
                     bool async = true);
     void moveToPoint(float x, float y, int timeout, lemlib::MoveToPointParams params = {}, bool async = true);
 
+    // Goes up by one every time setPose teleports odometry (auton start, goal resets), so anything following odometry
+    // by its motion can tell a reset from real driving.
+    std::uint32_t poseResets() const;
+
     void donut(float theta, int timeout, DonutParams params = {}, bool async = true);
     bool setPoseFromGoal(float goalX, float goalY, GoalPoseParams params = {});
     // The robot's front (or back) is pressed against the goal at (goalX, goalY); keeps
     // the IMU heading and always applies the reset.
     bool resetFromGoalFront(float goalX, float goalY);
     bool resetFromGoalBack(float goalX, float goalY);
+
+private:
+    std::atomic<std::uint32_t> pose_resets_{0};
 };
 
 }

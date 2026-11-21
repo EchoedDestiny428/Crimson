@@ -1,6 +1,12 @@
 #pragma once
 
+#include <cstdint>
+
 namespace config {
+
+// How old a picture is by the time the code reads it. Each picture is solved with odometry from that moment, then
+// moved forward by however far odometry has driven since. 0 until it is measured on a latency-testing branch.
+inline constexpr std::uint32_t kCameraLatencyMs = 0;
 
 // Lens height above the field tiles. With one tag in view, range comes mostly from this number. Stay well clear of the
 // tag heights (37.8, 101.8 and 178.0 mm): level with a tag, range becomes unusable.
