@@ -2,7 +2,7 @@
 
 namespace autons {
 
-namespace match::short_stage1 {
+namespace skills {
 
 void setup();
 void run();
