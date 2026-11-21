@@ -3,6 +3,7 @@
 #include "config/camera.hpp"
 #include "display/controller_hud.hpp"
 #include "robotconfig.hpp"
+#include "subsystems/donut_tester.hpp"
 #include "subsystems/drive.hpp"
 #include "subsystems/elevator/claw.hpp"
 #include "subsystems/elevator/extension.hpp"
@@ -53,17 +54,18 @@ void autonomous() {
     autons::run_selected();
 }
 
+// donut-testing branch: driver control is only the drive and the donut tuner (src/subsystems/donut_tester.cpp). The
+// lift, arm, claw and side toggle are not on the controller; the arm still holds where it is.
 void opcontrol() {
     chassis.cancelAllMotions();
     elevator::arm_pivot::set_hold(true);
-    util::start_driver_task("Elevator stages", elevator::macros::update, elevator::macros::stop);
-    util::start_driver_task("Claw", elevator::claw::update);
-    util::start_driver_task("Side toggle", side_toggle::update, side_toggle::stop);
-    util::start_driver_task("HUD", display::controller_hud::update);
+    controller.clear();
 
     std::uint32_t now = pros::millis();
     while (true) {
-        drive::update();
+        if (!donut_tester::update()) {
+            drive::update();
+        }
         pros::Task::delay_until(&now, util::kLoopMs);
     }
 }
