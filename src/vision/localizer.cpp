@@ -11,6 +11,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <mutex>
 
 namespace vision::localizer {
@@ -211,6 +212,7 @@ void run() {
     std::uint32_t last_read_ms = pros::millis();
     bool configured = false;
     std::optional<std::uint32_t> last_fix_ms;
+    std::uint32_t accepted = 0;
     std::uint32_t tick = 0;
     std::uint32_t last_ms = pros::millis();
     std::uint32_t wake_ms = last_ms;
@@ -277,6 +279,7 @@ void run() {
                     fix = filter.update(solution);
                     if (fix == Fix::Accepted) {
                         last_fix_ms = now_ms;
+                        ++accepted;
                         const Pose after = filter.pose();
                         next.correction_in =
                             std::hypot(after.x_mm - before.x_mm, after.y_mm - before.y_mm) / field::kMmPerInch;
@@ -308,6 +311,7 @@ void run() {
             if (!odom_ok) {
                 next.status = Status::NoImu;
             }
+            next.accepted = accepted;
             published = next;
         }
 
@@ -328,6 +332,75 @@ void start() {
 Snapshot snapshot() {
     const std::lock_guard lock(shared_mutex);
     return shared;
+}
+
+namespace {
+
+constexpr std::uint32_t kResetPollMs = 10;
+// Odometry moving more than this from where the robot stopped restarts the still clock.
+constexpr double kStillDriftIn = 0.25;
+constexpr double kStillTurnDeg = 1.0;
+
+const char* reset_name(ResetOutcome outcome) {
+    switch (outcome) {
+    case ResetOutcome::Applied:
+        return "applied";
+    case ResetOutcome::Agreed:
+        return "agreed";
+    case ResetOutcome::TooFar:
+        return "too_far";
+    case ResetOutcome::NoCamera:
+        return "no_camera";
+    case ResetOutcome::StillMoving:
+        return "still_moving";
+    }
+    return "?";
+}
+
+ResetResult report(ResetOutcome outcome, double difference_in) {
+    std::printf("ODOM_RESET,%s,%.2f\n", reset_name(outcome), difference_in);
+    return {outcome, difference_in};
+}
+
+}
+
+ResetResult reset_odometry(const ResetParams& params) {
+    chassis.waitUntilDone();
+    const std::uint32_t start = pros::millis();
+    lemlib::Pose anchor = chassis.getPose();
+    std::uint32_t still_since = start;
+    std::uint32_t fixes_at_still = snapshot().accepted;
+    bool was_still = false;
+
+    while (pros::millis() - start <= params.timeout_ms) {
+        const std::uint32_t now = pros::millis();
+        const lemlib::Pose odom = chassis.getPose();
+        if (std::hypot(odom.x - anchor.x, odom.y - anchor.y) > kStillDriftIn ||
+            std::fabs(odom.theta - anchor.theta) > kStillTurnDeg) {
+            anchor = odom;
+            still_since = now;
+            fixes_at_still = snapshot().accepted;
+        }
+
+        const Snapshot camera = snapshot();
+        const bool still = now - still_since >= params.still_ms;
+        was_still = was_still || still;
+        const bool fresh = static_cast<int>(camera.accepted - fixes_at_still) >= params.fixes;
+        if (still && fresh && camera.status == Status::Locked) {
+            const double difference = std::hypot(camera.pose.x_in - odom.x, camera.pose.y_in - odom.y);
+            if (difference > params.max_correction_in) {
+                return report(ResetOutcome::TooFar, difference);
+            }
+            if (difference < params.min_correction_in) {
+                return report(ResetOutcome::Agreed, difference);
+            }
+            // Keep the IMU heading: the camera only measures heading when it sees two goals at once.
+            chassis.setPose(static_cast<float>(camera.pose.x_in), static_cast<float>(camera.pose.y_in), odom.theta);
+            return report(ResetOutcome::Applied, difference);
+        }
+        pros::delay(kResetPollMs);
+    }
+    return report(was_still ? ResetOutcome::NoCamera : ResetOutcome::StillMoving, 0.0);
 }
 
 }

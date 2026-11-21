@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vision/tag_solver.hpp"
+#include <cstdint>
 #include <optional>
 
 namespace vision::localizer {
@@ -46,9 +47,45 @@ struct Snapshot {
     std::optional<RawTag> raw;
     Outcome outcome = Outcome::NoTags;
     double correction_in = 0.0; // how far the last accepted picture moved the estimate
+    std::uint32_t accepted = 0; // accepted pictures since boot; goes up by one per fix
 };
 
 void start();
 Snapshot snapshot();
+
+// ---- Resetting odometry from the camera when the robot stops ----
+
+struct ResetParams {
+    // How long the robot has to stand still before the camera is trusted. Pictures are config::kCameraLatencyMs old
+    // when they arrive, so waiting a bit longer than that means every picture used was taken after the robot stopped.
+    // 0 resets as soon as the camera agrees, trusting the latency correction instead.
+    std::uint32_t still_ms = 350;
+    // Accepted camera pictures needed after the robot stopped.
+    int fixes = 2;
+    // Give up after this long and leave odometry alone (no tag in view, still moving, camera unsure).
+    std::uint32_t timeout_ms = 1000;
+    // A bigger difference is more likely the camera picking the twin goal than odometry drifting: refuse it.
+    double max_correction_in = 6.0;
+    // Smaller differences are left alone; a reset restarts the camera's estimate, so tiny ones aren't worth it.
+    double min_correction_in = 0.25;
+};
+
+enum class ResetOutcome {
+    Applied,     // odometry moved to the camera's position (heading kept from the IMU)
+    Agreed,      // camera and odometry already within min_correction_in
+    TooFar,      // camera disagrees by more than max_correction_in; odometry left alone
+    NoCamera,    // no locked camera fix after the robot stopped before the timeout
+    StillMoving, // the robot never stood still for still_ms before the timeout
+};
+
+struct ResetResult {
+    ResetOutcome outcome;
+    double difference_in; // camera minus odometry distance when it decided (0 if it never got that far)
+};
+
+// For autons: call it where the robot stops with its back (the camera) toward a goal within about 2 ft. Waits for the
+// current motion to finish, then for the robot to be still and the camera to agree, then moves odometry's x and y
+// to the camera's. Blocks for still_ms or so when it works, up to timeout_ms when it can't.
+ResetResult reset_odometry(const ResetParams& params = {});
 
 }
