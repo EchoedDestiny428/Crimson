@@ -28,6 +28,10 @@ struct CurveParams {
     float entryBias = 0.0f; // 0-1: same for the entry carrot; also tilts the final approach off entryHeading
     int finalMaxSpeed = 127; // last leg into the target, e.g. slow onto a goal
     int finalTimeout = 800;
+    // Shift the carrot nearest the target this far (in) off the approach line toward the inside of the turn, so
+    // momentum carries the robot onto the line instead of past it: curve()'s entry carrot, curveReverse()'s last one.
+    // curveReverse() takes it from `drive`, not `path`, so it doesn't move the path it reverses.
+    float lead = 0.0f;
 };
 
 // Goal center to robot center when the robot is pressed against a goal, in inches
@@ -68,6 +72,13 @@ public:
     // From the current pose to (x, y); headings are the robot's own facing at the exit and entry points.
     void curve(float x, float y, float exitHeading, float entryHeading, float exitLength, float entryLength,
                int timeout, CurveParams params = {});
+    // Drive curve()'s path backwards: the path curve(x, y, ...) with `path` would take from (fromX, fromY), run from
+    // (x, y) back to (fromX, fromY) and end squared up at exitHeading (e.g. goal to loader along the loader-to-goal
+    // curve). `drive` sets the speeds: minSpeed and maxSpeed for the first two legs, finalMaxSpeed and finalTimeout
+    // for the last.
+    void curveReverse(float fromX, float fromY, float x, float y, float exitHeading, float entryHeading,
+                      float exitLength, float entryLength, const CurveParams& path, int timeout,
+                      CurveParams drive = {});
     bool setPoseFromGoal(float goalX, float goalY, GoalPoseParams params = {});
     // The robot's front (or back) is pressed against the goal at (goalX, goalY); keeps
     // the IMU heading and always applies the reset.

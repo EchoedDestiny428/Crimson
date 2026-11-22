@@ -36,6 +36,17 @@ LemlibPoint toward(float from_x, float from_y, float to_x, float to_y) {
     return {(to_x - from_x) / length, (to_y - from_y) / length};
 }
 
+// Unit normal to the line through (line_x, line_y) along heading_deg, on the side of (side_x, side_y): the inside of a
+// turn onto that line from there.
+LemlibPoint inside_of(float line_x, float line_y, float heading_deg, float side_x, float side_y) {
+    const LemlibPoint along = travel(heading_deg, 1.0f);
+    const LemlibPoint normal{-along.y, along.x};
+    if (normal.x * (side_x - line_x) + normal.y * (side_y - line_y) < 0.0f) {
+        return {-normal.x, -normal.y};
+    }
+    return normal;
+}
+
 // Unit vector bias of the way from a to b; a when bias is 0 or b is zero.
 LemlibPoint blend(LemlibPoint a, LemlibPoint b, float bias) {
     if (bias <= 0.0f || (b.x == 0.0f && b.y == 0.0f)) {
@@ -150,11 +161,16 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
     endMotion();
 }
 
-void Chassis::curve(float x, float y, float exitHeading, float entryHeading, float exitLength, float entryLength,
-                    int timeout, CurveParams params) {
-    // The exit point hangs off where the robot actually stops, not where an async motion still has it.
-    waitUntilDone();
-    const lemlib::Pose start = getPose();
+namespace {
+
+// curve()'s two carrots for the path from start to (x, y).
+struct CurveCarrots {
+    LemlibPoint exit;
+    LemlibPoint entry;
+};
+
+CurveCarrots curve_carrots(LemlibPoint start, float x, float y, float exitHeading, float entryHeading,
+                           float exitLength, float entryLength, const CurveParams& params) {
     const float direction = params.forwards ? 1.0f : -1.0f;
 
     // Travel directions at the exit and entry points. Facing heading h in the field frame points along (cos h, -sin h).
@@ -168,9 +184,26 @@ void Chassis::curve(float x, float y, float exitHeading, float entryHeading, flo
         blend(exitTravel, toward(start.x, start.y, plainEntry.x, plainEntry.y), params.exitBias);
     const LemlibPoint exit{start.x + exitDir.x * (exitLength + 2.0f), start.y + exitDir.y * (exitLength + 2.0f)};
     const LemlibPoint entryDir = blend(entryTravel, toward(exit.x, exit.y, x, y), params.entryBias);
-    const LemlibPoint entry{x - entryDir.x * entryLength, y - entryDir.y * entryLength};
+    return {exit, {x - entryDir.x * entryLength, y - entryDir.y * entryLength}};
+}
 
-    moveToPoint(exit.x, exit.y, 800,
+}
+
+void Chassis::curve(float x, float y, float exitHeading, float entryHeading, float exitLength, float entryLength,
+                    int timeout, CurveParams params) {
+    // The exit point hangs off where the robot actually stops, not where an async motion still has it. Only wait while
+    // one is running: LemLib's waitUntilDone() never returns before the first motion of the program.
+    if (isInMotion()) {
+        waitUntilDone();
+    }
+    const lemlib::Pose start = getPose();
+    const CurveCarrots carrots =
+        curve_carrots({start.x, start.y}, x, y, exitHeading, entryHeading, exitLength, entryLength, params);
+    // lead moves the entry carrot off the approach line toward the inside of the turn.
+    const LemlibPoint inside = inside_of(x, y, entryHeading, start.x, start.y);
+    const LemlibPoint entry{carrots.entry.x + inside.x * params.lead, carrots.entry.y + inside.y * params.lead};
+
+    moveToPoint(carrots.exit.x, carrots.exit.y, 800,
                 {.forwards = params.forwards, .maxSpeed = static_cast<float>(params.exitMaxSpeed),
                  .minSpeed = static_cast<float>(params.minSpeed), .earlyExitRange = 2.0f});
     moveToPoint(entry.x, entry.y, timeout,
@@ -181,6 +214,33 @@ void Chassis::curve(float x, float y, float exitHeading, float entryHeading, flo
                  .earlyExitRange = 2.0f});
     moveToPoint(x, y, params.finalTimeout,
                 {.forwards = params.forwards, .maxSpeed = static_cast<float>(params.finalMaxSpeed)});
+}
+
+void Chassis::curveReverse(float fromX, float fromY, float x, float y, float exitHeading, float entryHeading,
+                           float exitLength, float entryLength, const CurveParams& path, int timeout,
+                           CurveParams drive) {
+    if (isInMotion()) {
+        waitUntilDone();
+    }
+    const CurveCarrots carrots =
+        curve_carrots({fromX, fromY}, x, y, exitHeading, entryHeading, exitLength, entryLength, path);
+    const bool forwards = !path.forwards;
+
+    // lead moves the last carrot off the approach line (through (fromX, fromY) along exitHeading) toward the side the
+    // path comes from, the inside of the turn.
+    const LemlibPoint inside = inside_of(fromX, fromY, exitHeading, x, y);
+    const LemlibPoint last{carrots.exit.x + inside.x * drive.lead, carrots.exit.y + inside.y * drive.lead};
+
+    moveToPoint(carrots.entry.x, carrots.entry.y, 800,
+                {.forwards = forwards, .maxSpeed = static_cast<float>(drive.maxSpeed),
+                 .minSpeed = static_cast<float>(drive.minSpeed), .earlyExitRange = 2.0f});
+    moveToPoint(last.x, last.y, timeout,
+                {.forwards = forwards, .maxSpeed = static_cast<float>(drive.maxSpeed),
+                 .minSpeed = static_cast<float>(drive.minSpeed), .earlyExitRange = 2.0f});
+    // The forward curve leaves (fromX, fromY) at exitHeading, so end there squared up rather than at the angle of the
+    // last leg.
+    moveToPose(fromX, fromY, exitHeading, drive.finalTimeout,
+               {.forwards = forwards, .maxSpeed = static_cast<float>(drive.finalMaxSpeed)});
 }
 
 bool Chassis::setPoseFromGoal(float goalX, float goalY, GoalPoseParams params) {

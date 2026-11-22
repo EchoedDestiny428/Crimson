@@ -23,6 +23,7 @@ struct Routine {
 constexpr std::array kRoutines{
     Routine{"ShortStage1", match::short_stage1::setup, match::short_stage1::run},
     Routine{"Skills", skills::setup, skills::run},
+    Routine{"LoopTest", loop_test::setup, loop_test::run},
     Routine{"None", nullptr, nullptr},
 };
 

@@ -27,6 +27,15 @@ macros::Pose stage(int level, Goal goal = Goal::Alliance) {
 // For aim_staged(): true once the robot is kBackedOutIn from where it is now, i.e. off the loader with room to swing
 // the arm. kBackedOutIn is the goal curve's straight exit leg.
 constexpr float kBackedOutIn = 4.0f;
+// Loader-to-goal curves. Each loop drives its curve onto the goal and the same path in reverse back to the loader,
+// so both halves come from one definition (tuned in LoopTest). lead moves the carrot nearest the target toward the
+// inside of the turn: 0.5 in onto the goal; the reverse trip's own 2 in keeps it off the wall by the loader.
+constexpr crimson::CurveParams kLeftGoalCurve{.forwards = false, .minSpeed = 50, .exitBias = 0.6f, .entryBias = 0.45f,
+                                              .finalMaxSpeed = 50, .finalTimeout = 1050, .lead = 0.5f};
+constexpr crimson::CurveParams kRightGoalCurve{.forwards = false, .minSpeed = 50, .exitBias = 0.6f, .entryBias = 0.45f,
+                                               .finalTimeout = 1000, .lead = 0.5f};
+constexpr crimson::CurveParams kToLoader{.minSpeed = 50, .finalMaxSpeed = 70, .finalTimeout = 900, .lead = 2.0f};
+
 std::function<bool()> backed_out() {
     const lemlib::Pose from = chassis.getPose();
     return [from] {
@@ -92,19 +101,14 @@ void left_loop(int pass) {
     // last leg starts, so this has to come before it).
     macros::aim_staged(stage(3 + pass, Goal::Neutral), backed_out());
     // Back off the loader, swing around and back onto goal 1 heading 90 (back toward +Y).
-    chassis.curve(120, 48, 0, 90, 2, 10, 1200,
-                  {.forwards = false, .minSpeed = 50, .exitBias = 0.6f, .entryBias = 0.45f, .finalMaxSpeed = 50,
-                   .finalTimeout = 1200}); // goal 1
+    chassis.curve(120, 48, 0, 90, 2, 10, 1200, kLeftGoalCurve); // goal 1
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 48, {.distance = 7.5});
     macros::drop();
     macros::home_async(); // home after every score
-    chassis.moveToPoint(127, 12, 1200); // 2 in further toward the loader than PointWeaver's 125
-    chassis.turnToPoint(141.6, 13, 700); // facing point 4
-    chassis.moveToPose(135.3, 13, 0, 600); // claw on red left loader (141.6, 13)
-    chassis.waitUntil(8.28);
-    chassis.cancelMotion();
-    chassis.moveToPose(135.3, 13, 0, 750, {.maxSpeed = 50}); // last 20%
+    // The same curve in reverse, ending square on the loader at heading 0.
+    chassis.curveReverse(135.3, 13, 120, 48, 0, 90, 2, 10, kLeftGoalCurve, 1000,
+                         kToLoader); // claw on red left loader (141.6, 13)
     chassis.waitUntilDone();
     macros::pickup();
 }
@@ -166,17 +170,14 @@ void right_start() {
 // right loop
 void right_loop() {
     macros::aim_staged(stage(5), backed_out()); // like the left loop
-    // Mirror of the left loop: back onto red goal 2 heading -90 (back toward -Y).
-    chassis.curve(120, 96, 0, -90, 2, 10, 1200,
-                  {.forwards = false, .minSpeed = 50, .exitBias = 0.6f, .entryBias = 0.45f,
-                   .finalTimeout = 1000}); // red goal 2
+    // Mirror of the left loop: back onto red goal 2 heading -90 (back toward -Y), then the same curve in reverse.
+    chassis.curve(120, 96, 0, -90, 2, 10, 1200, kRightGoalCurve); // red goal 2
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
     macros::drop();
     macros::home_async(); // home after every score
-    chassis.moveToPoint(127, 132, 1200); // 2 in further toward the loader than PointWeaver's 125
-    chassis.turnToPoint(141.6, 131, 700); // facing point 4
-    chassis.moveToPose(135.3, 131, 0, 1250); // claw on red right loader (141.6, 131)
+    chassis.curveReverse(135.3, 131, 120, 96, 0, -90, 2, 10, kRightGoalCurve, 1000,
+                         kToLoader); // claw on red right loader (141.6, 131)
     chassis.waitUntilDone();
     macros::pickup();
 }
