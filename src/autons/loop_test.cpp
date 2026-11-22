@@ -26,8 +26,8 @@ void run() {
 
     // Goal 1 to the left loader: the curve below run in reverse, ending square on the loader at heading 0.
     chassis.curveReverse(kLoaderX, kLoaderY, kGoalX, kGoalY, 0, 90, 2, 10, kGoalCurve, 1000,
-                         {.minSpeed = 50, .finalMaxSpeed = 70, .finalTimeout = 900,
-                          .lead = 2.0f}); // lead keeps it off the south wall
+                         {.minSpeed = 50, .finalMaxSpeed = 70, .finalTimeout = 600, .lead = 2.0f,
+                          .deeper = 3.0f}); // lead keeps it off the south wall; then straight 3 in into the loader
 
     // Left loader back onto goal 1 heading 90, the same curve skills uses.
     chassis.curve(kGoalX, kGoalY, 0, 90, 2, 10, 1200, kGoalCurve);

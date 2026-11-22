@@ -32,9 +32,9 @@ constexpr float kBackedOutIn = 4.0f;
 // inside of the turn: 0.5 in onto the goal; the reverse trip's own 2 in keeps it off the wall by the loader.
 constexpr crimson::CurveParams kLeftGoalCurve{.forwards = false, .minSpeed = 50, .exitBias = 0.6f, .entryBias = 0.45f,
                                               .finalMaxSpeed = 50, .finalTimeout = 1050, .lead = 0.5f};
-constexpr crimson::CurveParams kRightGoalCurve{.forwards = false, .minSpeed = 50, .exitBias = 0.6f, .entryBias = 0.45f,
-                                               .finalTimeout = 1000, .lead = 0.5f};
-constexpr crimson::CurveParams kToLoader{.minSpeed = 50, .finalMaxSpeed = 70, .finalTimeout = 900, .lead = 2.0f};
+constexpr crimson::CurveParams kRightGoalCurve = kLeftGoalCurve; // mirrored by the headings passed in
+constexpr crimson::CurveParams kToLoader{.minSpeed = 50, .finalMaxSpeed = 70, .finalTimeout = 600, .lead = 2.0f,
+                                         .deeper = 3.0f}; // then straight 3 in into the loader to load
 
 std::function<bool()> backed_out() {
     const lemlib::Pose from = chassis.getPose();
@@ -52,7 +52,9 @@ void start() {
     chassis.setPose(135.5, 72, -90);
     claw::grab(); // hold the preload; the claw boots open
 
-    side_toggle_motors.move_velocity(-200); 
+    side_toggle_motors.move_velocity(-200);
+    // Home while the toggle spins: the arm pushes onto its hardstop and resets its encoder there.
+    macros::home_async();
     pros::delay(1200);
     side_toggle_motors.brake();
 
@@ -160,9 +162,9 @@ void right_start() {
     macros::drop();
     macros::home_async(); // home after every score
     chassis.donut(-82.09, 1900, {.forwards = false, .slowSpeed = 19}); // facing point 5
-    chassis.moveToPoint(127, 132, 1200); // 2 in further toward the loader than PointWeaver's 125
-    chassis.turnToPoint(141.6, 131, 700); // facing point 6
-    chassis.moveToPoint(135.31, 131.38, 750); // claw on red right loader (141.6, 131)
+    // To the right loader along right_loop's goal curve in reverse, ending square at heading 0.
+    chassis.curveReverse(135.3, 131, 120, 96, 0, -90, 2, 10, kRightGoalCurve, 1000,
+                         kToLoader); // claw on red right loader (141.6, 131)
     chassis.waitUntilDone();
     macros::pickup();
 }
@@ -220,7 +222,7 @@ void run() {
     }
     transition();
     right_start();
-    // right_loop();
+    right_loop(); // one pass: score red goal 2 L5, back to the right loader for the last pin
     ending();
 }
 

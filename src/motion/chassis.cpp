@@ -241,6 +241,12 @@ void Chassis::curveReverse(float fromX, float fromY, float x, float y, float exi
     // last leg.
     moveToPose(fromX, fromY, exitHeading, drive.finalTimeout,
                {.forwards = forwards, .maxSpeed = static_cast<float>(drive.finalMaxSpeed)});
+    if (drive.deeper > 0.0f) {
+        // Then straight on in along exitHeading.
+        const LemlibPoint in = travel(exitHeading, forwards ? 1.0f : -1.0f);
+        moveToPoint(fromX + in.x * drive.deeper, fromY + in.y * drive.deeper, 500,
+                    {.forwards = forwards, .maxSpeed = static_cast<float>(drive.finalMaxSpeed)});
+    }
 }
 
 bool Chassis::setPoseFromGoal(float goalX, float goalY, GoalPoseParams params) {

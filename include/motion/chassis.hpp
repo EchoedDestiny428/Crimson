@@ -32,6 +32,9 @@ struct CurveParams {
     // momentum carries the robot onto the line instead of past it: curve()'s entry carrot, curveReverse()'s last one.
     // curveReverse() takes it from `drive`, not `path`, so it doesn't move the path it reverses.
     float lead = 0.0f;
+    // curveReverse() only (in `drive`): once squared up at (fromX, fromY), drive straight on this far along
+    // exitHeading, e.g. into a loader to load.
+    float deeper = 0.0f;
 };
 
 // Goal center to robot center when the robot is pressed against a goal, in inches
