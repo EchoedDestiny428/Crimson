@@ -9,11 +9,15 @@ namespace crimson {
 
 namespace {
 
+constexpr std::uint32_t kPeriodMs = 10;
+constexpr float kSettleWindowDeg = 90.0f;
+
 struct LemlibPoint {
     float x;
     float y;
 };
 
+// Field (x, y) to LemLib's frame. Field heading 0 points along field +X, which is LemLib's +Y.
 LemlibPoint to_lemlib(float x, float y) {
     return {-y, x};
 }
@@ -28,6 +32,11 @@ lemlib::Pose Chassis::getPose(bool radians, bool standardPos) {
 void Chassis::setPose(float x, float y, float theta, bool radians) {
     const LemlibPoint point = to_lemlib(x, y);
     lemlib::Chassis::setPose(point.x, point.y, theta, radians);
+    ++pose_resets_;
+}
+
+std::uint32_t Chassis::poseResets() const {
+    return pose_resets_;
 }
 
 void Chassis::setPose(lemlib::Pose pose, bool radians) {
@@ -53,13 +62,6 @@ void Chassis::moveToPose(float x, float y, float theta, int timeout, lemlib::Mov
 void Chassis::moveToPoint(float x, float y, int timeout, lemlib::MoveToPointParams params, bool async) {
     const LemlibPoint point = to_lemlib(x, y);
     lemlib::Chassis::moveToPoint(point.x, point.y, timeout, params, async);
-}
-
-namespace {
-
-constexpr std::uint32_t kPeriodMs = 10;
-constexpr float kSettleWindowDeg = 90.0f;
-
 }
 
 void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
@@ -130,6 +132,7 @@ bool Chassis::setPoseFromGoal(float goalX, float goalY, GoalPoseParams params) {
     const float side = params.forwards ? -1.0f : 1.0f;
     const float distance =
         params.distance > 0.0f ? params.distance : (params.forwards ? kGoalResetFrontIn : kGoalResetBackIn);
+    // Facing heading h in the field frame points along (cos h, -sin h).
     const float x = goalX + side * distance * std::cos(heading);
     const float y = goalY - side * distance * std::sin(heading);
     if (std::hypot(x - now.x, y - now.y) > params.maxCorrection) {

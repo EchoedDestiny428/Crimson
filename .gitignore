@@ -21,3 +21,7 @@ project.pros
 
 # Downloaded telemetry logs
 logs/
+
+# OS and tool clutter (macOS Finder files; PROS CLI settings written into a literal "~" folder)
+.DS_Store
+~/

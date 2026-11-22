@@ -25,6 +25,7 @@ constexpr double kMaxYawCorrectionDeg = 20.0;
 constexpr double kRivalMarginPx = 0.3;
 constexpr double kMaxYawSpreadDeg = 1.0;
 constexpr double kMinDepthMm = 50.0;
+constexpr double kMinForwardRay = 0.05;
 constexpr double kFieldMarginMm = 75.0;
 constexpr double kGoalKeepoutMm = 100.0;
 constexpr double kMergeRadiusMm = 150.0;
@@ -89,6 +90,27 @@ bool known_id(int id) {
     return std::ranges::any_of(field::kGoals, [id](const field::Goal& goal) { return goal.tag_id == id; });
 }
 
+// The rest of the solver assumes a level camera. Turning each pixel's ray back up by the pitch gives the pixel a level
+// camera at the same spot would have seen, so the pixel limits below are in those level-camera pixels.
+std::optional<Corners> level_corners(const Corners& seen, const Camera& camera) {
+    const double pitch = deg_to_rad(camera.pitch_deg);
+    const double c = std::cos(pitch);
+    const double s = std::sin(pitch);
+    Corners level{};
+    for (std::size_t i = 0; i < kCornersPerTag; ++i) {
+        const double right = (seen[i].u - camera.cx) / camera.fx;
+        const double down = (seen[i].v - camera.cy) / camera.fy;
+        const double forward = c - down * s;
+        const double drop = s + down * c;
+        if (forward < kMinForwardRay) {
+            return std::nullopt;
+        }
+        level[i] = {camera.cx + camera.fx * right / forward, camera.cy + camera.fy * drop / forward};
+    }
+    return level;
+}
+
+// Corners match order_corners as seen by a camera facing the plate, so right is measured from that side.
 WorldCorners tag_corners(const Placement& placement) {
     const field::Goal& goal = field::kGoals[placement.goal];
     const double face = deg_to_rad(placement.face_deg);
@@ -139,6 +161,7 @@ double reprojection_cost(const Pose& pose, std::span<const View> views, const Ca
     return cost;
 }
 
+// With heading fixed, the projection is linear in the camera position once the depth is multiplied out.
 std::optional<Pose> linear_seed(std::span<const View> views, double heading_deg, const Camera& camera) {
     const double yaw = deg_to_rad(heading_deg);
     const double s = std::sin(yaw);
@@ -347,6 +370,7 @@ double fit_error(double cost, std::size_t tags) {
     return std::sqrt(cost / (kResidualsPerTag * static_cast<double>(tags)));
 }
 
+// Heading error moves where a goal's plates are predicted, but not which of two neighbouring plates is further left.
 void uncross_plates(std::span<const Tag> tags, std::span<Placement> placements, const Pose& pose,
                     const Camera& camera) {
     for (std::size_t i = 1; i < tags.size(); ++i) {
@@ -364,6 +388,7 @@ void uncross_plates(std::span<const Tag> tags, std::span<Placement> placements, 
     }
 }
 
+// Assumes the largest tag sits on the given face, then checks whether the rest of the view agrees.
 std::optional<Candidate> try_placement(std::span<const Tag> tags, const Placement& first, double heading_deg,
                                        const Camera& camera) {
     std::array<Placement, kMaxDetections> placements{};
@@ -403,6 +428,8 @@ std::optional<Candidate> try_placement(std::span<const Tag> tags, const Placemen
         const Pose fixed_pose = fit.pose;
         fit = refine(fixed_pose, all_views, camera, true);
 
+        // A far tag seen corner-on can sit on either of two plates 70 mm apart, which still fits and tilts the solved
+        // yaw by several degrees. Try each tag's other plates, and do not trust yaw if a rival fits about as well.
         for (std::size_t i = 1; i < tags.size(); ++i) {
             for (const double face : field::kTagFacesDeg) {
                 const Placement other{placements[i].goal, face};
@@ -472,14 +499,26 @@ void add_candidate(Solution& solution, const Candidate& candidate) {
               [](const Candidate& a, const Candidate& b) { return a.error_px < b.error_px; });
 }
 
+// The fit is of the lens. Steps back from the lens to the turning centre along the robot's own heading.
+Pose robot_pose(const Pose& lens, const Camera& camera) {
+    const double heading = lens.heading_deg - camera.yaw_deg;
+    const double yaw = deg_to_rad(heading);
+    const double c = std::cos(yaw);
+    const double s = std::sin(yaw);
+    return {lens.x_mm - camera.forward_mm * c + camera.right_mm * s,
+            lens.y_mm + camera.forward_mm * s + camera.right_mm * c, heading};
+}
+
 }
 
 std::array<Pixel, 4> order_corners(std::array<Pixel, 4> corners) {
     const Pixel middle = centre(corners);
+    // Image rows grow downwards, so rising angle walks clockwise around the tag.
     std::ranges::sort(corners, {}, [&middle](const Pixel& corner) {
         return std::atan2(corner.v - middle.v, corner.u - middle.u);
     });
 
+    // The tag is upright and the camera is flat, so the true starting corner is the one that gives the tallest sides.
     std::size_t top_left = 0;
     double tallest = -std::numeric_limits<double>::infinity();
     for (std::size_t start = 0; start < corners.size(); ++start) {
@@ -503,7 +542,11 @@ Solution solve(std::span<const Detection> detections, double heading_deg, const 
         if (count == tags.size()) {
             break;
         }
-        const Corners ordered = order_corners(detection.corners);
+        const std::optional<Corners> level = level_corners(detection.corners, camera);
+        if (!level) {
+            continue;
+        }
+        const Corners ordered = order_corners(*level);
         if (known_id(detection.id) && pixel_height(ordered) >= kMinTagHeightPx) {
             tags[count++] = {detection.id, ordered};
         }
@@ -517,20 +560,25 @@ Solution solve(std::span<const Detection> detections, double heading_deg, const 
         return pixel_height(a.corners) > pixel_height(b.corners);
     });
 
+    const double lens_heading_deg = heading_deg + camera.yaw_deg;
     const Tag& largest = usable.front();
     for (std::size_t goal = 0; goal < field::kGoals.size(); ++goal) {
         if (field::kGoals[goal].tag_id != largest.id) {
             continue;
         }
         for (const double face : field::kTagFacesDeg) {
-            if (!can_see_face(largest, heading_deg, face, camera)) {
+            if (!can_see_face(largest, lens_heading_deg, face, camera)) {
                 continue;
             }
-            const std::optional<Candidate> candidate = try_placement(usable, {goal, face}, heading_deg, camera);
+            const std::optional<Candidate> candidate = try_placement(usable, {goal, face}, lens_heading_deg, camera);
             if (candidate) {
                 add_candidate(solution, *candidate);
             }
         }
+    }
+
+    for (std::size_t i = 0; i < solution.count; ++i) {
+        solution.candidates[i].pose = robot_pose(solution.candidates[i].pose, camera);
     }
     return solution;
 }

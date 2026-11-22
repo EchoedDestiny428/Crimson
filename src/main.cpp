@@ -1,5 +1,6 @@
 #include "main.h"
 #include "autons/autons.hpp"
+#include "config/camera.hpp"
 #include "display/controller_hud.hpp"
 #include "robotconfig.hpp"
 #include "subsystems/drive.hpp"
@@ -21,6 +22,7 @@ void initialize() {
     dashboard.show_status("CALIBRATING");
 
     drive::init();
+    chassis.setPose(config::kStartXIn, config::kStartYIn, config::kStartHeadingDeg);
     elevator::extension::init();
     elevator::arm_pivot::init();
     side_toggle::init();
@@ -33,7 +35,7 @@ void initialize() {
     logger.start();
 
     screen::start();
-    vision::localizer::start();
+    ::vision::localizer::start();
 }
 
 void disabled() {

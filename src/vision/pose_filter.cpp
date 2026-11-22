@@ -7,9 +7,12 @@ namespace vision {
 
 namespace {
 
-constexpr double kStartSigmaMm = 300.0;
 constexpr double kStartHeadingSigmaDeg = 3.0;
-constexpr double kPositionDriftMmPerRootS = 150.0;
+// Odometry drift: variance grows by this many mm^2 per mm driven, about 30 mm (3%) after a metre and 42 mm after two.
+// A guess to tune from logs (camera minus odometry while driving).
+constexpr double kOdomDriftMm2PerMm = 0.9;
+// Floor so the estimate never gets so sure of itself that a real correction can't get in, even standing still.
+constexpr double kPositionDriftMmPerRootS = 10.0;
 constexpr double kHeadingDriftDegPerRootS = 0.1;
 
 constexpr double kBaseSigmaMm = 20.0;
@@ -48,18 +51,19 @@ void Kalman1D::correct(double innovation, double measurement_variance) {
     variance_ *= 1.0 - gain;
 }
 
-void PoseFilter::reset(const Pose& start) {
-    x_.reset(start.x_mm, square(kStartSigmaMm));
-    y_.reset(start.y_mm, square(kStartSigmaMm));
+void PoseFilter::reset(const Pose& start, double sigma_mm) {
+    x_.reset(start.x_mm, square(sigma_mm));
+    y_.reset(start.y_mm, square(sigma_mm));
     heading_.reset(start.heading_deg, square(kStartHeadingSigmaDeg));
     pending_frames_ = 0;
 }
 
-void PoseFilter::predict(double dt_s, double imu_delta_deg) {
-    const double position_noise = square(kPositionDriftMmPerRootS) * dt_s;
-    x_.predict(0.0, position_noise);
-    y_.predict(0.0, position_noise);
-    heading_.predict(imu_delta_deg, square(kHeadingDriftDegPerRootS) * dt_s);
+void PoseFilter::predict(double dx_mm, double dy_mm, double dheading_deg, double dt_s) {
+    const double position_noise =
+        kOdomDriftMm2PerMm * std::hypot(dx_mm, dy_mm) + square(kPositionDriftMmPerRootS) * dt_s;
+    x_.predict(dx_mm, position_noise);
+    y_.predict(dy_mm, position_noise);
+    heading_.predict(dheading_deg, square(kHeadingDriftDegPerRootS) * dt_s);
 }
 
 Fix PoseFilter::update(const Solution& solution) {
@@ -92,6 +96,8 @@ Fix PoseFilter::update(const Solution& solution) {
         return Fix::Ambiguous;
     }
 
+    // One clear answer far from the estimate: either a glitch, or odometry is wrong. Repeats mean odometry is wrong.
+    // Candidates are already moved forward to the current time, so a moving robot still repeats in place.
     const Candidate& only = solution.candidates[0];
     const bool repeat = pending_frames_ > 0 && std::hypot(only.pose.x_mm - pending_.pose.x_mm,
                                                           only.pose.y_mm - pending_.pose.y_mm) < kRelockRadiusMm;
