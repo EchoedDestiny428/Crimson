@@ -78,7 +78,6 @@ inline constexpr double kNeutralGoalHeightCm = 14.65; // neutral quadrant goals 
 inline constexpr double kCenterGoalHeightCm = 22.27;  // center goal ("tall" in the manual)
 // Alliance goal release heights per level, the same ones the driver stages above aim for.
 inline constexpr std::array kAllianceReleaseCm{17.5, 36.0, 53.0, 70.0, 87.0, 104.0, 121.0};
-inline constexpr std::int32_t kPickupDistanceMm = 50; // TODO: guess, tune on the robot
 
 enum class Goal { Alliance, Neutral, Center }; // 8.25, 14.65 and 22.27 cm tall
 

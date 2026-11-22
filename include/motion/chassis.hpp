@@ -17,6 +17,19 @@ struct DonutParams {
     float earlyExitRange = 0;
 };
 
+// The v1 robot's curve: exit along exitHeading, aim for a point entryLength short of the target along entryHeading,
+// then turn and drive the last leg in. Speeds out of 127; minSpeed keeps the first two legs chained without stopping.
+struct CurveParams {
+    bool forwards = true;
+    int minSpeed = 10;
+    int maxSpeed = 127;
+    int exitMaxSpeed = 127;  // the short straight exit leg; lower it to keep the robot from swinging wide
+    float exitBias = 0.0f;  // 0-1: turn the exit carrot toward the entry carrot to start the curve sooner
+    float entryBias = 0.0f; // 0-1: same for the entry carrot; also tilts the final approach off entryHeading
+    int finalMaxSpeed = 127; // last leg into the target, e.g. slow onto a goal
+    int finalTimeout = 800;
+};
+
 // Goal center to robot center when the robot is pressed against a goal, in inches
 // (LemLib units; / 2.54 converts cm). Front and back differ on the new robot.
 inline constexpr float kGoalResetFrontIn = 15.0f / 2.54f; // front of the robot against the goal
@@ -52,6 +65,9 @@ public:
     std::uint32_t poseResets() const;
 
     void donut(float theta, int timeout, DonutParams params = {}, bool async = true);
+    // From the current pose to (x, y); headings are the robot's own facing at the exit and entry points.
+    void curve(float x, float y, float exitHeading, float entryHeading, float exitLength, float entryLength,
+               int timeout, CurveParams params = {});
     bool setPoseFromGoal(float goalX, float goalY, GoalPoseParams params = {});
     // The robot's front (or back) is pressed against the goal at (goalX, goalY); keeps
     // the IMU heading and always applies the reset.

@@ -19,7 +19,6 @@ telemetry::Logger logger;
 pros::Rotation vertical_odom(ports::kVerticalOdom);
 pros::Rotation horizontal_odom(ports::kHorizontalOdom);
 
-pros::Distance claw_distance(ports::kClawDistance);
 pros::adi::Pneumatics claw_piston(ports::kClawPiston, false);
 
 namespace {

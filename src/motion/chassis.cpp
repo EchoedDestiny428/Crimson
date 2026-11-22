@@ -22,6 +22,30 @@ LemlibPoint to_lemlib(float x, float y) {
     return {-y, x};
 }
 
+// Field-frame unit vectors for curve(), stored in the same {x, y} pair.
+LemlibPoint travel(float heading_deg, float direction) {
+    const float radians = lemlib::degToRad(heading_deg);
+    return {direction * std::cos(radians), -direction * std::sin(radians)};
+}
+
+LemlibPoint toward(float from_x, float from_y, float to_x, float to_y) {
+    const float length = std::hypot(to_x - from_x, to_y - from_y);
+    if (length < 1e-3f) {
+        return {0.0f, 0.0f};
+    }
+    return {(to_x - from_x) / length, (to_y - from_y) / length};
+}
+
+// Unit vector bias of the way from a to b; a when bias is 0 or b is zero.
+LemlibPoint blend(LemlibPoint a, LemlibPoint b, float bias) {
+    if (bias <= 0.0f || (b.x == 0.0f && b.y == 0.0f)) {
+        return a;
+    }
+    const LemlibPoint mixed{(1.0f - bias) * a.x + bias * b.x, (1.0f - bias) * a.y + bias * b.y};
+    const float length = std::hypot(mixed.x, mixed.y);
+    return length < 1e-3f ? a : LemlibPoint{mixed.x / length, mixed.y / length};
+}
+
 }
 
 lemlib::Pose Chassis::getPose(bool radians, bool standardPos) {
@@ -124,6 +148,39 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
     drivetrain.rightMotors->move(0);
     distTraveled = -1;
     endMotion();
+}
+
+void Chassis::curve(float x, float y, float exitHeading, float entryHeading, float exitLength, float entryLength,
+                    int timeout, CurveParams params) {
+    // The exit point hangs off where the robot actually stops, not where an async motion still has it.
+    waitUntilDone();
+    const lemlib::Pose start = getPose();
+    const float direction = params.forwards ? 1.0f : -1.0f;
+
+    // Travel directions at the exit and entry points. Facing heading h in the field frame points along (cos h, -sin h).
+    const LemlibPoint exitTravel = travel(exitHeading, direction);
+    const LemlibPoint entryTravel = travel(entryHeading, direction);
+
+    // Each bias turns its carrot point that fraction of the way toward the other point, so the robot starts
+    // curving on the first leg instead of driving straight out and swinging wide.
+    const LemlibPoint plainEntry{x - entryTravel.x * entryLength, y - entryTravel.y * entryLength};
+    const LemlibPoint exitDir =
+        blend(exitTravel, toward(start.x, start.y, plainEntry.x, plainEntry.y), params.exitBias);
+    const LemlibPoint exit{start.x + exitDir.x * (exitLength + 2.0f), start.y + exitDir.y * (exitLength + 2.0f)};
+    const LemlibPoint entryDir = blend(entryTravel, toward(exit.x, exit.y, x, y), params.entryBias);
+    const LemlibPoint entry{x - entryDir.x * entryLength, y - entryDir.y * entryLength};
+
+    moveToPoint(exit.x, exit.y, 800,
+                {.forwards = params.forwards, .maxSpeed = static_cast<float>(params.exitMaxSpeed),
+                 .minSpeed = static_cast<float>(params.minSpeed), .earlyExitRange = 2.0f});
+    moveToPoint(entry.x, entry.y, timeout,
+                {.forwards = params.forwards, .maxSpeed = static_cast<float>(params.maxSpeed),
+                 .minSpeed = static_cast<float>(params.minSpeed), .earlyExitRange = 6.0f});
+    turnToPoint(x, y, 600,
+                {.forwards = params.forwards, .maxSpeed = params.maxSpeed, .minSpeed = params.minSpeed,
+                 .earlyExitRange = 2.0f});
+    moveToPoint(x, y, params.finalTimeout,
+                {.forwards = params.forwards, .maxSpeed = static_cast<float>(params.finalMaxSpeed)});
 }
 
 bool Chassis::setPoseFromGoal(float goalX, float goalY, GoalPoseParams params) {

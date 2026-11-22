@@ -196,7 +196,7 @@ void Chaos::release() {
     held.reset();
 }
 
-bool Chaos::pickup(field::Color color, std::uint32_t timeoutMs) {
+bool Chaos::pickup(field::Color color) {
     macros::Pose pose{};
     if (!solve_for(kPickupTipCm, Side::Front, pose)) {
         return false;
@@ -206,7 +206,7 @@ bool Chaos::pickup(field::Color color, std::uint32_t timeoutMs) {
     if (!wait_until(macros::settled, swing_timeout)) {
         return false;
     }
-    if (!macros::pickup(timeoutMs)) {
+    if (!macros::pickup()) {
         return false;
     }
     held = color;

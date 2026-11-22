@@ -10,6 +10,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace subsystems::elevator::macros {
@@ -33,6 +34,9 @@ constexpr std::uint32_t kRaiseTimeoutMs = 1000;
 Score score_state = Score::Idle;
 std::uint32_t score_at_ms = 0;
 
+// Bumped by every lift/arm command, so a staged aim still running in its task gives up once something else takes over.
+std::atomic<std::uint32_t> command_id{0};
+
 double offset_cm() {
     return goal_tier * constants::kGoalTierStepCm;
 }
@@ -46,6 +50,7 @@ Pose current_pose() {
 // the slack adjustment on the arm (toward 180 deg); home gets neither. Going to L1 or home,
 // the arm's last 30 deg runs at 35%.
 void go_to_stage(int next) {
+    ++command_id;
     stage = std::clamp(next, 0, constants::kTopStage);
     const constants::Setpoint& setpoint = constants::kStageSetpoints[stage];
     const bool scoring = stage > 0;
@@ -234,10 +239,40 @@ bool solve(double tip_cm, Pose& out, double arm_min_deg, double arm_max_deg) {
 }
 
 void aim(Pose pose) {
+    ++command_id;
     stage = -1; // off the driver stages
     arm_pivot::set_slow_zone(false);
     extension::set_target(constants::extension_cm_to_motor_deg(pose.lift_cm));
     arm_pivot::move_to(constants::arm_deg_to_motor_deg(slack_adjusted(pose.arm_deg)));
+}
+
+void aim_staged(Pose pose, std::function<bool()> clear, std::uint32_t timeout_ms) {
+    const std::uint32_t mine = ++command_id;
+    stage = -1;
+    arm_pivot::set_slow_zone(false);
+    const double lift_target = constants::extension_cm_to_motor_deg(pose.lift_cm);
+    const double arm_target = constants::arm_deg_to_motor_deg(slack_adjusted(pose.arm_deg));
+    extension::set_target(lift_target);
+
+    pros::Task task([=] {
+        // False only once another lift/arm command has taken over; a timeout just moves on to the next step.
+        const auto wait = [mine, timeout_ms](const auto& done) {
+            const std::uint32_t start = pros::millis();
+            while (command_id == mine && !done() && pros::millis() - start < timeout_ms) {
+                pros::delay(kPollMs);
+            }
+            return command_id == mine;
+        };
+        if (!wait(clear)) {
+            return;
+        }
+        extension::set_target(extension::height()); // hold the lift while the arm swings
+        arm_pivot::move_to(arm_target);
+        if (!wait([] { return arm_pivot::is_settled(); })) {
+            return;
+        }
+        extension::set_target(lift_target);
+    });
 }
 
 bool settled() {
@@ -249,16 +284,16 @@ bool drop() {
     return pause(kGripMs);
 }
 
-bool home() {
+void home_async() {
     go_to_stage(0);
+}
+
+bool home() {
+    home_async();
     return wait_for(settled, kHomeTimeoutMs);
 }
 
-bool pickup(std::uint32_t timeout_ms) {
-    claw::prime();
-    if (!wait_for([] { return claw::distance_mm() < constants::kPickupDistanceMm; }, timeout_ms)) {
-        return false;
-    }
+bool pickup() {
     claw::grab();
     return pause(kGripMs);
 }

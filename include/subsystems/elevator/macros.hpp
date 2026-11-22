@@ -2,6 +2,7 @@
 
 #include "subsystems/elevator/constants.hpp"
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace subsystems::elevator::macros {
@@ -37,10 +38,15 @@ inline constexpr double kArmBehindMaxDeg = 315.0;
 // The blocking ones return false on a timeout or when stop() cancels them.
 bool solve(double tip_cm, Pose& out, double arm_min_deg = kArmFrontMinDeg, double arm_max_deg = kArmBehindMaxDeg);
 void aim(Pose pose);  // start the lift and arm toward pose (slack adjustment on the arm) and return
+// aim() in steps, to keep the center of gravity low while driving: the lift starts now, the arm waits for clear()
+// (e.g. backed off a loader), then the lift holds while the arm swings and finishes once the arm settles. Returns at
+// once; each step moves on after timeout_ms, and any later lift/arm command cancels the rest.
+void aim_staged(Pose pose, std::function<bool()> clear, std::uint32_t timeout_ms = 3000);
 bool settled();       // lift and arm both settled
 bool drop();          // open the claw, then wait for the piece to fall
 bool home();          // the driver's home stage, blocking until there
-bool pickup(std::uint32_t timeout_ms = 5000); // prime the claw, grab once the sensor sees a piece
+void home_async();    // start the driver's home stage (arm onto the hardstop) and return
+bool pickup();        // close the claw on the piece in front of it, then wait for the grip
 double travel_seconds(const Pose& to);        // from the current pose
 double claw_offset_in(const Pose& pose);      // release point ahead of robot center (negative: behind)
 

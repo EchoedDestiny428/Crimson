@@ -21,8 +21,6 @@ inline constexpr std::int8_t kExtensionB = -9;  // from newbot-mechanism_tests
 
 inline constexpr std::int8_t kArmPivot = 7;
 
-inline constexpr std::int8_t kClawDistance = 12; // placeholder
-
 // Side toggle, one 5.5W motor per side, spun together.
 inline constexpr std::int8_t kSideToggleLeft = 2;
 inline constexpr std::int8_t kSideToggleRight = -3;

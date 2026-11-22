@@ -25,7 +25,6 @@ inline constexpr int kTimeoutPadMs = 300; // placeholder
 inline constexpr DonutParams kDonutParams{.fastSpeed = 100, .slowSpeed = 75}; // placeholder
 
 inline constexpr double kPickupTipCm = 10.0; // placeholder
-inline constexpr std::uint32_t kPickupTimeoutMs = 5000; // placeholder
 
 inline constexpr bool kRamForwards = true; // placeholder
 inline constexpr double kToggleApproachIn = 18.0; // placeholder
@@ -51,7 +50,7 @@ public:
     void start(float x, float y, float heading);
     void grab(field::Color color = kOurColor);
     void release();
-    bool pickup(field::Color color = kOurColor, std::uint32_t timeoutMs = kPickupTimeoutMs);
+    bool pickup(field::Color color = kOurColor);
     bool home();
     bool moveTo(field::GoalId goal, Side side = kScoreSide);
     bool score(field::GoalId goal, Side side = kScoreSide);
