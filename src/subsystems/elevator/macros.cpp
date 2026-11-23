@@ -256,6 +256,10 @@ void aim_lift(Pose pose) {
     pending_arm_motor_deg = constants::arm_deg_to_motor_deg(slack_adjusted(pose.arm_deg));
 }
 
+bool wait_settled(std::uint32_t timeout_ms) {
+    return wait_for(settled, timeout_ms);
+}
+
 bool swing_arm(std::uint32_t timeout_ms) {
     arm_pivot::move_to(pending_arm_motor_deg);
     return wait_for(settled, timeout_ms);

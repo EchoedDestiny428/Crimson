@@ -6,7 +6,7 @@ namespace ports {
 
 // Drive and odometry ports are the new robot's. Everything marked placeholder is a guess.
 inline constexpr std::int8_t kVision = 5; // AI Vision camera, from the Crimson branch (tested on the robot)
-inline constexpr std::int8_t kImu = 11;
+inline constexpr std::int8_t kImu = 13;
 
 inline constexpr std::int8_t kLeftDriveA = -17;
 inline constexpr std::int8_t kLeftDriveB = -18;

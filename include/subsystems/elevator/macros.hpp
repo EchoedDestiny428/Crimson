@@ -47,6 +47,7 @@ bool swing_arm(std::uint32_t timeout_ms = 1500);
 // once; each step moves on after timeout_ms, and any later lift/arm command cancels the rest.
 void aim_staged(Pose pose, std::function<bool()> clear, std::uint32_t timeout_ms = 3000);
 bool settled();       // lift and arm both settled
+bool wait_settled(std::uint32_t timeout_ms = 2000); // block until settled (a home counts once it's on the hardstop)
 bool drop();          // open the claw, then wait for the piece to fall
 bool home();          // the driver's home stage, blocking until there
 void home_async();    // start the driver's home stage (arm onto the hardstop) and return

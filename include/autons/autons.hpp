@@ -9,6 +9,13 @@ void run();
 
 }
 
+namespace match::snacky {
+
+void setup();
+void run();
+
+}
+
 namespace skills {
 
 void setup();
