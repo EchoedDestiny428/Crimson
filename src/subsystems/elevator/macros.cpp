@@ -37,6 +37,8 @@ std::uint32_t score_at_ms = 0;
 // Bumped by every lift/arm command, so a staged aim still running in its task gives up once something else takes over.
 std::atomic<std::uint32_t> command_id{0};
 
+double pending_arm_motor_deg = 0.0; // the arm half of the last aim_lift(), for swing_arm()
+
 double offset_cm() {
     return goal_tier * constants::kGoalTierStepCm;
 }
@@ -244,6 +246,19 @@ void aim(Pose pose) {
     arm_pivot::set_slow_zone(false);
     extension::set_target(constants::extension_cm_to_motor_deg(pose.lift_cm));
     arm_pivot::move_to(constants::arm_deg_to_motor_deg(slack_adjusted(pose.arm_deg)));
+}
+
+void aim_lift(Pose pose) {
+    ++command_id;
+    stage = -1;
+    arm_pivot::set_slow_zone(false);
+    extension::set_target(constants::extension_cm_to_motor_deg(pose.lift_cm));
+    pending_arm_motor_deg = constants::arm_deg_to_motor_deg(slack_adjusted(pose.arm_deg));
+}
+
+bool swing_arm(std::uint32_t timeout_ms) {
+    arm_pivot::move_to(pending_arm_motor_deg);
+    return wait_for(settled, timeout_ms);
 }
 
 void aim_staged(Pose pose, std::function<bool()> clear, std::uint32_t timeout_ms) {

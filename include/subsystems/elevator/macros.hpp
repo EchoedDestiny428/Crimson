@@ -38,6 +38,10 @@ inline constexpr double kArmBehindMaxDeg = 315.0;
 // The blocking ones return false on a timeout or when stop() cancels them.
 bool solve(double tip_cm, Pose& out, double arm_min_deg = kArmFrontMinDeg, double arm_max_deg = kArmBehindMaxDeg);
 void aim(Pose pose);  // start the lift and arm toward pose (slack adjustment on the arm) and return
+// aim() split in two, so only the lift moves while driving: aim_lift() starts the lift and remembers the arm angle;
+// swing_arm() (once at the goal) swings the arm there and waits for the lift and arm to settle.
+void aim_lift(Pose pose);
+bool swing_arm(std::uint32_t timeout_ms = 1500);
 // aim() in steps, to keep the center of gravity low while driving: the lift starts now, the arm waits for clear()
 // (e.g. backed off a loader), then the lift holds while the arm swings and finishes once the arm settles. Returns at
 // once; each step moves on after timeout_ms, and any later lift/arm command cancels the rest.

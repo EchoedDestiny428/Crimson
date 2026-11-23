@@ -2,8 +2,6 @@
 #include "subsystems/side_toggle.hpp"
 #include "subsystems/elevator/claw.hpp"
 #include "subsystems/elevator/macros.hpp"
-#include <cmath>
-#include <functional>
 
 namespace autons::skills {
 
@@ -11,8 +9,8 @@ void setup() {}
 
 constexpr int kLeftLoops = 4;
 
-// Mechanism: aim the lift and arm while driving onto a goal, drop, then home (arm onto the hardstop) without waiting,
-// so the next pickup starts from home. Each goal's first score is L1.
+// Mechanism: raise only the lift while driving onto a goal; once backed against it, swing the chain bar, drop, then
+// home (arm onto the hardstop) without waiting, so the next pickup starts from home. Each goal's first score is L1.
 namespace claw = subsystems::elevator::claw;
 namespace macros = subsystems::elevator::macros;
 using subsystems::elevator::constants::Goal;
@@ -24,9 +22,6 @@ macros::Pose stage(int level, Goal goal = Goal::Alliance) {
             setpoint.arm_deg};
 }
 
-// For aim_staged(): true once the robot is kBackedOutIn from where it is now, i.e. off the loader with room to swing
-// the arm. kBackedOutIn is the goal curve's straight exit leg.
-constexpr float kBackedOutIn = 4.0f;
 // Loader-to-goal curves. Each loop drives its curve onto the goal and the same path in reverse back to the loader,
 // so both halves come from one definition (tuned in LoopTest). lead moves the carrot nearest the target toward the
 // inside of the turn: 0.5 in onto the goal; the reverse trip's own 2 in keeps it off the wall by the loader.
@@ -35,14 +30,6 @@ constexpr crimson::CurveParams kLeftGoalCurve{.forwards = false, .minSpeed = 50,
 constexpr crimson::CurveParams kRightGoalCurve = kLeftGoalCurve; // mirrored by the headings passed in
 constexpr crimson::CurveParams kToLoader{.minSpeed = 50, .finalMaxSpeed = 70, .finalTimeout = 600, .lead = 2.0f,
                                          .deeper = 3.0f}; // then straight 3 in into the loader to load
-
-std::function<bool()> backed_out() {
-    const lemlib::Pose from = chassis.getPose();
-    return [from] {
-        const lemlib::Pose now = chassis.getPose();
-        return std::hypot(now.x - from.x, now.y - from.y) >= kBackedOutIn;
-    };
-}
 
 // skills, made in PointWeaver.
 // Field frame: (0, 0) is the corner on blue's right, +X toward red, heading 0 faces red, clockwise. Inches.
@@ -59,12 +46,13 @@ void start() {
     side_toggle_motors.brake();
 
     chassis.moveToPoint(120, 48, 600, {.forwards = false}); // goal 1
-    macros::aim(stage(1, Goal::Neutral)); // preload
+    macros::aim_lift(stage(1, Goal::Neutral)); // preload
     chassis.waitUntil(10);
     chassis.cancelMotion();
     chassis.moveToPoint(120, 48, 900, {.forwards = false, .maxSpeed = 50}); // last 65%
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 48, {.distance = 7.5});
+    macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     macros::home_async(); // home after every score
     chassis.donut(0, 1000, {.forwards = false});
@@ -75,12 +63,13 @@ void start() {
     chassis.waitUntilDone();
     macros::pickup();
     chassis.moveToPoint(120, 48, 550, {.forwards = false, .maxSpeed = 50}); // goal 1
-    macros::aim(stage(2, Goal::Neutral));
+    macros::aim_lift(stage(2, Goal::Neutral));
     chassis.waitUntil(6.2);
     chassis.cancelMotion();
     chassis.moveToPoint(120, 48, 650, {.forwards = false, .maxSpeed = 50}); // last 60%
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 48, {.distance = 7.5});
+    macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     macros::home_async(); // home after every score
     chassis.donut(45, 950, {.forwards = false}); // facing point 4
@@ -99,13 +88,13 @@ void start() {
 // left loop
 // pass 0 to kLeftLoops - 1: each one starts and ends on the left loader, so they chain.
 void left_loop(int pass) {
-    // Lift first while backing off the loader, then the arm, then the rest of the lift (curve() only returns once its
-    // last leg starts, so this has to come before it).
-    macros::aim_staged(stage(3 + pass, Goal::Neutral), backed_out());
+    // Only the lift moves on the way (curve() only returns once its last leg starts, so this comes before it).
+    macros::aim_lift(stage(3 + pass, Goal::Neutral));
     // Back off the loader, swing around and back onto goal 1 heading 90 (back toward +Y).
     chassis.curve(120, 48, 0, 90, 2, 10, 1200, kLeftGoalCurve); // goal 1
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 48, {.distance = 7.5});
+    macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     macros::home_async(); // home after every score
     // The same curve in reverse, ending square on the loader at heading 0.
@@ -122,9 +111,10 @@ void transition() {
     chassis.moveToPoint(132.5, 84, 2200, {.forwards = false});
     chassis.turnToPoint(120, 96, 550, {.forwards = false}); // facing point 3
     chassis.moveToPoint(120, 96, 1300, {.forwards = false, .maxSpeed = 50}); // red goal 2
-    macros::aim(stage(1)); // the loader piece, first on the empty goal
+    macros::aim_lift(stage(1)); // the loader piece, first on the empty goal
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
+    macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     macros::home_async(); // home after every score
     chassis.donut(0, 950, {.forwards = false}); // facing point 4
@@ -132,9 +122,10 @@ void transition() {
     chassis.waitUntilDone();
     macros::pickup();
     chassis.moveToPoint(120, 96, 1200, {.forwards = false, .maxSpeed = 50}); // red goal 2
-    macros::aim(stage(2));
+    macros::aim_lift(stage(2));
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
+    macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     macros::home_async(); // home after every score
     chassis.donut(-90, 1750, {.forwards = false});
@@ -146,9 +137,10 @@ void right_start() {
     chassis.waitUntilDone();
     macros::pickup();
     chassis.moveToPoint(120, 96, 950, {.forwards = false}); // red goal 2
-    macros::aim(stage(3));
+    macros::aim_lift(stage(3));
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
+    macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     macros::home_async(); // home after every score
     chassis.donut(180, 1750, {.forwards = false}); // facing point 3
@@ -156,9 +148,10 @@ void right_start() {
     chassis.waitUntilDone();
     macros::pickup();
     chassis.moveToPoint(120, 96, 950, {.forwards = false}); // red goal 2
-    macros::aim(stage(4));
+    macros::aim_lift(stage(4));
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
+    macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     macros::home_async(); // home after every score
     chassis.donut(-82.09, 1900, {.forwards = false, .slowSpeed = 19}); // facing point 5
@@ -171,11 +164,12 @@ void right_start() {
 
 // right loop
 void right_loop() {
-    macros::aim_staged(stage(5), backed_out()); // like the left loop
+    macros::aim_lift(stage(5)); // only the lift on the way, like the left loop
     // Mirror of the left loop: back onto red goal 2 heading -90 (back toward -Y), then the same curve in reverse.
     chassis.curve(120, 96, 0, -90, 2, 10, 1200, kRightGoalCurve); // red goal 2
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
+    macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     macros::home_async(); // home after every score
     chassis.curveReverse(135.3, 131, 120, 96, 0, -90, 2, 10, kRightGoalCurve, 1000,
@@ -189,9 +183,10 @@ void ending() {
     chassis.moveToPoint(132, 132, 1000, {.forwards = false});
     chassis.turnToPoint(72, 72, 600, {.forwards = false}); // facing point 2
     chassis.moveToPoint(72, 72, 2500, {.forwards = false}); // goal 0
-    macros::aim(stage(1, Goal::Center));
+    macros::aim_lift(stage(1, Goal::Center));
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(72, 72, {.distance = 7.5});
+    macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     macros::home_async(); // home after every score
     chassis.donut(135, 3250, {.forwards = false}); // facing point 3
@@ -199,18 +194,20 @@ void ending() {
     chassis.waitUntilDone();
     macros::pickup();
     chassis.moveToPoint(72, 72, 1200, {.forwards = false}); // goal 0
-    macros::aim(stage(2, Goal::Center));
+    macros::aim_lift(stage(2, Goal::Center));
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(72, 72, {.distance = 7.5});
+    macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     macros::home_async(); // home after every score
     chassis.moveToPoint(28.45, 28.45, 1800); // claw on yellow pin (24, 24)
     chassis.waitUntilDone();
     macros::pickup();
     chassis.moveToPoint(72, 72, 1950, {.forwards = false}); // goal 0
-    macros::aim(stage(3, Goal::Center));
+    macros::aim_lift(stage(3, Goal::Center));
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(72, 72, {.distance = 7.5});
+    macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     macros::home_async(); // home after every score
 }
