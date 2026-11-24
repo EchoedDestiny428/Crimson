@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <string_view>
 
 namespace autons {
@@ -93,6 +94,12 @@ void run_selected() {
     prepare();
     prepared = false;
     auton_ran = true;
+
+    // The log gets "# auton,<name>" and "# auton_start_ms,<ms>" just before its next row.
+    char start_ms[16];
+    std::snprintf(start_ms, sizeof(start_ms), "%lu", static_cast<unsigned long>(pros::millis()));
+    logger.note("auton", kRoutines[selected].name);
+    logger.note("auton_start_ms", start_ms);
 
     if (kRoutines[selected].run != nullptr) {
         kRoutines[selected].run();

@@ -20,10 +20,19 @@ public:
     void register_robot_fields();
     void start();
     void dump();
+    // Writes "# key,value" into the log just before the next row, for things that aren't numbers (like which auton
+    // is running). The row after it carries the time. Also printed to the terminal as LOG_NOTE,key,value.
+    void note(const char* key, const char* value);
 
 private:
     static constexpr std::size_t kMaxPorts = 21;
     static constexpr std::size_t kMaxFields = 64;
+    static constexpr std::size_t kMaxNotes = 8; // waiting to be written; more than this before the next row are dropped
+
+    struct Note {
+        char key[32];
+        char value[64];
+    };
 
     struct Field {
         const char* name;
@@ -43,6 +52,7 @@ private:
     bool writeMetadata(std::FILE* file);
     bool writeHeader(std::FILE* file);
     bool writeSample(std::FILE* file);
+    bool writeNotes(std::FILE* file);
 
     const char* directory;
     std::uint32_t period;
@@ -54,6 +64,9 @@ private:
     std::size_t fieldCount = 0;
     pros::Task* task = nullptr;
     pros::Mutex fileMutex;
+    std::array<Note, kMaxNotes> notes {};
+    std::size_t noteCount = 0;
+    pros::Mutex notesMutex;
 };
 
 }

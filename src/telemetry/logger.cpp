@@ -213,6 +213,32 @@ void Logger::start() {
     }
 }
 
+void Logger::note(const char* key, const char* value) {
+    if (key == nullptr || value == nullptr) {
+        return;
+    }
+    // Also on the terminal, so it shows up even without an SD card.
+    std::printf("LOG_NOTE,%s,%s\n", key, value);
+    notesMutex.take();
+    if (noteCount < notes.size()) {
+        std::snprintf(notes[noteCount].key, sizeof(notes[noteCount].key), "%s", key);
+        std::snprintf(notes[noteCount].value, sizeof(notes[noteCount].value), "%s", value);
+        ++noteCount;
+    }
+    notesMutex.give();
+}
+
+bool Logger::writeNotes(std::FILE* file) {
+    notesMutex.take();
+    bool ok = true;
+    for (std::size_t i = 0; i < noteCount && ok; ++i) {
+        ok = std::fprintf(file, "# %s,%s\n", notes[i].key, notes[i].value) >= 0;
+    }
+    noteCount = 0;
+    notesMutex.give();
+    return ok;
+}
+
 void Logger::dump() {
     if (pros::usd::is_installed() == 0) {
         std::printf("LOG_DUMP_ERROR,sd_not_installed\n");
@@ -284,7 +310,7 @@ void Logger::run() {
     std::uint32_t now = pros::millis();
     while (true) {
         fileMutex.take();
-        if (!writeSample(file)) {
+        if (!writeNotes(file) || !writeSample(file)) {
             fileMutex.give();
             lemlib::infoSink()->warn("Telemetry: unable to write to {}", filePath);
             break;
