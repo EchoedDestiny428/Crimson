@@ -12,7 +12,7 @@ namespace autons {
 
 namespace {
 
-constexpr std::string_view kDefaultRoutine = "Skills";
+constexpr std::string_view kDefaultRoutine = "Snacky";
 
 struct Routine {
     const char* name;

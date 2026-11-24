@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pointweaver",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd ~/pw-editor && PATH=~/.local/node/bin:$PATH exec node_modules/.bin/vite --port 5173 --strictPort"],
+      "port": 5173
+    }
+  ]
+}
