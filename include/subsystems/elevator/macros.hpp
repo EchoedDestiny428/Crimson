@@ -13,12 +13,12 @@ struct Pose {
     double arm_deg;
 };
 
-// Driver control, always scoring behind. Up/Down select a stage (1-7, printed on the
+// Driver control, always scoring behind. R1/R2 select a stage (1-7, printed on the
 // controller). Hold L1 to send the lift and arm to it (hard setpoints,
 // constants::kStageSetpoints); release L1 to score: the claw opens, 300 ms later the lift
 // goes up 11 cm, then everything goes home. B goes home (the intake pose) and cancels a
 // score. Right cycles the goal (alliance, neutral, center), moving only the lift 7 cm per
-// goal. R1/R2 drive the lift by hand (100% up, 70% down) and hold where let go.
+// goal. Up/Down drive the lift by hand (100% up, 70% down) and hold where let go.
 void update();
 void stop();
 
@@ -73,7 +73,7 @@ bool score_behind(constants::Goal goal, int level, float goal_x_in, float goal_y
 // Live readings for the controller readout.
 Pose pose_now();
 double tip_now();    // piece height (cm) from the lift and arm
-int selected_stage_now(); // the stage Up/Down have selected, 1-7
+int selected_stage_now(); // the stage R1/R2 have selected, 1-7
 int goal_tier_now(); // 0 alliance, 1 neutral, 2 center
 Pose target_now();   // lift and arm setpoints currently commanded
 int target_stage();  // 0 home, 1-7 scoring stage, -1 before the first press

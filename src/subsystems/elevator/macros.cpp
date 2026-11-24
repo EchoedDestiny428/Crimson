@@ -22,8 +22,8 @@ constexpr int kFullPower = 127;
 
 int stage = -1;           // stage last commanded: 0 home, 1-7 scoring, -1 none yet
 int goal_tier = 0;        // 0 alliance, 1 neutral, 2 center
-bool lift_manual = false; // R1/R2 driving the lift by hand
-int selected = 1;         // stage Up/Down have selected (1-7); L1 goes there
+bool lift_manual = false; // Up/Down driving the lift by hand
+int selected = 1;         // stage R1/R2 have selected (1-7); L1 goes there
 bool score_held = false;  // L1 was held on the last tick
 
 // Scoring after L1 is released: the claw opens, kOuttakeRaiseDelayMs later the lift goes up
@@ -114,7 +114,7 @@ bool solve_from(const Pose& from, double tip_cm, Pose& out, double arm_min_deg, 
 }
 
 void update() {
-    // Up/Down pick the stage (shown on the controller); nothing moves until L1.
+    // R1/R2 pick the stage (shown on the controller); nothing moves until L1.
     if (controller.get_digital_new_press(controls::kStageSelectUp)) {
         selected = std::min(selected + 1, constants::kTopStage);
     }
@@ -156,7 +156,7 @@ void update() {
         go_to_stage(0);
     }
 
-    // R1/R2: the lift by hand; it holds where it is let go.
+    // Up/Down: the lift by hand; it holds where it is let go.
     const bool lift_up = controller.get_digital(controls::kLiftManualUp);
     const bool lift_down = controller.get_digital(controls::kLiftManualDown) && !lift_up;
     if (lift_up || lift_down) {
