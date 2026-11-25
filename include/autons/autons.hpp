@@ -16,6 +16,13 @@ void run();
 
 }
 
+namespace match::red_snacky {
+
+void setup();
+void run();
+
+}
+
 namespace skills {
 
 void setup();

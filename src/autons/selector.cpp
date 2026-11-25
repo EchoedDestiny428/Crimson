@@ -12,7 +12,7 @@ namespace autons {
 
 namespace {
 
-constexpr std::string_view kDefaultRoutine = "None";
+constexpr std::string_view kDefaultRoutine = "RedSnacky";
 
 struct Routine {
     const char* name;
@@ -23,6 +23,7 @@ struct Routine {
 constexpr std::array kRoutines{
     Routine{"ShortStage1", match::short_stage1::setup, match::short_stage1::run},
     Routine{"Snacky", match::snacky::setup, match::snacky::run},
+    Routine{"RedSnacky", match::red_snacky::setup, match::red_snacky::run},
     Routine{"Skills", skills::setup, skills::run},
     Routine{"LoopTest", loop_test::setup, loop_test::run},
     Routine{"None", nullptr, nullptr},
