@@ -66,20 +66,21 @@ void run() {
     macros::aim_lift(stage(1)); // preload
     chassis.waitUntil(18.1); // 3 in before the robot's back meets the goal (7.5 in short of its centre)
     chassis.cancelMotion();
-    chassis.moveToPoint(120, 96, 600, {.forwards = false, .maxSpeed = 50}); // last 3 in
+    chassis.moveToPoint(120, 96, 600, {.forwards = false, .maxSpeed = 40}); // last 3 in
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
 
     // skills transition: donut(0, 950) + moveToPoint(135.5, 96, 700)
     // The donut orbits the goal behind the robot, so the claw stays over it: score and home while it turns.
-    chassis.donut(0, 1200, {.forwards = false, .slowSpeed = 20}); // facing the wall pin
+    chassis.donut(0, 1500, {.forwards = false, .slowSpeed = 20}); // facing the wall pin
     macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     pros::delay(kScoreSettleMs);
     macros::home_async();
     chassis.waitUntilDone();
     macros::wait_settled(); // fully home before driving at the wall, or the claw comes down on it
-    macros::aim_lift({2.0, 30.0}); // lift chain bar 2 cm higher to pick the wall pin (L2 pin)
+    macros::aim_lift({2.0, 30.0}); // raise lift 2 cm higher to pick the wall pin
+    macros::wait_settled(); // ensure lift finishes raising before driving into the wall
     chassis.moveToPoint(136.5, 96, 700); // claw on wall pin (141.8, 96), 1 in deeper than skills' 135.5
     chassis.waitUntilDone();
     macros::pickup();
