@@ -79,6 +79,7 @@ void run() {
     macros::home_async();
     chassis.waitUntilDone();
     macros::wait_settled(); // fully home before driving at the wall, or the claw comes down on it
+    macros::aim_lift({2.0, 30.0}); // lift chain bar 2 cm higher to pick the wall pin (L2 pin)
     chassis.moveToPoint(136.5, 96, 700); // claw on wall pin (141.8, 96), 1 in deeper than skills' 135.5
     chassis.waitUntilDone();
     macros::pickup();
