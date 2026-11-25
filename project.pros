@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "prelude to chaos",
+    "project_name": "snack",
     "target": "v5",
     "templates": {
       "kernel": {
@@ -642,8 +642,9 @@
       }
     },
     "upload_options": {
-      "slot": 1,
-      "description": "hi"
+      "slot": 3,
+      "remote_name": "snack",
+      "description": "snack"
     },
     "use_early_access": false
   }

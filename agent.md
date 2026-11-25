@@ -192,14 +192,14 @@ flowchart TD
 - **Slot Isolation:** The V5 Brain maintains 8 completely independent program slots (`slot_1.bin` through `slot_8.bin`).
 - **Does uploading erase other slots?** **NO.** Uploading a program only overwrites the single designated slot. Other slots are never touched or erased unless explicitly requested (e.g. via `prosv5 v5 rm-all` or brain screen format).
 - **Slot Configuration:**
-  - Configured in [`project.pros`](file:///Users/royboy/Library/CloudStorage/OneDrive-TaipeiAmericanSchool/Roy's universe/VEX/Crimson/project.pros) under `"upload_options": { "slot": 1 }`.
+  - Configured in [`project.pros`](file:///Users/royboy/Library/CloudStorage/OneDrive-TaipeiAmericanSchool/Roy's universe/VEX/Crimson/project.pros) under `"upload_options": { "slot": 3, "remote_name": "snack" }` and `"project_name": "snack"`.
   - To upload to a different slot via CLI:
     ```bash
     pros upload --slot <1-8>
     # or with make and upload:
     pros mu --slot <1-8>
     ```
-  - Using [`tools/deploy.ps1`](file:///Users/royboy/Library/CloudStorage/OneDrive-TaipeiAmericanSchool/Roy's universe/VEX/Crimson/tools/deploy.ps1): Runs `pros mu @args`, which defaults to the slot in `project.pros` (Slot 1) unless overridden with arguments (e.g., `.\tools\deploy.ps1 --slot 2`).
+  - Using [`tools/deploy.ps1`](file:///Users/royboy/Library/CloudStorage/OneDrive-TaipeiAmericanSchool/Roy's universe/VEX/Crimson/tools/deploy.ps1): Runs `pros mu @args`, which defaults to the slot and program name in `project.pros` (Slot 3, name `snack`) unless overridden with arguments.
 
 ### 3.7 PROS Version & Toolchain
 - **Kernel Version:** **PROS 4.2.2** (defined in [`include/pros/version.h`](file:///Users/royboy/Library/CloudStorage/OneDrive-TaipeiAmericanSchool/Roy's universe/VEX/Crimson/include/pros/version.h)).
