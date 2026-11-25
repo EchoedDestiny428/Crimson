@@ -1,4 +1,5 @@
 #include "display/controller_hud.hpp"
+#include "display/motor_temps.hpp"
 #include "robotconfig.hpp"
 #include "subsystems/elevator/macros.hpp"
 
@@ -14,7 +15,7 @@ int line = 0;
 
 // Line 1: lift cm and arm deg. Line 2: piece height, the goal and the
 // selected stage. Line 3: the setpoints
-// being driven to (stage, lift cm, arm deg).
+// being driven to (stage, lift cm, arm deg), or the hottest motor while one overheats.
 void update() {
     if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_UP) &&
         controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {
@@ -34,7 +35,7 @@ void update() {
         static constexpr char kGoal[] = {'A', 'N', 'C'};
         controller.print(1, 0, "tip%5.1f %c SEL%d  ", macros::tip_now(), kGoal[macros::goal_tier_now()],
                          macros::selected_stage_now());
-    } else {
+    } else if (!display::motor_temps::print_warning(2)) {
         const macros::Pose target = macros::target_now();
         controller.print(2, 0, "T%d L%4.1f A%5.1f  ", macros::target_stage(), target.lift_cm, target.arm_deg);
     }
