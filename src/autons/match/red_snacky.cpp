@@ -66,49 +66,47 @@ void run() {
     macros::aim_lift(stage(1)); // preload
     chassis.waitUntil(18.1); // 3 in before the robot's back meets the goal (7.5 in short of its centre)
     chassis.cancelMotion();
-    chassis.moveToPoint(120, 96, 600, {.forwards = false, .maxSpeed = 40}); // last 3 in
+    chassis.moveToPoint(120, 96, 600, {.forwards = false, .maxSpeed = 50}); // last 3 in
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
 
+    
     // skills transition: donut(0, 950) + moveToPoint(135.5, 96, 700)
     // The donut orbits the goal behind the robot, so the claw stays over it: score and home while it turns.
-    chassis.donut(0, 1500, {.forwards = false, .slowSpeed = 20}); // facing the wall pin
+    chassis.donut(0, 1200, {.forwards = false, .slowSpeed = 20}); // facing the wall pin
     macros::swing_arm(); // chain bar only once backed against the goal
     macros::drop();
     pros::delay(kScoreSettleMs);
     macros::home_async();
     chassis.waitUntilDone();
     macros::wait_settled(); // fully home before driving at the wall, or the claw comes down on it
-    macros::aim_lift({2.0, 30.0}); // raise lift 2 cm higher to pick the wall pin
-    macros::wait_settled(); // ensure lift finishes raising before driving into the wall
-    chassis.moveToPoint(136.5, 96, 700); // claw on wall pin (141.8, 96), 1 in deeper than skills' 135.5
+    macros::aim_lift({4.0, 30.0}); // lift chain bar 2 cm higher to pick the wall pin (L2 pin)
+    chassis.moveToPoint(137.7, 96, 900); // claw on wall pin (141.8, 96), deeper towards wall
     chassis.waitUntilDone();
     macros::pickup();
     macros::aim(stage(2)); // lift and chain bar together while backing onto the goal
-    chassis.moveToPoint(120, 96, 950, {.forwards = false}); // red goal 2, 16.5 in away
-    chassis.waitUntil(6); // 3 in before the robot's back meets the goal (7.5 in short of its centre)
-    chassis.cancelMotion();
-    chassis.moveToPoint(120, 96, 600, {.forwards = false, .maxSpeed = 50}); // last 3 in
+    chassis.moveToPose(127, 96, 0, 1100, {.forwards = false, .maxSpeed = 50}); // red goal 2, square at heading 0
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
 
     // skills transition's last donut(-90, 1750) + right_start's moveToPoint(120, 113.7, 750)
-    chassis.donut(-90, 1750, {.forwards = false, .slowSpeed = 20}); // facing pin (120, 120)
+    chassis.donut(-90, 1700, {.forwards = false, .slowSpeed = 30}); // facing pin (120, 120)
     score(); // during the donut
     chassis.moveToPoint(120, 113.95, 750); // claw on yellow pin (120, 120), 0.25 in further in than skills' 113.7
     wait_near(120, 113.95, 1);
     claw::grab(); // clamp during the last inch
     chassis.waitUntilDone();
+    pros::delay(100); // allow pneumatics to fully bite before whipping arm backward
     macros::aim(stage(3)); // lift and chain bar together while backing onto the goal
     chassis.moveToPoint(120, 96, 950, {.forwards = false}); // red goal 2, 17.95 in away
     chassis.waitUntil(7.45); // 3 in before the robot's back meets the goal (7.5 in short of its centre)
     chassis.cancelMotion();
-    chassis.moveToPoint(120, 96, 600, {.forwards = false, .maxSpeed = 50}); // last 3 in
+    chassis.moveToPoint(120, 96, 600, {.forwards = false, .maxSpeed = 40}); // last 3 in
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
 
     // skills right_start: donut(180, 1750) + moveToPoint(102.3, 96, 750)
-    chassis.donut(180, 1750, {.forwards = false, .slowSpeed = 20}); // facing pin (96, 96)
+    chassis.donut(180, 17500, {.forwards = false, .slowSpeed = 20}); // facing pin (96, 96)
     score(); // during the donut
     chassis.moveToPoint(102.05, 96, 750); // claw on yellow pin (96, 96), 0.25 in past skills' 102.3
     wait_near(102.05, 96, 1);
@@ -117,10 +115,10 @@ void run() {
     macros::aim(stage(2, Goal::Neutral)); // L2 on the neutral goal; lift and chain bar move during the turn and drive
     chassis.turnToPoint(120, 48, 500, {.forwards = false});
     chassis.waitUntilDone(); // so waitUntil below measures the drive, not the turn
-    chassis.moveToPoint(120, 48, 950, {.forwards = false}); // neutral goal (120, 48), 51.3 in away
-    chassis.waitUntil(40.8); // 3 in before the robot's back meets the goal (7.5 in short of its centre)
+    chassis.moveToPoint(120, 48, 1100, {.forwards = false}); // neutral goal (120, 48), 51.3 in away
+    chassis.waitUntil(38.0); // 5.8 in before the robot's back meets the goal
     chassis.cancelMotion();
-    chassis.moveToPoint(120, 48, 600, {.forwards = false, .maxSpeed = 50}); // last 3 in
+    chassis.moveToPoint(120, 48, 450, {.forwards = false, .maxSpeed = 40}); // last 5.8 in
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 48, {.distance = 7.5});
     score();

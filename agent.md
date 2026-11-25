@@ -1,9 +1,8 @@
 # AI Agent Guidelines & Repository Reference
 
-> [!IMPORTANT]
-> **MANDATORY INSTRUCTION FOR ALL AI AGENTS:**
-> **ALWAYS PUSH AFTER MAKING CHANGES.**
-> Whenever you create, edit, or refactor code/files, you must stage your changes, create a meaningful commit, and push them to the active remote branch (`git push origin <branch>`). Never leave uncommitted or unpushed work at the end of a turn/task.
+> [!NOTE]
+> **AI AGENT COMMIT & PUSH GUIDELINE:**
+> Do **NOT** automatically commit and push after every minor edit or incremental step during rapid testing. Instead, keep changes in the working tree during iteration and only commit & push after completing a major milestone, at the end of a long working session, or when explicitly requested by the user. Always verify the build (`pros make`) beforehand.
 
 ---
 
@@ -221,7 +220,9 @@ When implementing changes in this repository, always adhere to the following ste
    Maintain consistency with `.clang-format` and avoid modifying PROS library internals (`include/pros/` or `include/lemlib/`).
 3. **Build Verification:**
    Compile the code to confirm there are no syntax or linker errors.
-4. **Git Push Rule (MANDATORY):**
+4. **Git Commit & Push Guidelines:**
+   - Avoid creating commits for small incremental changes or trial-and-error adjustments during testing.
+   - Stage, commit, and push once a substantial milestone or long session concludes, or when instructed by the user:
    ```bash
    git status
    git add <modified files>
