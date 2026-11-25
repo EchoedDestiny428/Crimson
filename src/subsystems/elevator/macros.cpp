@@ -34,6 +34,12 @@ constexpr std::uint32_t kRaiseTimeoutMs = 1000;
 Score score_state = Score::Idle;
 std::uint32_t score_at_ms = 0;
 
+// B: go home, then open the claw once the arm is on the hardstop and the lift is within
+// kRaiseDoneCm of home (or kHomeReleaseTimeoutMs passes). L1 cancels it.
+constexpr std::uint32_t kHomeReleaseTimeoutMs = 2000;
+bool release_at_home = false;
+std::uint32_t home_at_ms = 0;
+
 // Bumped by every lift/arm command, so a staged aim still running in its task gives up once something else takes over.
 std::atomic<std::uint32_t> command_id{0};
 
@@ -127,6 +133,7 @@ void update() {
     if (go) {
         // Held: go to the selected stage (and follow it if it changes), cancelling any score.
         score_state = Score::Idle;
+        release_at_home = false;
         if (stage != selected) {
             go_to_stage(selected);
         }
@@ -154,6 +161,15 @@ void update() {
     if (controller.get_digital_new_press(controls::kHome)) {
         score_state = Score::Idle;
         go_to_stage(0);
+        release_at_home = true;
+        home_at_ms = now;
+    }
+    if (release_at_home) {
+        const double gap_cm = std::fabs(constants::extension_motor_deg_to_cm(extension::target() - extension::height()));
+        if ((!arm_pivot::homing() && gap_cm < kRaiseDoneCm) || now - home_at_ms >= kHomeReleaseTimeoutMs) {
+            release_at_home = false;
+            claw::open();
+        }
     }
 
     // Up/Down: the lift by hand; it holds where it is let go.
@@ -365,6 +381,7 @@ bool score_behind(constants::Goal goal, int level, float goal_x_in, float goal_y
 void stop() {
     ++generation;
     score_state = Score::Idle;
+    release_at_home = false;
     score_held = false;
     stage = -1;
     lift_manual = false;

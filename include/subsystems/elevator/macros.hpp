@@ -16,8 +16,8 @@ struct Pose {
 // Driver control, always scoring behind. R1/R2 select a stage (1-7, printed on the
 // controller). Hold L1 to send the lift and arm to it (hard setpoints,
 // constants::kStageSetpoints); release L1 to score: the claw opens, 300 ms later the lift
-// goes up 11 cm, then everything goes home. B goes home (the intake pose) and cancels a
-// score. Right cycles the goal (alliance, neutral, center), moving only the lift 7 cm per
+// goes up 11 cm, then everything goes home. B goes home (the intake pose), cancels a
+// score, and opens the claw once home. Right cycles the goal (alliance, neutral, center), moving only the lift 7 cm per
 // goal. Up/Down drive the lift by hand (100% up, 70% down) and hold where let go.
 void update();
 void stop();

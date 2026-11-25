@@ -148,6 +148,10 @@ void home(double motor_deg) {
     home_state = Home::Approach;
 }
 
+bool homing() {
+    return home_state != Home::Idle;
+}
+
 void set_slow_zone(bool enabled) {
     motor.setSlowZone(enabled ? kSlowRangeDeg : 0.0f, kSlowPower);
 }

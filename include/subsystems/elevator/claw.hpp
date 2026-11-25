@@ -2,7 +2,7 @@
 
 namespace subsystems::elevator::claw {
 
-void update(); // L2 and X toggle the claw piston
+void update(); // L2 and X toggle the claw piston; clamping lifts the cup off the floor
 void toggle();
 void open();  // hard-set open (outtake), not a toggle
 void close(); // hard-set closed

@@ -65,6 +65,10 @@ inline constexpr int kTopStage = static_cast<int>(kStageSetpoints.size()) - 1;
 // Scoring (L1 release): after the claw opens, wait this long and raise the lift this far.
 inline constexpr int kOuttakeRaiseDelayMs = 300;
 inline constexpr double kOuttakeRaiseCm = 11.0;
+// Clamping the claw (L2 or X) raises the lift to at least this height, kClampLiftDelayMs after
+// the clamp, so the cup doesn't drag on the floor. It doesn't change the selected stage.
+inline constexpr double kClampLiftCm = 9.0;
+inline constexpr int kClampLiftDelayMs = 200;
 // Right cycles the goal: neutral = alliance + 7 cm of lift, center = alliance + 14.
 inline constexpr double kGoalTierStepCm = 7.0;
 

@@ -13,6 +13,7 @@ void move_to(double motor_deg);
 // PID to motor_deg (the home angle), then push down at power 20 into the hardstop and hold
 // once the arm stops moving. Any other arm command cancels it.
 void home(double motor_deg);
+bool homing(); // a home() move is still on its way to the hardstop
 void set_power(int power); // open loop, -127..127
 void set_slow_zone(bool enabled); // cap the last 30 deg of PID moves at 35%
 double get_pos();
