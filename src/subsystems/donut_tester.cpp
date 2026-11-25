@@ -1,4 +1,5 @@
 #include "subsystems/donut_tester.hpp"
+#include "display/motor_temps.hpp"
 #include "robotconfig.hpp"
 #include <algorithm>
 #include <cmath>
@@ -8,7 +9,7 @@ namespace subsystems::donut_tester {
 
 namespace {
 
-constexpr int kStep = 5;
+constexpr int kStep = 1;
 constexpr std::uint32_t kRepeatDelayMs = 400; // hold a speed button this long and it starts repeating
 constexpr std::uint32_t kRepeatEveryMs = 120;
 constexpr std::uint32_t kPrintMs = 60;        // the controller drops text sent faster than ~50 ms
@@ -77,6 +78,8 @@ void print(std::uint32_t now) {
         const double push = (outer - inner) / 2.0;
         const double spin = (outer + inner) / 2.0;
         controller.print(1, 0, "push %3.0f spin %3.0f  ", push, spin);
+    } else if (display::motor_temps::print_warning(2)) {
+        // a motor is overheating: the warning has line 3
     } else if (running[0] != '\0') {
         controller.print(2, 0, "%s L%4d R%4d   ", running, left_cmd, right_cmd);
     } else {
