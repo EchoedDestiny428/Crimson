@@ -27,13 +27,14 @@ struct FieldPose {
     double heading_deg;
 };
 
-// Largest tag in view, unsolved, for calibrating against a tape measure.
+// Largest tag in view, unsolved, for calibrating against a tape measure (and from logs, against odometry).
 struct RawTag {
     int id;
     double u;
     double v;
     double width_px;
     double height_px;
+    std::array<Pixel, 4> corners; // as order_corners() puts them: top left, top right, bottom right, bottom left
 };
 
 struct Snapshot {
@@ -48,6 +49,8 @@ struct Snapshot {
     Outcome outcome = Outcome::NoTags;
     double correction_in = 0.0; // how far the last accepted picture moved the estimate
     std::uint32_t accepted = 0; // accepted pictures since boot; goes up by one per fix
+    std::uint32_t read_ms = 0;  // pros::millis() when the sensor was last read (the picture is older by the latency)
+    std::uint32_t reads = 0;    // sensor reads since boot; goes up by one per read, tags or not
 };
 
 void start();

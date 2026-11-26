@@ -12,6 +12,12 @@ namespace {
 constexpr std::uint32_t kPeriodMs = 10;
 constexpr float kSettleWindowDeg = 90.0f;
 
+// setPoseFromGoal's push: against the goal once odometry has moved less than kStoppedInPerTick a tick for kStoppedMs,
+// after at least kPushMinMs of pushing (so a robot still rolling in isn't mistaken for stopped).
+constexpr float kStoppedInPerTick = 0.01f; // 1 in/s
+constexpr std::uint32_t kStoppedMs = 60;
+constexpr std::uint32_t kPushMinMs = 80;
+
 struct LemlibPoint {
     float x;
     float y;
@@ -171,6 +177,46 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
 }
 
 bool Chassis::setPoseFromGoal(float goalX, float goalY, GoalPoseParams params) {
+    if (params.pushPower > 0) {
+        // Push toward the goal until odometry stops: then the robot is really against it.
+        waitUntilDone();
+        const int power = params.forwards ? params.pushPower : -params.pushPower;
+        drivetrain.leftMotors->move(power);
+        drivetrain.rightMotors->move(power);
+        const std::uint32_t start = pros::millis();
+        // Odometry without the camera feed's nudges: the feed may slide the pose while the robot sits against the
+        // goal, which isn't the robot moving.
+        const auto raw_pose = [this] {
+            const OdomSample now = sample();
+            return lemlib::Pose(now.pose.x - now.nudge_x, now.pose.y - now.nudge_y, now.pose.theta);
+        };
+        lemlib::Pose last = raw_pose();
+        std::uint32_t stopped_since = 0;
+        bool contact = false;
+        while (pros::millis() - start < static_cast<std::uint32_t>(std::max(params.pushTimeout, 0))) {
+            pros::delay(kPeriodMs);
+            const std::uint32_t now_ms = pros::millis();
+            const lemlib::Pose pose = raw_pose();
+            const bool still = std::hypot(pose.x - last.x, pose.y - last.y) < kStoppedInPerTick;
+            last = pose;
+            if (!still || now_ms - start < kPushMinMs) {
+                stopped_since = 0;
+            } else if (stopped_since == 0) {
+                stopped_since = now_ms;
+            } else if (now_ms - stopped_since >= kStoppedMs) {
+                contact = true;
+                break;
+            }
+        }
+        drivetrain.leftMotors->move(0);
+        drivetrain.rightMotors->move(0);
+        if (!contact) { // never stopped against anything: don't trust a reset
+            reset_dx_ = 0.0f;
+            reset_dy_ = 0.0f;
+            ++reset_skips_;
+            return false;
+        }
+    }
     const lemlib::Pose now = getPose();
     const float heading = lemlib::degToRad(now.theta);
     const float side = params.forwards ? -1.0f : 1.0f;
