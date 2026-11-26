@@ -1,22 +1,24 @@
 #include "autons/routine.hpp"
+#include "config/ports.hpp"
 #include "pros/rtos.hpp"
 #include "subsystems/side_toggle.hpp"
 #include "subsystems/elevator/claw.hpp"
+#include "subsystems/elevator/arm_pivot.hpp"
 #include "subsystems/elevator/macros.hpp"
 #include <cmath>
 
 namespace autons::match::red_snacky {
 
-// Red snacky: blue snacky (snacky.cpp) turned 180 deg about the field centre, (x, y) -> (144 - x, 144 - y),
-// heading + 180. Red goal 2 (120, 96) is where skills' transition / right_start already work, so the moves match
-// those lines. Starts on the red wall, the same way round as blue on the blue wall.
+// Red snacky: starts on the red wall facing blue, drives out to x = 120 (one tile in), turns to 90 and backs straight
+// up x = 120 into red goal 2 (120, 96), so the first alignment with the goal is square, not from the corner. Then the
+// three pins: (96, 96) and (120, 120) onto red goal 2, and the wall pin (141.8, 96) onto the neutral goal (120, 48).
 // Mechanism: everything runs alongside the driving. Right after each pickup the lift and chain bar both head for the
 // scoring pose while the robot backs onto the goal; once there, the donut starts straight away and the score runs
 // during it (the donut orbits the goal behind the robot, so the claw stays over it): wait for the lift and chain bar,
-// drop, give the pin 250 ms to land, and home on the way to the next pin. On the two free-standing pins the claw clamps during the last inch of the drive.
-// The preload starts while the arm is still homing, so only its lift moves on the way and the chain bar swings at the
-// goal. Before the wall pin the home has to finish (the claw can't come down on the wall): it runs during the donut,
-// and the drive to the wall waits for it.
+// drop, and start homing at once; the drive to each pin waits until the home has finished. On the two free-standing pins the claw clamps
+// during the last inch of the drive. The preload goes up to L1 only once the robot is out in the x = 120 lane, clear
+// of the wall. Before the wall pin the home has to finish (the claw can't come down on the wall): it runs
+// during the donut, and the drive to the wall waits for it.
 
 namespace claw = subsystems::elevator::claw;
 namespace macros = subsystems::elevator::macros;
@@ -29,15 +31,43 @@ macros::Pose stage(int level, Goal goal = Goal::Alliance) {
             setpoint.arm_deg};
 }
 
-constexpr std::uint32_t kScoreSettleMs = 250; // after the release, before anything moves: let the pin drop onto the goal
+constexpr double kArriveLiftCm = 1.5;
+constexpr double kArriveArmDeg = 4.0;
 
-// At the goal after aim(): wait for the lift and chain bar to arrive, drop, then home without waiting.
+// The lift and chain bar are within kArrive* of their targets. macros::settled() also waits for both controllers to
+// report settled, which hangs a few hundred ms after they're already there.
+bool lift_arrived() {
+    return std::fabs(macros::pose_now().lift_cm - macros::target_now().lift_cm) < kArriveLiftCm;
+}
+
+bool arrived() {
+    return lift_arrived() && std::fabs(macros::pose_now().arm_deg - macros::target_now().arm_deg) < kArriveArmDeg;
+}
+
+// Block until `done` or timeout_ms.
+template <typename Done> void wait_until(Done done, std::uint32_t timeout_ms) {
+    const std::uint32_t start = pros::millis();
+    while (!done() && pros::millis() - start < timeout_ms) {
+        pros::delay(10);
+    }
+}
+
+// The arm is on its hardstop (the home's push has finished; it rests there, not on its 30 deg target) and the lift is
+// back down.
+void wait_homed() {
+    wait_until([] { return !subsystems::elevator::arm_pivot::homing() && lift_arrived(); }, 2000);
+}
+
+// At the goal after aim(): drop as soon as the lift and chain bar reach the scoring pose, then start homing straight
+// away. The drive to the next pin waits for the home to finish (wait_homed).
 void score() {
-    macros::wait_settled();
+    wait_until(arrived, 1500);
     macros::drop();
-    pros::delay(kScoreSettleMs);
     macros::home_async(); // home after every score
 }
+
+// Pin drives use earlyExitRange 0.5: done within half an inch, instead of sitting in the drive's settle window (within
+// 1 in for 500 ms) before the pickup.
 
 // Block until the robot is within `within` in of (x, y) or the current motions end; for clamping while still driving in.
 void wait_near(float x, float y, float within) {
@@ -53,71 +83,74 @@ void wait_near(float x, float y, float within) {
 void setup() {}
 
 void run() {
-    chassis.setPose(135.5, 72, 90);
+    chassis.setPose(135.5, 72, 180); // the old start, turned to face blue
     claw::grab(); // hold the preload; the claw boots open
 
-    side_toggle_motors.move_relative(-8 * 360.0, 200); // 3 turns (~0.9 s at 200 rpm)
-    // Home while the toggle spins: the arm pushes onto its hardstop and resets its encoder there.
-    macros::home_async();
-    pros::delay(900);
+    // Side toggles one turn each (~0.3 s at 200 rpm), the right one 150 ms behind the left.
+    pros::Motor toggle_left(ports::kSideToggleLeft);
+    pros::Motor toggle_right(ports::kSideToggleRight);
+    toggle_left.move_relative(-360.0, 200);
+    pros::delay(150);
+    toggle_right.move_relative(-360.0, 200);
+    pros::delay(300);
     side_toggle_motors.brake();
 
-    chassis.moveToPoint(120, 96, 600, {.forwards = false, .maxSpeed = 70}); // red goal 2, 28.6 in away; 70 so it doesn't hit too hard
-    macros::aim_lift(stage(1)); // preload
-    chassis.waitUntil(15.1); // 6 in before the robot's back meets the goal (7.5 in short of its centre)
-    chassis.cancelMotion();
-    chassis.moveToPoint(120, 96, 600, {.forwards = false, .maxSpeed = 53}); // last 6 in at 42%
+    // Out to x = 120, in line with red goal 2, then square up and back straight into it.
+    chassis.moveToPoint(120, 72, 800); // 15.5 in
     chassis.waitUntilDone();
-    chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
-
-    // skills transition: donut(0, 950) + moveToPoint(135.5, 96, 700)
-    // The donut orbits the goal behind the robot, so the claw stays over it: score and home while it turns.
-    chassis.donut(0, 1200, {.forwards = false, .slowSpeed = 20}); // facing the wall pin
-    macros::swing_arm(); // chain bar only once backed against the goal
-    macros::drop();
-    pros::delay(kScoreSettleMs);
+    // Only now, clear of the wall: home (the arm pushes onto its hardstop and resets its encoder there), then the
+    // preload's lift and chain bar go to L1 (the chain bar once the home is done) during the turn and the back-in.
     macros::home_async();
+    macros::aim_staged(stage(1), [] { return !subsystems::elevator::arm_pivot::homing(); });
+    chassis.turnToHeading(90, 700);
     chassis.waitUntilDone();
-    macros::wait_settled(); // fully home before driving at the wall, or the claw comes down on it
-    macros::aim_lift({4.0, 30.0}); // lift chain bar 2 cm higher to pick the wall pin (L2 pin)
-    chassis.moveToPoint(137.7, 96, 900); // claw on wall pin (141.8, 96), deeper towards wall
-    chassis.waitUntilDone();
-    macros::pickup();
-    macros::aim(stage(2)); // lift and chain bar together while backing onto the goal
-    chassis.moveToPose(127, 96, 0, 1100, {.forwards = false, .maxSpeed = 50}); // red goal 2, square at heading 0
-    chassis.waitUntilDone();
-    chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
-
-    // skills transition's last donut(-90, 1750) + right_start's moveToPoint(120, 113.7, 750)
-    chassis.donut(-90, 1700, {.forwards = false, .slowSpeed = 30}); // facing pin (120, 120)
-    score(); // during the donut
-    chassis.moveToPoint(120, 113.95, 750); // claw on yellow pin (120, 120), 0.25 in further in than skills' 113.7
-    wait_near(120, 113.95, 1);
-    claw::grab(); // clamp during the last inch
-    chassis.waitUntilDone();
-    pros::delay(100); // allow pneumatics to fully bite before whipping arm backward
-    macros::aim(stage(3)); // lift and chain bar together while backing onto the goal
-    chassis.moveToPoint(120, 96, 950, {.forwards = false}); // red goal 2, 17.95 in away
-    chassis.waitUntil(4.45); // 6 in before the robot's back meets the goal (7.5 in short of its centre)
-    chassis.cancelMotion();
-    chassis.moveToPoint(120, 96, 600, {.forwards = false, .maxSpeed = 53}); // last 6 in at 42%
+    // Aim at where the robot's back meets the goal (centre 7.5 in from the goal's), so the drive slows down by itself
+    // on the way in and ends at the goal instead of pushing into it until it times out.
+    chassis.moveToPoint(120, 88.5, 1200, {.forwards = false, .maxSpeed = 70}); // red goal 2; 70 so it doesn't hit too hard
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
 
     // skills right_start: donut(180, 1750) + moveToPoint(102.3, 96, 750)
-    chassis.donut(180, 1750, {.forwards = false, .slowSpeed = 20}); // facing pin (96, 96)
-    score(); // during the donut
-    chassis.moveToPoint(102.05, 96, 750); // claw on yellow pin (96, 96), 0.25 in past skills' 102.3
-    wait_near(102.05, 96, 1);
+    chassis.donut(180, 1750, {.forwards = false, .slowSpeed = 16}); // facing pin (96, 96)
+    score(); // the preload, during the donut
+    wait_homed(); // homed before the claw reaches the pin
+    chassis.moveToPoint(103.05, 96, 750, {.earlyExitRange = 0.5}); // claw on yellow pin (96, 96), 0.75 in short of skills' 102.3
+    wait_near(103.05, 96, 1);
     claw::grab(); // clamp during the last inch
     chassis.waitUntilDone();
+    macros::aim(stage(2)); // lift and chain bar together while backing onto the goal
+    chassis.moveToPoint(112.5, 96, 1200, {.forwards = false}); // red goal 2, centre 7.5 in out: just touching
+    chassis.waitUntilDone();
+    chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
+
+    // skills transition's last donut(-90, 1750) + right_start's moveToPoint(120, 113.7, 750)
+    chassis.donut(-90, 1750, {.forwards = false, .slowSpeed = 16}); // facing pin (120, 120)
+    score(); // during the donut
+    wait_homed(); // homed before the claw reaches the pin
+    chassis.moveToPoint(120, 112.95, 750, {.earlyExitRange = 0.5}); // claw on yellow pin (120, 120), 0.75 in short of skills' 113.7
+    wait_near(120, 112.95, 1);
+    claw::grab(); // clamp during the last inch
+    chassis.waitUntilDone();
+    pros::delay(100); // allow pneumatics to fully bite before whipping arm backward
+    macros::aim(stage(3)); // lift and chain bar together while backing onto the goal
+    chassis.moveToPoint(120, 103.5, 1200, {.forwards = false}); // red goal 2, centre 7.5 in out: just touching
+    chassis.waitUntilDone();
+    chassis.setPoseFromGoal(120, 96, {.distance = 7.5});
+
+    // skills transition: donut(0, 950) + moveToPoint(135.5, 96, 700)
+    chassis.donut(0, 1750, {.forwards = false, .slowSpeed = 16}); // facing the wall pin; a 90 deg turn like the others
+    score(); // during the donut
+    chassis.waitUntilDone();
+    wait_homed(); // fully home before driving at the wall, or the claw comes down on it
+    macros::aim_lift({4.0, 30.0}); // lift chain bar 2 cm higher to pick the wall pin (L2 pin)
+    chassis.moveToPoint(136.7, 96, 900, {.earlyExitRange = 0.5}); // claw on wall pin (141.8, 96)
+    chassis.waitUntilDone();
+    macros::pickup();
     macros::aim(stage(2, Goal::Neutral)); // L2 on the neutral goal; lift and chain bar move during the turn and drive
     chassis.turnToPoint(120, 48, 500, {.forwards = false});
-    chassis.waitUntilDone(); // so waitUntil below measures the drive, not the turn
-    chassis.moveToPoint(120, 48, 1100, {.forwards = false}); // neutral goal (120, 48), 51.3 in away
-    chassis.waitUntil(37.8); // 6 in before the robot's back meets the goal (7.5 in short of its centre)
-    chassis.cancelMotion();
-    chassis.moveToPoint(120, 48, 450, {.forwards = false, .maxSpeed = 53}); // last 6 in at 42%
+    chassis.waitUntilDone();
+    // neutral goal (120, 48), centre 7.5 in out on the line from the wall pin (136.7, 96): just touching
+    chassis.moveToPoint(122.5, 55.1, 1600, {.forwards = false});
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(120, 48, {.distance = 7.5});
     score();

@@ -53,7 +53,7 @@ struct Setpoint {
 };
 inline constexpr std::array<Setpoint, 8> kStageSetpoints{{
     {0.0, 30.0},               // home / intake: PID to 30 deg, then pushed onto the hardstop
-    {0.0, kArmScoreLowDeg},    // L1  17.5 cm (ends ~21 cm: lift already down)
+    {3.0, kArmScoreLowDeg},    // L1  20.5 cm (lift 3 cm up; was 0 / 17.5 cm, too low)
     {20.0, kArmScoreLowDeg},   // L2  36.0 cm
     {0.0, kArmScoreHighDeg},   // L3  53.0 cm (the high angle already reaches it, lift stays down)
     {16.8, kArmScoreHighDeg},  // L4  70.0 cm
