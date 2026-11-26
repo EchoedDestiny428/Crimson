@@ -39,8 +39,11 @@ constexpr float kHorizontalWheelOffsetIn = 1.4f; // measured (newbot-localizatio
 lemlib::Drivetrain drivetrain(&left_motors, &right_motors, kTrackWidthIn, lemlib::Omniwheel::NEW_325, kDriveRpm,
                               kHorizontalDrift);
 
-lemlib::ControllerSettings linear_controller(9.5, 0, 12, 1, 0.2, 100, 1, 500, 40);
-lemlib::ControllerSettings angular_controller(5.5, 0, 40, 3, 1, 50, 3, 300, 0);
+// (kP, kI, kD, windup, smallError, smallErrorTimeout ms, largeError, largeErrorTimeout ms, slew). The large-error
+// timeouts were 500 / 300 ms: stops that stall just short (inside 1 in / 3 deg but never reaching 0.2 in / 1 deg) sat
+// still that long (telemetry_0014: about 1 s per loop). 200 / 150 ms ends them sooner at the same error.
+lemlib::ControllerSettings linear_controller(9.5, 0, 12, 1, 0.2, 100, 1, 200, 40);
+lemlib::ControllerSettings angular_controller(5.5, 0, 40, 3, 1, 50, 3, 150, 0);
 
 lemlib::TrackingWheel vertical_tracking_wheel(&vertical_odom, kTrackingWheelDiameterIn, kVerticalWheelOffsetIn);
 lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_odom, kTrackingWheelDiameterIn, kHorizontalWheelOffsetIn);

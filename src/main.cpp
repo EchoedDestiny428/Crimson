@@ -18,6 +18,10 @@ using namespace subsystems;
 void initialize() {
     controller.clear();
     apply_motor_config();
+    // Tracking wheels report every 5 ms instead of the default 10 (logs showed them changing only every 20 ms and a
+    // few ms behind the IMU, which LemLib pairs them with: fast turns drifted).
+    vertical_odom.set_data_rate(5);
+    horizontal_odom.set_data_rate(5);
     dashboard.initialize();
     dashboard.show_status("CALIBRATING");
 

@@ -21,100 +21,99 @@ void skills_loop_test_start() {
     telemetry::mark(1003);
     chassis.cancelMotion();
     telemetry::mark(1004);
-    chassis.moveToPoint(120, 48, 950, {.forwards = false, .maxSpeed = 50, .minSpeed = 1, .earlyExitRange = 8}); // last 80%
+    chassis.moveToPoint(120, 48, 1050, {.forwards = false, .maxSpeed = 50, .minSpeed = 1, .earlyExitRange = 8}); // last 80%
     telemetry::mark(1005);
     chassis.waitUntilDone();
     telemetry::mark(1006);
     pros::delay(100);
     telemetry::mark(1007);
-    chassis.setPoseFromGoal(120, 48, {.distance = 7.5});
+    chassis.setPoseFromGoal(120, 48, {.distance = 7.17});
     telemetry::mark(1008);
-    chassis.donut(0, 1400, {.forwards = false, .earlyExitRange = 1.5});
+    chassis.donut(0, 900, {.forwards = false, .earlyExitRange = 1.5});
     telemetry::mark(1009);
-    chassis.moveToPoint(135.5, 48, 500); // claw on yellow pin (141.8, 48)
+    chassis.moveToPoint(135.5, 48, 600); // claw on yellow pin (141.8, 48)
     telemetry::mark(1010);
-    chassis.waitUntil(4);
+    chassis.waitUntil(5.83);
     telemetry::mark(1011);
     chassis.cancelMotion();
     telemetry::mark(1012);
-    chassis.moveToPoint(135.5, 48, 300, {.maxSpeed = 50, .minSpeed = 1, .earlyExitRange = 2}); // last 50%
+    chassis.moveToPoint(135.5, 48, 500, {.maxSpeed = 50}); // last 30%
     telemetry::mark(1013);
     chassis.waitUntilDone();
     telemetry::mark(1014);
     pros::delay(500);
     telemetry::mark(1015);
-    chassis.moveToPoint(120, 48, 400, {.forwards = false}); // goal 1
+    chassis.moveToPoint(120, 48, 450, {.forwards = false}); // goal 1
     telemetry::mark(1016);
-    chassis.waitUntil(2.17);
+    chassis.waitUntil(3.1);
     telemetry::mark(1017);
     chassis.cancelMotion();
     telemetry::mark(1018);
-    chassis.moveToPoint(120, 48, 500, {.forwards = false, .maxSpeed = 50, .minSpeed = 1, .earlyExitRange = 8}); // last 86%
+    chassis.moveToPoint(120, 48, 400, {.forwards = false, .maxSpeed = 50, .minSpeed = 1, .earlyExitRange = 8}); // last 80%
     telemetry::mark(1019);
     chassis.waitUntilDone();
     telemetry::mark(1020);
     pros::delay(100);
     telemetry::mark(1021);
-    chassis.setPoseFromGoal(120, 48, {.distance = 7.5});
+    chassis.setPoseFromGoal(120, 48, {.distance = 7.17});
     telemetry::mark(1022);
-    chassis.donut(55, 1600, {.forwards = false, .earlyExitRange = 1.5});
+    chassis.donut(55, 800, {.forwards = false, .earlyExitRange = 1.5});
     telemetry::mark(1023);
-    chassis.moveToPoint(114.6, 13, 1500, {.minSpeed = 1, .earlyExitRange = 2});
+    chassis.moveToPoint(118.5, 13, 1800);
     telemetry::mark(1024);
-    chassis.waitUntilDone();
+    chassis.turnToHeading(0, 1050, {.minSpeed = 1, .earlyExitRange = 1});
     telemetry::mark(1025);
-    pros::delay(150);
+    chassis.moveToPose(135.3, 13, 0, 950); // claw on red left loader (141.6, 13)
     telemetry::mark(1026);
-    chassis.turnToHeading(0, 1100, {.minSpeed = 1, .earlyExitRange = 1});
+    chassis.waitUntil(13.44);
     telemetry::mark(1027);
-    chassis.moveToPose(135.3, 13, 0, 1000); // claw on red left loader (141.6, 13)
-    telemetry::mark(1028);
-    chassis.waitUntil(16.56);
-    telemetry::mark(1029);
     chassis.cancelMotion();
-    telemetry::mark(1030);
-    chassis.moveToPoint(135.3, 13, 300, {.maxSpeed = 50, .minSpeed = 1, .earlyExitRange = 2}); // last 20%
-    telemetry::mark(1031);
+    telemetry::mark(1028);
+    chassis.moveToPose(135.3, 13, 0, 550, {.maxSpeed = 50}); // last 20%
+    telemetry::mark(1029);
     chassis.waitUntilDone();
-    telemetry::mark(1032);
-    pros::delay(730);
-    telemetry::mark(1033);
+    telemetry::mark(1030);
+    pros::delay(500);
+    telemetry::mark(1031);
 }
 
 // skills-loop-test/left loop
 void skills_loop_test_left_loop() {
-    chassis.moveToPoint(120, 48, 750, {.forwards = false}); // goal 1
+    chassis.moveToPoint(120, 48, 1200, {.forwards = false}); // goal 1
     telemetry::mark(2001);
-    chassis.waitUntil(11.46);
+    chassis.waitUntil(28.2);
     telemetry::mark(2002);
     chassis.cancelMotion();
     telemetry::mark(2003);
-    chassis.moveToPoint(120, 48, 950, {.forwards = false, .maxSpeed = 50, .minSpeed = 1, .earlyExitRange = 8}); // last 70%
+    chassis.moveToPoint(120, 48, 1200, {.forwards = false, .maxSpeed = 50, .minSpeed = 1, .earlyExitRange = 8}); // last 26%
     telemetry::mark(2004);
     chassis.waitUntilDone();
     telemetry::mark(2005);
     pros::delay(100);
     telemetry::mark(2006);
-    chassis.setPoseFromGoal(120, 48, {.distance = 7.5});
+    chassis.setPoseFromGoal(120, 48, {.distance = 7.17});
     telemetry::mark(2007);
-    chassis.moveToPoint(125.9, 13, 1400, {.minSpeed = 1, .earlyExitRange = 2});
-    telemetry::mark(2008);
     chassis.waitUntilDone();
+    telemetry::mark(2008);
+    pros::delay(500);
     telemetry::mark(2009);
-    pros::delay(150);
+    chassis.moveToPoint(125.9, 13, 1150);
     telemetry::mark(2010);
-    chassis.turnToHeading(0, 950, {.minSpeed = 1, .earlyExitRange = 1});
+    chassis.turnToHeading(0, 550, {.minSpeed = 1, .earlyExitRange = 1});
     telemetry::mark(2011);
-    chassis.moveToPoint(135.3, 13, 700, {.minSpeed = 1, .earlyExitRange = 2}); // claw on red left loader (141.6, 13)
+    chassis.moveToPose(135.3, 13, 0, 1150); // claw on red left loader (141.6, 13)
     telemetry::mark(2012);
+    chassis.waitUntilDone();
+    telemetry::mark(2013);
+    pros::delay(500);
+    telemetry::mark(2014);
 }
 
 void run() {
-    telemetry::route("skills-loop-test #d0b9409c");
+    telemetry::route("skills-loop-test #30be7acb");
     skills_loop_test_start();
     skills_loop_test_left_loop();
 }
-
 
 
 }

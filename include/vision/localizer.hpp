@@ -15,9 +15,11 @@ enum class Outcome {
     Accepted,     // moved the estimate
     Ambiguous,    // two or more poses fit about as well, nothing changed
     Rejected,     // far from the estimate; five in a row in one place jump the estimate there
-    Stale,        // same corners as last time although odometry moved: an old picture, skipped
-    Turning,      // turning too fast for a sharp, well-timed picture, skipped
+    Stale,        // same corners as the last read: the same picture again, skipped (each picture counts once)
+    Turning,      // turning around the time the picture was taken (over kStillMaxDegPerS), skipped
     NoHistory,    // taken before the last setPose, skipped
+    TooFar,       // every answer was further than config::kCameraMaxRangeIn: too rough to correct with, skipped
+    Moving,       // driving around the time the picture was taken (over kStillMaxInPerS), skipped
 };
 
 // Estimated robot position in inches and heading in degrees, in the frame described in field_constants.hpp.

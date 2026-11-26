@@ -61,7 +61,7 @@ constexpr Column kLeadColumns[] = {
     {"pose_resets", 0},      // chassis.poseResets(): setPose calls so far
     {"pose_reset_dx_in", 3}, // the last setPose's correction, field frame (new - old); 0 after a skipped goal reset
     {"pose_reset_dy_in", 3},
-    {"pose_reset_skips", 0}, // goal resets setPoseFromGoal skipped (too far off)
+    {"pose_reset_skips", 0}, // goal resets skipped: no contact / too far off, or a donut that left its goal
     {"dropped_rows", 0},     // rows lost because the ring was full (the SD card fell far behind)
 };
 constexpr std::size_t kLeadCount = sizeof(kLeadColumns) / sizeof(kLeadColumns[0]);
@@ -237,7 +237,8 @@ double vision_pose_theta(const void*) {
     return g_vision.pose.heading_deg;
 }
 
-// 0 no tags, 1 no fit, 2 accepted, 3 ambiguous, 4 rejected, 5 stale, 6 turning, 7 no history (vision::localizer::Outcome)
+// 0 no tags, 1 no fit, 2 accepted, 3 ambiguous, 4 rejected, 5 stale, 6 turning, 7 no history, 8 too far, 9 moving
+// (vision::localizer::Outcome)
 double vision_outcome(const void*) {
     return static_cast<double>(static_cast<int>(g_vision.outcome));
 }

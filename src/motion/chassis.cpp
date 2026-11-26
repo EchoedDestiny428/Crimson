@@ -23,6 +23,11 @@ struct LemlibPoint {
     float y;
 };
 
+struct FieldPoint {
+    float x;
+    float y;
+};
+
 // Field (x, y) to LemLib's frame. Field heading 0 points along field +X, which is LemLib's +Y.
 LemlibPoint to_lemlib(float x, float y) {
     return {-y, x};
@@ -127,7 +132,18 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
         return;
     }
 
-    const float start_heading = getPose().theta;
+    // The goal this donut pivots on, from where the robot starts: goal distance behind it (in front when forwards).
+    const lemlib::Pose start_pose = getPose();
+    const float side = params.forwards ? -1.0f : 1.0f; // as in setPoseFromGoal: robot = goal + side * d * facing
+    const float goal_distance =
+        params.goalDistance > 0.0f ? params.goalDistance : (params.forwards ? kGoalResetFrontIn : kGoalResetBackIn);
+    const auto goal_from = [side, goal_distance](const lemlib::Pose& pose) {
+        const float h = lemlib::degToRad(pose.theta); // facing h in the field frame points along (cos h, -sin h)
+        return FieldPoint{pose.x - side * goal_distance * std::cos(h), pose.y + side * goal_distance * std::sin(h)};
+    };
+    const FieldPoint goal = goal_from(start_pose);
+
+    const float start_heading = start_pose.theta;
     const lemlib::AngularDirection direction = lemlib::angleError(theta, start_heading, false, params.direction) >= 0
                                                    ? lemlib::AngularDirection::CW_CLOCKWISE
                                                    : lemlib::AngularDirection::CCW_COUNTERCLOCKWISE;
@@ -172,6 +188,23 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
 
     drivetrain.leftMotors->move(0);
     drivetrain.rightMotors->move(0);
+
+    if (params.reanchor) {
+        // Back onto the goal it started on, if it stayed on it: ended facing about where it should (the IMU), and
+        // odometry still puts the goal about where it was.
+        const lemlib::Pose end_pose = getPose();
+        const FieldPoint goal_now = goal_from(end_pose);
+        const bool on_heading = std::fabs(lemlib::angleError(theta, end_pose.theta, false)) <= params.reanchorMaxDeg;
+        const bool on_goal = std::hypot(goal_now.x - goal.x, goal_now.y - goal.y) <= params.reanchorMaxDriftIn;
+        if (on_heading && on_goal) {
+            const float h = lemlib::degToRad(end_pose.theta);
+            setPose(goal.x + side * goal_distance * std::cos(h), goal.y - side * goal_distance * std::sin(h),
+                    end_pose.theta);
+        } else {
+            ++reset_skips_;
+        }
+    }
+
     distTraveled = -1;
     endMotion();
 }

@@ -24,12 +24,18 @@ constexpr std::uint32_t kCameraEveryTicks = 3;
 constexpr std::uint32_t kLockHoldMs = 500;
 // How far off the estimate may be at boot, and after a setPose the code made on purpose.
 constexpr double kBootSigmaMm = 300.0;
-constexpr double kResetSigmaMm = 100.0;
-// Turning faster than this blurs the picture, and it is where an error in kCameraLatencyMs costs the most.
-constexpr double kMaxTurnRateDegPerS = 120.0;
-// The same corners as the last read although odometry moved this much: the sensor handed back an old picture.
-constexpr double kStaleMoveMm = 5.0;
-constexpr double kStaleTurnDeg = 0.5;
+// After a setPose (the auton's start, a goal-contact reset) the estimate starts this sure of itself. Contact resets
+// land within about half an inch (2026-11-27 logs), so a camera reading only nudges the pose right after one; the
+// uncertainty grows again as the robot drives (pose_filter.cpp), and the camera gets more say the further it goes.
+// It was 100 mm (4 in): one reading from 27 in away then moved the pose 1.1 in, the wrong way.
+constexpr double kResetSigmaMm = 19.0;
+// A picture is only used if the robot was nearly still from kStillLeadMs before it was taken until now: slower than
+// kStillMaxInPerS and kStillMaxDegPerS (from odometry history at the picture time, not at read time). A picture of
+// a moving robot is only as good as the latency estimate and the tracking wheels' timing: in run 16 one taken at
+// 25-30 in/s and 55 deg/s slid the pose 0.6 in the wrong way.
+constexpr std::uint32_t kStillLeadMs = 50;
+constexpr double kStillMaxInPerS = 2.0;
+constexpr double kStillMaxDegPerS = 15.0;
 constexpr std::size_t kHistorySize = 128; // 1.28 s of odometry at kTickMs
 
 constexpr Camera kCamera{config::kCameraHeightMm,
@@ -244,8 +250,6 @@ void run() {
     std::array<Detection, kMaxDetections> tags{};
     std::array<Detection, kMaxDetections> last_tags{};
     std::size_t last_count = 0;
-    Pose last_read_odom = odom;
-    std::uint32_t last_read_ms = pros::millis();
     bool configured = false;
     std::optional<std::uint32_t> last_fix_ms;
     std::uint32_t accepted = 0;
@@ -271,7 +275,6 @@ void run() {
             history.clear();
             last_fix_ms.reset();
             last_count = 0;
-            last_read_odom = now;
         } else if (odom_ok && finite(odom)) {
             filter.predict(now.x_mm - odom.x_mm, now.y_mm - odom.y_mm, now.heading_deg - odom.heading_deg, dt_s);
         } else {
@@ -291,42 +294,64 @@ void run() {
             next.correction_in = published.correction_in;
             if (count) {
                 const auto seen = std::span<const Detection>(tags).first(*count);
+                // The same corners as the last read: the sensor handed back the same picture. Each picture counts once.
                 const bool repeat = same_view(seen, std::span<const Detection>(last_tags).first(last_count));
-                const bool moved = std::hypot(odom.x_mm - last_read_odom.x_mm, odom.y_mm - last_read_odom.y_mm) >
-                                       kStaleMoveMm ||
-                                   std::fabs(odom.heading_deg - last_read_odom.heading_deg) > kStaleTurnDeg;
-                const double read_gap_s = std::max(static_cast<double>(now_ms - last_read_ms) / 1000.0, 1e-3);
-                const double turn_rate = std::fabs(odom.heading_deg - last_read_odom.heading_deg) / read_gap_s;
                 const std::optional<Pose> then = history.at(now_ms - config::kCameraLatencyMs);
+                const std::optional<Pose> lead = history.at(now_ms - config::kCameraLatencyMs - kStillLeadMs);
+                // How fast the robot was moving and turning around the picture: just before it, and since.
+                double speed_in_s = 0.0;
+                double turn_deg_s = 0.0;
+                if (then && lead) {
+                    const auto rates = [&](const Pose& a, const Pose& b, double seconds) {
+                        speed_in_s = std::max(speed_in_s,
+                                              std::hypot(b.x_mm - a.x_mm, b.y_mm - a.y_mm) / field::kMmPerInch / seconds);
+                        turn_deg_s = std::max(turn_deg_s, std::fabs(b.heading_deg - a.heading_deg) / seconds);
+                    };
+                    rates(*lead, *then, kStillLeadMs / 1000.0);
+                    rates(*then, odom, config::kCameraLatencyMs / 1000.0);
+                }
 
                 Solution solution;
                 Fix fix = Fix::None;
                 if (*count == 0) {
                     next.outcome = Outcome::NoTags;
-                } else if (repeat && moved) {
+                } else if (repeat) {
                     next.outcome = Outcome::Stale;
-                } else if (turn_rate > kMaxTurnRateDegPerS) {
-                    next.outcome = Outcome::Turning;
-                } else if (!then) {
+                } else if (!then || !lead) {
                     next.outcome = Outcome::NoHistory;
+                } else if (turn_deg_s > kStillMaxDegPerS) {
+                    next.outcome = Outcome::Turning;
+                } else if (speed_in_s > kStillMaxInPerS) {
+                    next.outcome = Outcome::Moving;
                 } else {
                     // Solve with the heading the robot had when the picture was taken, then bring the answer up to now.
                     const Pose before = filter.pose();
                     const double heading_then = before.heading_deg - (odom.heading_deg - then->heading_deg);
                     solution = solve(seen, heading_then, kCamera);
                     move_forward(solution, *then, odom);
-                    fix = filter.update(solution);
-                    if (fix == Fix::Accepted) {
-                        last_fix_ms = now_ms;
-                        ++accepted;
-                        const Pose after = filter.pose();
-                        next.correction_in =
-                            std::hypot(after.x_mm - before.x_mm, after.y_mm - before.y_mm) / field::kMmPerInch;
+                    // Only answers close enough to be trusted go to the filter (config::kCameraMaxRangeIn).
+                    Solution usable;
+                    for (std::size_t i = 0; i < solution.count; ++i) {
+                        if (solution.candidates[i].range_mm <= config::kCameraMaxRangeIn * field::kMmPerInch) {
+                            usable.candidates[usable.count++] = solution.candidates[i];
+                        }
                     }
-                    next.outcome = fix == Fix::Accepted    ? Outcome::Accepted
-                                   : fix == Fix::Ambiguous ? Outcome::Ambiguous
-                                   : fix == Fix::Rejected  ? Outcome::Rejected
-                                                           : Outcome::NoFit;
+                    if (solution.count > 0 && usable.count == 0) {
+                        next.outcome = Outcome::TooFar;
+                    } else {
+                        fix = filter.update(usable);
+                        if (fix == Fix::Accepted) {
+                            last_fix_ms = now_ms;
+                            ++accepted;
+                            const Pose after = filter.pose();
+                            next.correction_in =
+                                std::hypot(after.x_mm - before.x_mm, after.y_mm - before.y_mm) / field::kMmPerInch;
+                        }
+                        next.outcome = fix == Fix::Accepted    ? Outcome::Accepted
+                                       : fix == Fix::Ambiguous ? Outcome::Ambiguous
+                                       : fix == Fix::Rejected  ? Outcome::Rejected
+                                                               : Outcome::NoFit;
+                    }
                 }
 
                 const bool recent = last_fix_ms && now_ms - *last_fix_ms <= kLockHoldMs;
@@ -342,8 +367,6 @@ void run() {
 
                 std::copy(seen.begin(), seen.end(), last_tags.begin());
                 last_count = seen.size();
-                last_read_odom = odom;
-                last_read_ms = now_ms;
                 next.read_ms = now_ms;
                 next.reads = ++reads;
             } else {

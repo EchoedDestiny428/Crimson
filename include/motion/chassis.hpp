@@ -15,12 +15,21 @@ struct DonutParams {
     int fastSpeed = 127;
     int slowSpeed = 35;
     float earlyExitRange = 0;
+    // Re-anchor: the goal stays in the hole through a donut, so when it ends the pose is put back on that goal (where
+    // it was at the start, goal distance along the new heading), wiping out what odometry drifted while spinning
+    // (0.1-0.35 in a donut in the 2026-11-27 logs). Only if the donut really stayed on the goal: the IMU heading ended
+    // within reanchorMaxDeg of theta, and the goal position odometry implies moved less than reanchorMaxDriftIn.
+    // Otherwise (the donut failed and left the goal) the pose is left alone and poseResetSkips() goes up.
+    bool reanchor = true;
+    float goalDistance = 0.0f; // 0 uses kGoalResetFrontIn or kGoalResetBackIn to match `forwards`
+    float reanchorMaxDeg = 10.0f;
+    float reanchorMaxDriftIn = 2.0f;
 };
 
 // Goal center to robot center when the robot is pressed against a goal, in inches
 // (LemLib units; / 2.54 converts cm). Front and back differ on the new robot.
 inline constexpr float kGoalResetFrontIn = 15.0f / 2.54f; // front of the robot against the goal
-inline constexpr float kGoalResetBackIn = 22.0f / 2.54f;  // back of the robot against the goal
+inline constexpr float kGoalResetBackIn = 18.2f / 2.54f;  // back of the robot against the goal (measured 2026-11-27)
 
 // setPoseFromGoal only resets once the robot is really against the goal: it first pushes toward the goal at
 // pushPower (out of 127) until odometry stops moving (it hit the goal), then resets. A move that timed out short of
@@ -58,7 +67,8 @@ public:
     // by its motion can tell a reset from real driving.
     std::uint32_t poseResets() const;
     // For the log: how far (field-frame inches) the last setPose moved odometry (new - old), and how many goal resets
-    // setPoseFromGoal skipped for being too far off. A skipped reset sets the correction to 0.
+    // setPoseFromGoal skipped (too far off, or no contact) plus donut re-anchors skipped (it left the goal).
+    // A skipped setPoseFromGoal sets the correction to 0.
     float lastResetDx() const;
     float lastResetDy() const;
     std::uint32_t poseResetSkips() const;

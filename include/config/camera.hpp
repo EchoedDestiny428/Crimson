@@ -19,6 +19,10 @@ inline constexpr std::uint32_t kCameraLatencyMs = 250;
 //   locked onto the wrong (twin) goal than odometry drifting.
 // - Gaps under kCameraFeedDeadbandIn are left alone.
 // false: the camera only keeps its own estimate (the dashboard and log show it; reset_odometry() can still apply it).
+// Camera readings further than this (robot centre to the tag) are ignored. Measured 2026-11-27 against odometry: within
+// about 1 in up to 20 in, about 2.5 in at 20-28 in (the tag is only 6-8 px tall that far out).
+inline constexpr double kCameraMaxRangeIn = 20.0;
+
 inline constexpr bool kCameraFeedsOdometry = true;
 inline constexpr double kCameraFeedInPerS = 3.0;
 inline constexpr double kCameraFeedMaxIn = 6.0;
