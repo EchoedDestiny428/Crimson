@@ -122,7 +122,6 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
     const float max_spin = static_cast<float>(params.fastSpeed + params.slowSpeed) / 2.0f;
 
     angularPID.reset();
-    angularLargeExit.reset();
     angularSmallExit.reset();
 
     const std::uint32_t start_time = pros::millis();
@@ -130,8 +129,10 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
     bool settling = false;
     distTraveled = 0;
 
+    // Small exit only (within 1 deg for 50 ms). The large exit ends a turn while it is still up to 3 deg off, which
+    // leaves the claw tilted into a pin. The timeout is the cap when the heading never gets there.
     while (motionRunning && pros::millis() - start_time < static_cast<std::uint32_t>(timeout) &&
-           !angularLargeExit.getExit() && !angularSmallExit.getExit()) {
+           !angularSmallExit.getExit()) {
         const float heading = getPose().theta;
         distTraveled = std::fabs(heading - start_heading);
 
@@ -143,7 +144,6 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
         previous_raw_error = raw_error;
 
         const float error = settling ? raw_error : lemlib::angleError(theta, heading, false, direction);
-        angularLargeExit.update(error);
         angularSmallExit.update(error);
         if (params.earlyExitRange > 0 && std::fabs(error) < params.earlyExitRange) {
             break;
