@@ -246,6 +246,42 @@ double vision_correction_in(const void*) {
     return g_vision.correction_in;
 }
 
+// The raw camera read, for recalibrating the camera (and checking its latency) from logs against odometry: when the
+// sensor was last read and how many reads so far (a new read is a new vision_reads; rows in between repeat the last
+// read), then the largest tag in that read in pixels: its centre, size and four corners. nan when it saw no tag.
+double vision_read_ms(const void*) {
+    return g_vision.reads > 0 ? static_cast<double>(g_vision.read_ms) : -1.0;
+}
+
+double vision_reads(const void*) {
+    return g_vision.reads;
+}
+
+// context: which number. 0-3 centre u, v, width, height; 4-11 corners TL u, v, TR u, v, BR u, v, BL u, v.
+constexpr int kTagValues[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+
+double vision_tag_value(const void* context) {
+    if (!g_vision.raw) {
+        return kNaN;
+    }
+    const vision::localizer::RawTag& tag = *g_vision.raw;
+    const int which = *static_cast<const int*>(context);
+    switch (which) {
+    case 0:
+        return tag.u;
+    case 1:
+        return tag.v;
+    case 2:
+        return tag.width_px;
+    case 3:
+        return tag.height_px;
+    default: {
+        const vision::Pixel& corner = tag.corners[static_cast<std::size_t>((which - 4) / 2)];
+        return (which - 4) % 2 == 0 ? corner.u : corner.v;
+    }
+    }
+}
+
 // Raw driver stick, -127..127, before the drive curve, slew and arcade mixing.
 double controller_axis(const void* context) {
     const auto axis = *static_cast<const controls::Axis*>(context);
@@ -336,6 +372,20 @@ void Logger::register_robot_fields() {
     register_field("vision_pose_theta_deg", vision_pose_theta);
     register_field("vision_outcome", vision_outcome);
     register_field("vision_correction_in", vision_correction_in);
+    register_field("vision_read_ms", vision_read_ms);
+    register_field("vision_reads", vision_reads);
+    register_field("vision_tag_u_px", vision_tag_value, &kTagValues[0]);
+    register_field("vision_tag_v_px", vision_tag_value, &kTagValues[1]);
+    register_field("vision_tag_w_px", vision_tag_value, &kTagValues[2]);
+    register_field("vision_tag_h_px", vision_tag_value, &kTagValues[3]);
+    register_field("vision_tag_tl_u_px", vision_tag_value, &kTagValues[4]);
+    register_field("vision_tag_tl_v_px", vision_tag_value, &kTagValues[5]);
+    register_field("vision_tag_tr_u_px", vision_tag_value, &kTagValues[6]);
+    register_field("vision_tag_tr_v_px", vision_tag_value, &kTagValues[7]);
+    register_field("vision_tag_br_u_px", vision_tag_value, &kTagValues[8]);
+    register_field("vision_tag_br_v_px", vision_tag_value, &kTagValues[9]);
+    register_field("vision_tag_bl_u_px", vision_tag_value, &kTagValues[10]);
+    register_field("vision_tag_bl_v_px", vision_tag_value, &kTagValues[11]);
     register_field("stick_throttle", controller_axis, &controls::kThrottle);
     register_field("stick_turn", controller_axis, &controls::kTurn);
 }

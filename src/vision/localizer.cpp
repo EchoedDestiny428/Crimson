@@ -92,7 +92,8 @@ std::optional<RawTag> largest_tag(std::span<const Detection> tags) {
                          (top_left.u + top_right.u + bottom_right.u + bottom_left.u) / 4.0,
                          (top_left.v + top_right.v + bottom_right.v + bottom_left.v) / 4.0,
                          ((top_right.u - top_left.u) + (bottom_right.u - bottom_left.u)) / 2.0,
-                         ((bottom_left.v - top_left.v) + (bottom_right.v - top_right.v)) / 2.0};
+                         ((bottom_left.v - top_left.v) + (bottom_right.v - top_right.v)) / 2.0,
+                         {top_left, top_right, bottom_right, bottom_left}};
         if (!largest || raw.height_px > largest->height_px) {
             largest = raw;
         }
@@ -213,6 +214,7 @@ void run() {
     bool configured = false;
     std::optional<std::uint32_t> last_fix_ms;
     std::uint32_t accepted = 0;
+    std::uint32_t reads = 0;
     std::uint32_t tick = 0;
     std::uint32_t last_ms = pros::millis();
     std::uint32_t wake_ms = last_ms;
@@ -305,6 +307,8 @@ void run() {
                 last_count = seen.size();
                 last_read_odom = odom;
                 last_read_ms = now_ms;
+                next.read_ms = now_ms;
+                next.reads = ++reads;
             } else {
                 next.status = Status::NoSensor;
             }
