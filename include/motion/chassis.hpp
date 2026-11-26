@@ -56,6 +56,21 @@ public:
     float lastResetDy() const;
     std::uint32_t poseResetSkips() const;
 
+    // Camera feed (vision/localizer): shifts the pose by (dx, dy) field-frame inches without counting as a teleport
+    // (poseResets() stays put), and keeps the running total, so the localizer can tell its own shifts apart from
+    // driving. setPose (a teleport) zeroes the total.
+    void nudge(float dx, float dy);
+    float nudgeX() const; // running totals since the last setPose, inches
+    float nudgeY() const;
+    // The pose (field frame), the nudge totals and poseResets(), read together so none of them changes in between.
+    struct OdomSample {
+        lemlib::Pose pose;
+        float nudge_x;
+        float nudge_y;
+        std::uint32_t resets;
+    };
+    OdomSample sample();
+
     void donut(float theta, int timeout, DonutParams params = {}, bool async = true);
     bool setPoseFromGoal(float goalX, float goalY, GoalPoseParams params = {});
     // The robot's front (or back) is pressed against the goal at (goalX, goalY); keeps
@@ -68,6 +83,9 @@ private:
     std::atomic<float> reset_dx_{0.0f};
     std::atomic<float> reset_dy_{0.0f};
     std::atomic<std::uint32_t> reset_skips_{0};
+    std::atomic<float> nudge_x_{0.0f};
+    std::atomic<float> nudge_y_{0.0f};
+    pros::Mutex pose_mutex_; // setPose, nudge and sample
 };
 
 }

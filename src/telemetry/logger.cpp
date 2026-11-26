@@ -246,6 +246,15 @@ double vision_correction_in(const void*) {
     return g_vision.correction_in;
 }
 
+// How far the camera feed has slid odometry since the last setPose (field-frame inches; config::kCameraFeedsOdometry).
+double camera_nudge_x(const void*) {
+    return chassis.nudgeX();
+}
+
+double camera_nudge_y(const void*) {
+    return chassis.nudgeY();
+}
+
 // Raw driver stick, -127..127, before the drive curve, slew and arcade mixing.
 double controller_axis(const void* context) {
     const auto axis = *static_cast<const controls::Axis*>(context);
@@ -336,6 +345,8 @@ void Logger::register_robot_fields() {
     register_field("vision_pose_theta_deg", vision_pose_theta);
     register_field("vision_outcome", vision_outcome);
     register_field("vision_correction_in", vision_correction_in);
+    register_field("camera_nudge_x_in", camera_nudge_x);
+    register_field("camera_nudge_y_in", camera_nudge_y);
     register_field("stick_throttle", controller_axis, &controls::kThrottle);
     register_field("stick_turn", controller_axis, &controls::kTurn);
 }

@@ -30,12 +30,41 @@ lemlib::Pose Chassis::getPose(bool radians, bool standardPos) {
 }
 
 void Chassis::setPose(float x, float y, float theta, bool radians) {
+    pose_mutex_.take();
     const lemlib::Pose before = getPose(); // field frame, only to log the correction
     const LemlibPoint point = to_lemlib(x, y);
     lemlib::Chassis::setPose(point.x, point.y, theta, radians);
     reset_dx_ = x - before.x;
     reset_dy_ = y - before.y;
+    nudge_x_ = 0.0f;
+    nudge_y_ = 0.0f;
     ++pose_resets_;
+    pose_mutex_.give();
+}
+
+void Chassis::nudge(float dx, float dy) {
+    pose_mutex_.take();
+    const lemlib::Pose now = lemlib::Chassis::getPose(); // LemLib frame
+    const LemlibPoint shift = to_lemlib(dx, dy);           // field (x, y) -> LemLib (-y, x) works for a shift too
+    lemlib::Chassis::setPose(now.x + shift.x, now.y + shift.y, now.theta);
+    nudge_x_ = nudge_x_ + dx;
+    nudge_y_ = nudge_y_ + dy;
+    pose_mutex_.give();
+}
+
+float Chassis::nudgeX() const {
+    return nudge_x_;
+}
+
+float Chassis::nudgeY() const {
+    return nudge_y_;
+}
+
+Chassis::OdomSample Chassis::sample() {
+    pose_mutex_.take();
+    const OdomSample result{getPose(), nudge_x_, nudge_y_, pose_resets_};
+    pose_mutex_.give();
+    return result;
 }
 
 std::uint32_t Chassis::poseResets() const {

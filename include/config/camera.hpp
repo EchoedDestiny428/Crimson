@@ -11,6 +11,19 @@ namespace config {
 // localizer's odometry history (1.28 s).
 inline constexpr std::uint32_t kCameraLatencyMs = 250;
 
+// Feed the camera into odometry (the pose every motion drives on), the way an FRC pose estimator feeds vision in: the
+// localizer's filter keeps the best estimate (odometry plus camera fixes, weighted by how sure each is), and odometry
+// is slid toward it continuously. x and y only; the IMU keeps heading.
+// - At most kCameraFeedInPerS, so a motion in progress sees a slow drift, never a jump.
+// - Only while the estimate is within kCameraFeedMaxIn of odometry; further than that is more likely the camera
+//   locked onto the wrong (twin) goal than odometry drifting.
+// - Gaps under kCameraFeedDeadbandIn are left alone.
+// false: the camera only keeps its own estimate (the dashboard and log show it; reset_odometry() can still apply it).
+inline constexpr bool kCameraFeedsOdometry = true;
+inline constexpr double kCameraFeedInPerS = 3.0;
+inline constexpr double kCameraFeedMaxIn = 6.0;
+inline constexpr double kCameraFeedDeadbandIn = 0.05;
+
 // Lens height above the field tiles. With one tag in view, range comes mostly from this number. Stay well clear of the
 // tag heights (37.8, 101.8 and 178.0 mm): level with a tag, range becomes unusable.
 // Measured 282.5 mm to the middle of the lens glass on the robot mount. The 2026-11-21 robot calibration (see

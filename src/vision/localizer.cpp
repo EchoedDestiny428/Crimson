@@ -101,10 +101,44 @@ std::optional<RawTag> largest_tag(std::span<const Detection> tags) {
 }
 
 // Odometry owns the IMU (chassis.calibrate() in main.cpp), so heading comes from the chassis instead of a second IMU
-// here. The camera does not move the odometry pose; it keeps its own estimate next to it.
-Pose chassis_pose() {
-    const lemlib::Pose pose = chassis.getPose();
-    return {pose.x * field::kMmPerInch, pose.y * field::kMmPerInch, pose.theta};
+// here. The filter follows raw odometry: the chassis pose minus this file's own nudges (config::kCameraFeedsOdometry),
+// so sliding odometry toward the estimate never reads back as the robot driving.
+struct OdomRead {
+    Pose raw;               // odometry without the camera's nudges, mm
+    double nudge_x_mm;      // the nudges since the last setPose, mm
+    double nudge_y_mm;
+    std::uint32_t resets;   // chassis.poseResets()
+};
+
+OdomRead read_odometry() {
+    const crimson::Chassis::OdomSample sample = chassis.sample();
+    return {{(sample.pose.x - sample.nudge_x) * field::kMmPerInch, (sample.pose.y - sample.nudge_y) * field::kMmPerInch,
+             sample.pose.theta},
+            sample.nudge_x * field::kMmPerInch,
+            sample.nudge_y * field::kMmPerInch,
+            sample.resets};
+}
+
+// One tick of the camera feed: slides odometry toward the filter's estimate (x and y), at most
+// config::kCameraFeedInPerS, only while the estimate is within config::kCameraFeedMaxIn of raw odometry.
+void feed_odometry(const Pose& estimate, const OdomRead& odom) {
+    if (!config::kCameraFeedsOdometry) {
+        return;
+    }
+    const double want_x = estimate.x_mm - odom.raw.x_mm; // the nudge total that puts odometry on the estimate
+    const double want_y = estimate.y_mm - odom.raw.y_mm;
+    if (std::hypot(want_x, want_y) > config::kCameraFeedMaxIn * field::kMmPerInch) {
+        return; // too far to be drift: hold where it is
+    }
+    const double gap_x = want_x - odom.nudge_x_mm;
+    const double gap_y = want_y - odom.nudge_y_mm;
+    const double gap = std::hypot(gap_x, gap_y);
+    if (gap < config::kCameraFeedDeadbandIn * field::kMmPerInch) {
+        return;
+    }
+    const double step = std::min(gap, config::kCameraFeedInPerS * field::kMmPerInch * kTickMs / 1000.0);
+    chassis.nudge(static_cast<float>(gap_x / gap * step / field::kMmPerInch),
+                  static_cast<float>(gap_y / gap * step / field::kMmPerInch));
 }
 
 bool finite(const Pose& pose) {
@@ -195,8 +229,9 @@ void run() {
     pros::AIVision sensor(ports::kVision);
 
     // main.cpp has already put odometry at config::kStart*, so that is where the estimate starts too.
-    Pose odom = chassis_pose();
-    std::uint32_t resets = chassis.poseResets();
+    const OdomRead first = read_odometry();
+    Pose odom = first.raw;
+    std::uint32_t resets = first.resets;
     PoseFilter filter;
     filter.reset(odom, kBootSigmaMm);
 
@@ -219,14 +254,16 @@ void run() {
 
     while (true) {
         const std::uint32_t now_ms = pros::millis();
-        const Pose now = chassis_pose();
+        const OdomRead read = read_odometry();
+        const Pose now = read.raw;
         const bool odom_ok = finite(now);
         const double dt_s = static_cast<double>(now_ms - last_ms) / 1000.0;
         last_ms = now_ms;
 
         // Follow odometry. A setPose is a teleport, not driving: start the estimate over at the new pose.
-        const std::uint32_t now_resets = chassis.poseResets();
-        if (now_resets != resets && odom_ok) {
+        const std::uint32_t now_resets = read.resets;
+        const bool teleported = now_resets != resets;
+        if (teleported && odom_ok) {
             resets = now_resets;
             filter.reset(now, kResetSigmaMm);
             history.clear();
@@ -318,6 +355,10 @@ void run() {
         // The pose moves with odometry every tick; the camera fields change on reads.
         published.pose = to_field_pose(filter.pose());
         publish(published);
+        // Then odometry slides toward it (skipped on a tick that just saw a setPose: the estimate restarted there).
+        if (odom_ok && !teleported) {
+            feed_odometry(filter.pose(), read);
+        }
 
         pros::Task::delay_until(&wake_ms, kTickMs);
     }
