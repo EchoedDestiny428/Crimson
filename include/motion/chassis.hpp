@@ -13,7 +13,7 @@ struct DonutParams {
     lemlib::AngularDirection direction = lemlib::AngularDirection::AUTO;
     bool forwards = true;
     int fastSpeed = 127;
-    int slowSpeed = 15;
+    int slowSpeed = 35;
     float earlyExitRange = 0;
 };
 
