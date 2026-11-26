@@ -57,9 +57,9 @@ void run() {
     chassis.waitUntilDone();
     // macros::pickup();
     chassis.moveToPoint(24, 48, 950, {.forwards = false}); // blue goal 2, 15.5 in away
-    chassis.waitUntil(5); // 3 in before the robot's back meets the goal (7.5 in short of its centre)
+    chassis.waitUntil(2); // 6 in before the robot's back meets the goal (7.5 in short of its centre)
     chassis.cancelMotion();
-    chassis.moveToPoint(24, 48, 600, {.forwards = false, .maxSpeed = 50}); // last 3 in
+    chassis.moveToPoint(24, 48, 600, {.forwards = false, .maxSpeed = 53}); // last 6 in at 42%
     // macros::aim_lift(stage(2));
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(24, 48, {.distance = 7.5});
@@ -71,9 +71,9 @@ void run() {
     chassis.waitUntilDone();
     // macros::pickup();
     chassis.moveToPoint(24, 48, 950, {.forwards = false}); // blue goal 2, 17.7 in away
-    chassis.waitUntil(7.2); // 3 in before the robot's back meets the goal (7.5 in short of its centre)
+    chassis.waitUntil(4.2); // 6 in before the robot's back meets the goal (7.5 in short of its centre)
     chassis.cancelMotion();
-    chassis.moveToPoint(24, 48, 600, {.forwards = false, .maxSpeed = 50}); // last 3 in
+    chassis.moveToPoint(24, 48, 600, {.forwards = false, .maxSpeed = 53}); // last 6 in at 42%
     // macros::aim_lift(stage(3));
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(24, 48, {.distance = 7.5});
@@ -87,9 +87,9 @@ void run() {
     chassis.turnToPoint(24,96,500,{.forwards=false});
     chassis.waitUntilDone(); // so waitUntil below measures the drive, not the turn
     chassis.moveToPoint(24, 96, 950, {.forwards = false}); // neutral goal (24, 96), 51.2 in away
-    chassis.waitUntil(40.7); // 3 in before the robot's back meets the goal (7.5 in short of its centre)
+    chassis.waitUntil(37.7); // 6 in before the robot's back meets the goal (7.5 in short of its centre)
     chassis.cancelMotion();
-    chassis.moveToPoint(24, 96, 600, {.forwards = false, .maxSpeed = 50}); // last 3 in
+    chassis.moveToPoint(24, 96, 600, {.forwards = false, .maxSpeed = 53}); // last 6 in at 42%
     // macros::aim_lift(stage(1, Goal::Neutral)); // first score on this goal
     chassis.waitUntilDone();
     chassis.setPoseFromGoal(24, 96, {.distance = 7.5});

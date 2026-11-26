@@ -1,5 +1,24 @@
 # AI Agent Guidelines & Repository Reference
 
+> [!CAUTION]
+> **EVERYONE MUST BUILD WITH PROS KERNEL 4.2.3 (this means you too, Roy).**
+> All programs on a brain share one uploaded library, and it has to be the same build for everyone. If you upload
+> with a different kernel (an old local PROS install, a branch still on 4.2.2, `pros conductor` pulling something
+> else), the CLI sees "Library onboard doesn't match!" and **deletes every other slot on the brain** as orphaned.
+> This has wiped teammates' slots more than once.
+>
+> Before any upload:
+> 1. Update your PROS CLI / VS Code extension, then pull. The kernel lives in the repo (`firmware/libpros.a`,
+>    `include/pros/`, `project.pros` -> `"kernel"` `"version": "4.2.3"`); do not run `pros conductor apply` or
+>    `upgrade` to change it on your own.
+> 2. Check `include/pros/version.h` says `"4.2.3"`. If your branch says anything else, merge the kernel update in
+>    before uploading.
+> 3. Run `pros v5 ls-files` and see which slots are on the brain. If you're not sure your library matches, tell the
+>    owners of the other slots first.
+>
+> Changing the kernel version is a team decision: announce it, update this file, and make sure every active branch
+> moves at the same time.
+
 > [!NOTE]
 > **AI AGENT COMMIT & PUSH GUIDELINE:**
 > Do **NOT** automatically commit and push after every minor edit or incremental step during rapid testing. Instead, keep changes in the working tree during iteration and only commit & push after completing a major milestone, at the end of a long working session, or when explicitly requested by the user. Always verify the build (`pros make`) beforehand.
@@ -189,7 +208,7 @@ flowchart TD
 
 ### 3.6 Brain Program Slots & Safe Uploading
 - **Slot Isolation:** The V5 Brain maintains 8 completely independent program slots (`slot_1.bin` through `slot_8.bin`).
-- **Does uploading erase other slots?** **NO.** Uploading a program only overwrites the single designated slot. Other slots are never touched or erased unless explicitly requested (e.g. via `prosv5 v5 rm-all` or brain screen format).
+- **Does uploading erase other slots?** **Only if the library matches.** With the same kernel and templates, an upload only overwrites its own slot. If the cold library (kernel + LemLib + lvgl) differs from the one on the brain, the CLI uploads the new library and **deletes every other slot** as orphaned. See the kernel warning at the top of this file.
 - **Slot Configuration:**
   - Configured in [`project.pros`](file:///Users/royboy/Library/CloudStorage/OneDrive-TaipeiAmericanSchool/Roy's universe/VEX/Crimson/project.pros) under `"upload_options": { "slot": 3, "remote_name": "snack" }` and `"project_name": "snack"`.
   - To upload to a different slot via CLI:
@@ -201,8 +220,8 @@ flowchart TD
   - Using [`tools/deploy.ps1`](file:///Users/royboy/Library/CloudStorage/OneDrive-TaipeiAmericanSchool/Roy's universe/VEX/Crimson/tools/deploy.ps1): Runs `pros mu @args`, which defaults to the slot and program name in `project.pros` (Slot 3, name `snack`) unless overridden with arguments.
 
 ### 3.7 PROS Version & Toolchain
-- **Kernel Version:** **PROS 4.2.2** (defined in [`include/pros/version.h`](file:///Users/royboy/Library/CloudStorage/OneDrive-TaipeiAmericanSchool/Roy's universe/VEX/Crimson/include/pros/version.h)).
-  - This is the newest stable release of the PROS 4 kernel series.
+- **Kernel Version:** **PROS 4.2.3**, required for everyone (defined in [`include/pros/version.h`](file:///Users/royboy/Library/CloudStorage/OneDrive-TaipeiAmericanSchool/Roy's universe/VEX/Crimson/include/pros/version.h)).
+  - Moved from 4.2.2 on 2026-11-25. Branches still on 4.2.2 (e.g. `donut-testing`) build a different library and will wipe the other slots when uploaded.
   - Supports modern C++20, hard-float optimizations (`-mfloat-abi=hard`), AI Vision sensor API, and updated device abstractions.
 - **Library Templates:**
   - `liblvgl@9.2.0`: Light and Versatile Graphics Library v9.
