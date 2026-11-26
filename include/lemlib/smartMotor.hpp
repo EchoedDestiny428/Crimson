@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <limits>
 
 namespace lemlib {
 
@@ -138,6 +139,10 @@ private:
 
     std::atomic<float> encoderOffset{0.0f};
     std::atomic<float> target{0.0f};
+    // The target the PID last braked on as settled (either settle range), NaN while it isn't braked: isSettled()
+    // counts it, so a move that brakes inside the wider settle-hold range still reads settled. Compared with the
+    // current target, so a new setTarget() never reads the move before's settle.
+    std::atomic<float> brakedAt{std::numeric_limits<float>::quiet_NaN()};
     std::atomic<bool> targetChanged{false};
     std::atomic<bool> manual{false};
     std::atomic<int> manualPower{0};

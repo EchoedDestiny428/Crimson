@@ -27,6 +27,11 @@ void stop();
 // 0 while it's open.
 double home_lift_cm();
 
+// The driver's stage `level` (1-7, constants::kStageSetpoints) on a goal of `tier` (0 alliance, 1 neutral, 2 center):
+// the stage's lift plus constants::kGoalTierStepCm (7 cm) per tier, as the driver's Right button adds, and its arm
+// angle. Both are clamped into range. Hand it to aim / aim_lift / aim_swing_first, which add the slack adjustment.
+Pose stage(int level, int tier = 0);
+
 // ---- Auton motions (from new-robot, retuned from the arm-swing tests) ----
 // Every arm swing eases in and out, gentler the higher the lift (arm_pivot.cpp): 3000 deg/s^2 with the lift down,
 // about 1100 at L7. The blocking ones return false on a timeout or when stop() cancels them.

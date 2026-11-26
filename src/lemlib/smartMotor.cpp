@@ -120,8 +120,14 @@ float SmartMotor::getTarget() const {
     return target;
 }
 
+// Within settleRange now, or the PID has braked on this target (it also brakes inside setSettleHold's wider range,
+// which this alone would never call settled).
 bool SmartMotor::isSettled() const {
-    return !manual && std::fabs(target - getRotation()) < settleRange;
+    if (manual) {
+        return false;
+    }
+    const float goal = target;
+    return brakedAt.load() == goal || std::fabs(goal - getRotation()) < settleRange;
 }
 
 void SmartMotor::setTarget(float newTarget) {
@@ -140,6 +146,7 @@ void SmartMotor::setDecelerationDistance(float distance) {
 void SmartMotor::setManual(int power) {
     manualPower = power;
     manual = true;
+    brakedAt = std::numeric_limits<float>::quiet_NaN();
 }
 
 void SmartMotor::holdCurrent() {
@@ -339,6 +346,7 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
     if (!std::isfinite(goal - position)) {
         controller.reset();
         profileActive = false;
+        brakedAt = std::numeric_limits<float>::quiet_NaN();
         actuator->brake();
         return;
     }
@@ -392,9 +400,11 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
     }
     if (settled) {
         controller.reset();
+        brakedAt = goal;
         actuator->brake();
         return;
     }
+    brakedAt = std::numeric_limits<float>::quiet_NaN(); // driving again (or not there yet)
 
     float output = controller.update(error) + feedforward + profileKV * setpointVelocity;
     if (positionFeedforward) {

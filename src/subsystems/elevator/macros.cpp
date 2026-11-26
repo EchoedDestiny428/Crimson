@@ -19,7 +19,7 @@ namespace {
 constexpr double kPi = 3.14159265358979323846;
 constexpr int kFullPower = 127;
 
-int stage = -1;           // stage last commanded: 0 home, 1-7 scoring, -1 none yet
+int current_stage = -1;   // stage last commanded: 0 home, 1-7 scoring, -1 none yet
 int claw_seen = -1;       // claw state on the last tick: 1 closed, 0 open, -1 not looked yet
 std::uint32_t carry_at_ms = 0; // a carry raise waiting for its delay: when to send it (0: none)
 int goal_tier = 0;        // 0 alliance, 1 neutral, 2 center
@@ -58,11 +58,11 @@ Pose current_pose() {
 // runs at 35%.
 void go_to_stage(int next) {
     ++command_id;
-    stage = std::clamp(next, 0, constants::kTopStage);
+    current_stage = std::clamp(next, 0, constants::kTopStage);
     carry_at_ms = 0; // this sets the lift itself
-    const constants::Setpoint& setpoint = constants::kStageSetpoints[stage];
-    const bool scoring = stage > 0;
-    arm_pivot::set_slow_zone(stage <= 1);
+    const constants::Setpoint& setpoint = constants::kStageSetpoints[current_stage];
+    const bool scoring = current_stage > 0;
+    arm_pivot::set_slow_zone(current_stage <= 1);
     extension::set_target(
         constants::extension_cm_to_motor_deg(scoring ? setpoint.lift_cm + offset_cm() : home_lift_cm()));
     if (scoring) {
@@ -108,6 +108,11 @@ void update_carry() {
 
 double home_lift_cm() {
     return claw::is_closed() ? constants::kCarryLiftCm : 0.0;
+}
+
+Pose stage(int level, int tier) {
+    const constants::Setpoint& setpoint = constants::kStageSetpoints[std::clamp(level, 1, constants::kTopStage)];
+    return {setpoint.lift_cm + std::clamp(tier, 0, 2) * constants::kGoalTierStepCm, setpoint.arm_deg};
 }
 
 // Fastest-pose solver, kept for autons (the driver stages don't use it: they are hard
@@ -170,7 +175,7 @@ void update() {
     if (go) {
         // Held: go to the selected stage (and follow it if it changes), cancelling any score.
         score = Score::Idle;
-        if (stage != selected) {
+        if (current_stage != selected) {
             go_to_stage(selected);
         }
     } else if (score_held) {
@@ -218,7 +223,7 @@ void update() {
         const double old_offset = offset_cm();
         goal_tier = (goal_tier + 1) % 3;
         if (!lift_manual) {
-            const double lift = stage > 0 ? constants::kStageSetpoints[stage].lift_cm + offset_cm()
+            const double lift = current_stage > 0 ? constants::kStageSetpoints[current_stage].lift_cm + offset_cm()
                                           : current_pose().lift_cm + offset_cm() - old_offset;
             extension::set_target(constants::extension_cm_to_motor_deg(lift));
         }
@@ -232,7 +237,7 @@ void update() {
         const bool first = claw_seen < 0;
         claw_seen = closed;
         if (score == Score::Idle && !lift_manual && (!first || closed == 1)) {
-            claw_changed(closed == 1 ? stage <= 0 : stage == 0);
+            claw_changed(closed == 1 ? current_stage <= 0 : current_stage == 0);
         }
     }
     if (lift_manual) {
@@ -324,7 +329,7 @@ double slack_adjusted(double arm_deg) {
 // Off the driver stages, for an auton motion.
 void start_auton_command() {
     ++command_id;
-    stage = -1;
+    current_stage = -1;
     carry_at_ms = 0;
     arm_pivot::set_slow_zone(false);
 }
@@ -414,7 +419,7 @@ void stop() {
     carry_at_ms = 0;
     score = Score::Idle;
     score_held = false;
-    stage = -1;
+    current_stage = -1;
     lift_manual = false;
     extension::hold();
     arm_pivot::stop();
@@ -443,7 +448,7 @@ Pose target_now() {
 }
 
 int target_stage() {
-    return stage;
+    return current_stage;
 }
 
 }
