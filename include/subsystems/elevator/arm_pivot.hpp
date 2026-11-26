@@ -11,11 +11,17 @@ void stop();
 void set_hold(bool hold);
 void move_to(double motor_deg);
 // PID to motor_deg (the home angle), then push down at power 20 into the hardstop and hold
-// once the arm stops moving. Any other arm command cancels it.
+// once the arm stops moving. Any other arm command cancels it. The last 40% of the swing home
+// runs at 40% speed.
 void home(double motor_deg);
+bool homing(); // a home() move is still on its way to the hardstop
 void set_power(int power); // open loop, -127..127
 void set_slow_zone(bool enabled); // cap the last 30 deg of PID moves at 35%
 double get_pos();
 double target(); // motor deg
+bool is_settled(); // settled on its target, and not mid-home (autons)
+// How hard swings speed up and slow down right now (deg/s^2): 3000 with the lift down, gentler
+// the higher the lift (about 1100 at L7). See arm_pivot.cpp for the measurements behind it.
+double swing_accel();
 
 }

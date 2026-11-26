@@ -28,4 +28,16 @@ void grab() {
     close();
 }
 
+bool is_closed() {
+    return claw_piston.is_extended();
+}
+
+void prime() {
+    open();
+}
+
+void release() {
+    open();
+}
+
 }

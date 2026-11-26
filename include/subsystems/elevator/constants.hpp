@@ -51,7 +51,7 @@ struct Setpoint {
 };
 inline constexpr std::array<Setpoint, 8> kStageSetpoints{{
     {0.0, 30.0},               // home / intake: PID to 30 deg, then pushed onto the hardstop
-    {0.0, kArmScoreLowDeg},    // L1  17.5 cm (ends ~21 cm: lift already down)
+    {3.0, kArmScoreLowDeg},    // L1  20.5 cm (lift 3 cm up: new-robot found 0 / 17.5 cm too low)
     {20.0, kArmScoreLowDeg},   // L2  36.0 cm
     {0.0, kArmScoreHighDeg},   // L3  53.0 cm (the high angle already reaches it, lift stays down)
     {16.8, kArmScoreHighDeg},  // L4  70.0 cm
@@ -63,6 +63,11 @@ inline constexpr int kTopStage = static_cast<int>(kStageSetpoints.size()) - 1;
 // Scoring (L1 release): after the claw opens, wait this long and raise the lift this far.
 inline constexpr int kOuttakeRaiseDelayMs = 300;
 inline constexpr double kOuttakeRaiseCm = 11.0;
+// Holding a piece (claw closed), home never brings the lift below this (cm), so a cup-pin hanging from the claw stays
+// off the floor. Closing the claw at home raises the lift to it, kCarryDelayMs later so the claw has hold of the piece
+// first; opening the claw at home brings it straight back to 0. (new-robot has the same idea at 9 cm after 200 ms.)
+inline constexpr double kCarryLiftCm = 10.0;
+inline constexpr int kCarryDelayMs = 500;
 // Right cycles the goal: neutral = alliance + 7 cm of lift, center = alliance + 14.
 inline constexpr double kGoalTierStepCm = 7.0;
 

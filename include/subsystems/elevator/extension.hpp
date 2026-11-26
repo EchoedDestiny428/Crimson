@@ -10,5 +10,6 @@ void set_target(double height);
 void set_manual(int power);
 double height();
 double target();
+bool is_settled(); // the PID has settled on its target (autons)
 
 }

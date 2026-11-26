@@ -7,8 +7,10 @@
 #include "subsystems/elevator/constants.hpp"
 #include "subsystems/elevator/extension.hpp"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 
 namespace subsystems::elevator::macros {
 
@@ -18,6 +20,8 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr int kFullPower = 127;
 
 int stage = -1;           // stage last commanded: 0 home, 1-7 scoring, -1 none yet
+int claw_seen = -1;       // claw state on the last tick: 1 closed, 0 open, -1 not looked yet
+std::uint32_t carry_at_ms = 0; // a carry raise waiting for its delay: when to send it (0: none)
 int goal_tier = 0;        // 0 alliance, 1 neutral, 2 center
 bool lift_manual = false; // R1/R2 driving the lift by hand
 int selected = 1;         // stage Up/Down have selected (1-7); L1 goes there
@@ -31,6 +35,14 @@ constexpr std::uint32_t kRaiseTimeoutMs = 1000;
 Score score = Score::Idle;
 std::uint32_t score_at_ms = 0;
 
+// Bumped by every lift/arm command, so an aim_swing_first() still running in its task gives up once something else
+// takes over.
+std::atomic<std::uint32_t> command_id{0};
+// Each blocking auton motion takes a generation; stop() bumps it, which ends every wait.
+std::atomic<std::uint32_t> generation{0};
+
+double pending_arm_motor_deg = 0.0; // the arm half of the last aim_lift(), for swing_arm()
+
 double offset_cm() {
     return goal_tier * constants::kGoalTierStepCm;
 }
@@ -41,14 +53,18 @@ Pose current_pose() {
 }
 
 // Lift and arm to a stage's setpoint. Scoring stages get the goal offset on the lift and
-// the slack adjustment on the arm (toward 180 deg); home gets neither. Going to L1 or home,
-// the arm's last 30 deg runs at 35%.
+// the slack adjustment on the arm (toward 180 deg); home gets neither, and its lift is
+// home_lift_cm() (up a bit while holding a piece). Going to L1 or home, the arm's last 30 deg
+// runs at 35%.
 void go_to_stage(int next) {
+    ++command_id;
     stage = std::clamp(next, 0, constants::kTopStage);
+    carry_at_ms = 0; // this sets the lift itself
     const constants::Setpoint& setpoint = constants::kStageSetpoints[stage];
     const bool scoring = stage > 0;
     arm_pivot::set_slow_zone(stage <= 1);
-    extension::set_target(constants::extension_cm_to_motor_deg(setpoint.lift_cm + (scoring ? offset_cm() : 0.0)));
+    extension::set_target(
+        constants::extension_cm_to_motor_deg(scoring ? setpoint.lift_cm + offset_cm() : home_lift_cm()));
     if (scoring) {
         arm_pivot::move_to(constants::arm_deg_to_motor_deg(setpoint.arm_deg - constants::kArmSlackAdjustmentDeg));
     } else {
@@ -56,6 +72,42 @@ void go_to_stage(int next) {
     }
 }
 
+// The claw opened or closed outside a score: closing at home raises the lift to the carry height
+// constants::kCarryDelayMs later (never lowers it), opening at home brings it straight back to 0. at_home: the arm is
+// home (or homing).
+void claw_changed(bool at_home) {
+    carry_at_ms = 0;
+    if (!at_home) {
+        return;
+    }
+    if (claw::is_closed()) {
+        const std::uint32_t at = pros::millis() + static_cast<std::uint32_t>(constants::kCarryDelayMs);
+        carry_at_ms = at == 0 ? 1 : at; // grab first; update_carry lifts once the delay is up
+    } else {
+        extension::set_target(constants::extension_cm_to_motor_deg(0.0));
+    }
+}
+
+// Sends a waiting carry raise once its delay is up, if the claw is still closed and the arm still home.
+void update_carry() {
+    if (carry_at_ms == 0 || static_cast<std::int32_t>(pros::millis() - carry_at_ms) < 0) {
+        return;
+    }
+    carry_at_ms = 0;
+    const bool home = constants::arm_motor_deg_to_deg(arm_pivot::target()) < 90.0; // home is in front
+    if (!claw::is_closed() || !home) {
+        return;
+    }
+    const double lift_cm = constants::extension_motor_deg_to_cm(extension::target());
+    if (!(lift_cm >= constants::kCarryLiftCm)) { // also catches a NaN target
+        extension::set_target(constants::extension_cm_to_motor_deg(constants::kCarryLiftCm));
+    }
+}
+
+}
+
+double home_lift_cm() {
+    return claw::is_closed() ? constants::kCarryLiftCm : 0.0;
 }
 
 // Fastest-pose solver, kept for autons (the driver stages don't use it: they are hard
@@ -171,9 +223,195 @@ void update() {
             extension::set_target(constants::extension_cm_to_motor_deg(lift));
         }
     }
+
+    // The claw (A / X, its own task) opened or closed: at home, the lift follows it up to the carry height or back
+    // down. Not during a score (that opens the claw itself) or while the driver has the lift. Closing counts as home
+    // before the first stage press too (holding a preload at the start); opening only after a real home.
+    const int closed = claw::is_closed() ? 1 : 0;
+    if (closed != claw_seen) {
+        const bool first = claw_seen < 0;
+        claw_seen = closed;
+        if (score == Score::Idle && !lift_manual && (!first || closed == 1)) {
+            claw_changed(closed == 1 ? stage <= 0 : stage == 0);
+        }
+    }
+    if (lift_manual) {
+        carry_at_ms = 0; // the driver has the lift
+    }
+    update_carry();
+}
+
+namespace {
+
+constexpr std::uint32_t kPollMs = 10;
+constexpr std::uint32_t kGripMs = 250; // new-robot's, tuned in its autons
+constexpr std::uint32_t kHomeTimeoutMs = 2000;
+// drop(): with the lift above kSteadyLiftCm, wait for the robot to stop rocking first: its tilt rate (the IMU's x and
+// y, not yaw) under kSteadyDegPerS for kSteadyHoldMs straight, at most kSteadyTimeoutMs. At L7 the rock is about once a
+// second; at the top of each sway the rate is near 0 only briefly (a 2.3 deg sway stays under 2 deg/s for about 40 ms),
+// so holding 100 ms only passes once the sway is about 1 deg or less (~2 cm at an L7 claw). With the lift down it
+// barely rocks, so the check is skipped there.
+constexpr double kSteadyLiftCm = 15.0;
+constexpr double kSteadyDegPerS = 2.0;
+constexpr std::uint32_t kSteadyHoldMs = 100;
+constexpr std::uint32_t kSteadyTimeoutMs = 1000;
+
+template <typename Done>
+bool wait_for(Done done, std::uint32_t timeout_ms) {
+    const std::uint32_t mine = generation;
+    const std::uint32_t start = pros::millis();
+    while (generation == mine && !done()) {
+        if (pros::millis() - start >= timeout_ms) {
+            return false;
+        }
+        pros::delay(kPollMs);
+    }
+    return generation == mine;
+}
+
+// Waits ms; false only if stop() cancelled it.
+bool pause(std::uint32_t ms) {
+    const std::uint32_t mine = generation;
+    const std::uint32_t start = pros::millis();
+    while (generation == mine && pros::millis() - start < ms) {
+        pros::delay(kPollMs);
+    }
+    return generation == mine;
+}
+
+// Blocks until the robot has stopped rocking (see kSteadyLiftCm). False only if stop() cancelled it; a timeout, or no
+// IMU reading, returns true so the score still happens.
+bool wait_steady() {
+    if (!(current_pose().lift_cm >= kSteadyLiftCm)) {
+        return true;
+    }
+    const std::uint32_t mine = generation;
+    const std::uint32_t start = pros::millis();
+    std::uint32_t calm_since = 0;
+    while (generation == mine) {
+        const std::uint32_t now = pros::millis();
+        const pros::imu_gyro_s_t rate = imu.get_gyro_rate();
+        const double tilt_rate = std::hypot(rate.x, rate.y);
+        if (!std::isfinite(tilt_rate) || now - start >= kSteadyTimeoutMs) {
+            return true;
+        }
+        if (tilt_rate < kSteadyDegPerS) {
+            if (calm_since == 0) {
+                calm_since = now == 0 ? 1 : now;
+            }
+            if (now - calm_since >= kSteadyHoldMs) {
+                return true;
+            }
+        } else {
+            calm_since = 0;
+        }
+        pros::delay(kPollMs);
+    }
+    return false;
+}
+
+// Same slack adjustment as the driver stages, toward straight up (180) on either side.
+double slack_adjusted(double arm_deg) {
+    if (arm_deg > 180.0) {
+        return arm_deg - constants::kArmSlackAdjustmentDeg;
+    }
+    if (arm_deg < 180.0) {
+        return arm_deg + constants::kArmSlackAdjustmentDeg;
+    }
+    return arm_deg;
+}
+
+// Off the driver stages, for an auton motion.
+void start_auton_command() {
+    ++command_id;
+    stage = -1;
+    carry_at_ms = 0;
+    arm_pivot::set_slow_zone(false);
+}
+
+}
+
+void aim(Pose pose) {
+    start_auton_command();
+    extension::set_target(constants::extension_cm_to_motor_deg(pose.lift_cm));
+    arm_pivot::move_to(constants::arm_deg_to_motor_deg(slack_adjusted(pose.arm_deg)));
+}
+
+void aim_lift(Pose pose) {
+    start_auton_command();
+    extension::set_target(constants::extension_cm_to_motor_deg(pose.lift_cm));
+    pending_arm_motor_deg = constants::arm_deg_to_motor_deg(slack_adjusted(pose.arm_deg));
+}
+
+bool swing_arm(std::uint32_t timeout_ms) {
+    ++command_id;
+    arm_pivot::move_to(pending_arm_motor_deg);
+    return wait_for(settled, timeout_ms);
+}
+
+void aim_swing_first(Pose pose, std::function<bool()> clear, std::uint32_t timeout_ms) {
+    start_auton_command();
+    const std::uint32_t mine = command_id;
+    const double lift_target = constants::extension_cm_to_motor_deg(pose.lift_cm);
+    const double arm_target = constants::arm_deg_to_motor_deg(slack_adjusted(pose.arm_deg));
+    if (!(extension::target() <= lift_target)) {
+        extension::set_target(lift_target); // never up before the swing; down right away
+    }
+
+    pros::Task task([=] {
+        // False only once another lift/arm command has taken over; a timeout just moves on to the next step.
+        const auto wait = [mine, timeout_ms](const auto& done) {
+            const std::uint32_t start = pros::millis();
+            while (command_id == mine && !done() && pros::millis() - start < timeout_ms) {
+                pros::delay(kPollMs);
+            }
+            return command_id == mine;
+        };
+        if (clear && !wait(clear)) {
+            return;
+        }
+        arm_pivot::move_to(arm_target);
+        if (!wait([] { return arm_pivot::is_settled(); })) {
+            return;
+        }
+        extension::set_target(lift_target);
+    });
+}
+
+bool settled() {
+    return extension::is_settled() && arm_pivot::is_settled();
+}
+
+bool wait_settled(std::uint32_t timeout_ms) {
+    return wait_for(settled, timeout_ms);
+}
+
+bool drop() {
+    if (!wait_steady()) {
+        return false;
+    }
+    claw::release();
+    return pause(kGripMs);
+}
+
+void home_async() {
+    go_to_stage(0);
+}
+
+bool home() {
+    home_async();
+    return wait_for(settled, kHomeTimeoutMs);
+}
+
+bool pickup() {
+    claw::grab();
+    return pause(kGripMs);
 }
 
 void stop() {
+    ++generation;
+    ++command_id;
+    carry_at_ms = 0;
     score = Score::Idle;
     score_held = false;
     stage = -1;

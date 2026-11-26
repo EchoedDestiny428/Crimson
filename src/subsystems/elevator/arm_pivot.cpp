@@ -2,9 +2,11 @@
 #include "config/controls.hpp"
 #include "lemlib/smartMotor.hpp"
 #include "robotconfig.hpp"
+#include "subsystems/elevator/extension.hpp"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 
 namespace subsystems::elevator::arm_pivot {
 
@@ -42,17 +44,57 @@ constexpr double kMaxArmDeg = 315.0;
 constexpr double kLimitSlowRangeDeg = 15.0;
 constexpr float kLimitSlowPower = 25.0f; // ~20% of 127
 
+// Swing profile: the arm speeds up and slows down by at most a set rate (deg/s^2) instead of full power until the PID
+// lets go. Measured with a cup-pin (arm-swing-testing's automatic test, 2026-11-26):
+// - Lift down (L3): full power took 0.77 s to get within 2 deg (it overshoots and hunts) and slid the robot 0.9 in;
+//   3000 took 0.59 s and slid it 0.4 in, and barely tipped it.
+// - Lift all the way up (L7): the robot rocks past its lean 2.3 deg at 1000, 4.6 at 1500, 4.9 at 2000 and 7.5 at
+//   3000 (at a claw ~1.2 m up, 2.3 deg is ~5 cm). The arm's shove tips the robot about the wheels through the pivot,
+//   so the higher the pivot, the gentler the swing has to be.
+// So the rate scales with 1 / pivot height: kSwingAccelLiftDownDegPerS2 with the lift down, about 1100 at L7, never
+// under kSwingAccelMinDegPerS2 (the gentlest measured). The height is the higher of where the lift is and where it is
+// going, updated every 10 ms: a swing out to a high stage is gentle from the start, a swing home speeds up as the lift
+// comes down.
+constexpr double kSwingAccelLiftDownDegPerS2 = 3000.0;
+constexpr double kSwingAccelMinDegPerS2 = 1000.0;
+constexpr float kSwingMaxSpeedDegPerS = 480.0f; // a red motor tops out at 600 deg/s; the rest is room for the PID
+constexpr float kSwingKV = 127.0f / 600.0f;     // power per deg/s of setpoint speed (full power is ~600 deg/s)
+constexpr float kSwingMaxLagDeg = 15.0f;        // the setpoint waits for the arm if it gets this far ahead
+// Swinging home (from a stage back to the front): the last 40% at 40% speed, so the arm eases into the hardstop
+// instead of slamming. Swings out to a stage don't slow down.
+constexpr float kHomeFinishFraction = 0.4f;
+constexpr float kHomeFinishSpeedDegPerS = 0.4f * kSwingMaxSpeedDegPerS;
+
+std::atomic<float> swing_accel_now{static_cast<float>(kSwingAccelLiftDownDegPerS2)};
+
 lemlib::SmartMotor motor(&arm_pivot_motor, lemlib::PID(kP, 0.0f, kD), kSettleRange);
+
+double swing_accel_for(double lift_cm) {
+    const double pivot_cm = constants::kPivotStartHeightCm + std::max(0.0, lift_cm);
+    return std::clamp(kSwingAccelLiftDownDegPerS2 * constants::kPivotStartHeightCm / pivot_cm,
+                      kSwingAccelMinDegPerS2, kSwingAccelLiftDownDegPerS2);
+}
+
+void update_profile() {
+    const double lift_cm = constants::extension_motor_deg_to_cm(std::max(extension::height(), extension::target()));
+    const double accel = std::isfinite(lift_cm) ? swing_accel_for(lift_cm) : kSwingAccelMinDegPerS2;
+    swing_accel_now = static_cast<float>(accel);
+    motor.setProfile(static_cast<float>(accel), kSwingMaxSpeedDegPerS, kSwingKV, kSwingMaxLagDeg);
+}
 
 // Homing: PID to the home angle, then once within kHomeHandoffDeg of it, push down at
 // kHomePushPower until the arm sits on the hardstop: it has moved less than kStallDeg over
-// kStallWindowMs (or kHomePushTimeoutMs passed), then hold there.
+// kStallWindowMs (or kHomePushTimeoutMs passed), then hold there. Stalled within
+// kRezeroWindowDeg of where the encoder thinks the hardstop is, the encoder is reset to it
+// (new-robot), so a slipped arm comes back right after every home; stalled further off, it's
+// more likely caught on something, and the encoder is left alone.
 constexpr float kHomeHandoffDeg = 2.0f;
 constexpr int kHomePushPower = -20; // of 127, ~1.9 V
 constexpr float kStallDeg = 0.5f;
 constexpr std::uint32_t kStallWindowMs = 100;
 constexpr std::uint32_t kHomePushTimeoutMs = 1500;
 constexpr std::uint32_t kHomeLoopMs = 10;
+constexpr double kRezeroWindowDeg = 10.0;
 
 enum class Home { Idle, Approach, Push };
 std::atomic<Home> home_state{Home::Idle};
@@ -63,6 +105,7 @@ void home_loop() {
     float window_pos = 0.0f;
     std::uint32_t now = pros::millis();
     while (true) {
+        update_profile();
         const Home state = home_state.load();
         const float pos = motor.getRotation();
         if (state == Home::Approach && std::isfinite(pos) && pos - motor.getTarget() < kHomeHandoffDeg) {
@@ -78,6 +121,10 @@ void home_loop() {
                 if (stalled || now - push_start >= kHomePushTimeoutMs) {
                     Home expected = Home::Push;
                     if (home_state.compare_exchange_strong(expected, Home::Idle)) {
+                        const double hardstop = constants::arm_deg_to_motor_deg(constants::kArmHardstopDeg);
+                        if (stalled && std::fabs(pos - hardstop) < kRezeroWindowDeg) {
+                            motor.setPosition(static_cast<float>(hardstop));
+                        }
                         motor.holdCurrent(); // brakes (HOLD) on the hardstop
                     }
                 }
@@ -124,8 +171,13 @@ void init() {
         }
         return output;
     });
+    update_profile();
     motor.start();
     pros::Task home_task(home_loop, "Arm home");
+}
+
+double swing_accel() {
+    return swing_accel_now;
 }
 
 void stop() {
@@ -142,8 +194,17 @@ void set_hold(bool hold) {
 }
 
 void home(double motor_deg) {
+    motor.setProfileFinish(kHomeFinishFraction, kHomeFinishSpeedDegPerS);
     motor.setTarget(static_cast<float>(clamp_motor_deg(motor_deg)));
     home_state = Home::Approach;
+}
+
+bool homing() {
+    return home_state != Home::Idle;
+}
+
+bool is_settled() {
+    return home_state == Home::Idle && motor.isSettled();
 }
 
 void set_slow_zone(bool enabled) {
@@ -157,6 +218,7 @@ void set_power(int power) {
 
 void move_to(double motor_deg) {
     home_state = Home::Idle;
+    motor.setProfileFinish(0.0f, 0.0f); // only the swing home slows down at the end
     motor.setTarget(static_cast<float>(clamp_motor_deg(motor_deg)));
 }
 

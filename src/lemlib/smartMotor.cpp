@@ -206,6 +206,18 @@ void SmartMotor::setMinPower(float power, float range) {
     minPowerRange = std::max(0.0f, range);
 }
 
+void SmartMotor::setProfile(float maxAcceleration, float maxVelocity, float kV, float maxLag) {
+    profileMaxVelocity = std::max(0.0f, maxVelocity);
+    profileKV = kV;
+    profileMaxLag = std::max(0.0f, maxLag);
+    profileAcceleration = std::max(0.0f, maxAcceleration);
+}
+
+void SmartMotor::setProfileFinish(float fraction, float velocity) {
+    profileFinishVelocity = std::max(0.0f, velocity);
+    profileFinishFraction = std::clamp(fraction, 0.0f, 1.0f);
+}
+
 void SmartMotor::setOutputFilter(std::function<float(float position, float output)> filter) {
     outputFilter = std::move(filter);
 }
@@ -229,6 +241,7 @@ void SmartMotor::controlLoop() {
         const bool newTarget = targetChanged.exchange(false);
         if (manual) {
             positionCommanded = false;
+            profileActive = false; // the next PID move starts its profile from wherever this leaves the motor
             const float cap = maxPower;
             float output = std::clamp(static_cast<float>(manualPower.load()), -cap, cap);
             if (outputFilter) {
@@ -273,27 +286,94 @@ void SmartMotor::controlLoop() {
     }
 }
 
+// One tick of the setProfile setpoint: toward the goal, speeding up or slowing down by at most profileAcceleration,
+// never faster than it can still stop at the goal (sqrt(2 x accel x distance left)) or than profileMaxVelocity.
+void SmartMotor::advanceProfile(float goal, float position) {
+    constexpr float kDt = static_cast<float>(kPeriodMs) / 1000.0f;
+    const float acceleration = profileAcceleration;
+    const float remaining = goal - profilePosition;
+    const float direction = remaining >= 0.0f ? 1.0f : -1.0f;
+    const float toward = profileVelocity * direction; // speed toward the goal; negative is moving away from it
+    float wanted = std::sqrt(2.0f * acceleration * std::fabs(remaining));
+    const float cap = profileMaxVelocity;
+    if (cap > 0.0f) {
+        wanted = std::min(wanted, cap);
+    }
+    // setProfileFinish: inside the move's last stretch, at most the finish speed; before it, no faster than it can
+    // still slow down to that speed by the time it gets there.
+    const float finishFraction = profileFinishFraction;
+    const float finishVelocity = profileFinishVelocity;
+    if (finishFraction > 0.0f && finishVelocity > 0.0f) {
+        const float beyond = std::fabs(remaining) - finishFraction * profileSpan;
+        wanted = std::min(wanted, beyond <= 0.0f ? finishVelocity
+                                                 : std::sqrt(finishVelocity * finishVelocity +
+                                                             2.0f * acceleration * beyond));
+    }
+    // Slowing down may brake harder than the limit, just enough to still stop at the goal: setProfile can lower the
+    // limit mid-move (the arm's follows the lift height), and the setpoint must not arrive at speed.
+    float brake = acceleration;
+    if (toward > 0.0f && std::fabs(remaining) > 0.0f) {
+        brake = std::max(brake, toward * toward / (2.0f * std::fabs(remaining)));
+    }
+    const float next = toward + std::clamp(wanted - toward, -brake * kDt, acceleration * kDt);
+    if (next >= 0.0f && next * kDt >= std::fabs(remaining)) {
+        profilePosition = goal; // gets there this tick
+        profileVelocity = 0.0f;
+    } else {
+        profilePosition += next * kDt * direction;
+        profileVelocity = next * direction;
+    }
+    const float lag = profileMaxLag;
+    if (lag > 0.0f) {
+        profilePosition = std::clamp(profilePosition, position - lag, position + lag);
+    }
+}
+
 void SmartMotor::runPid(float goal, float position, bool newTarget) {
-    const float error = goal - position;
     if (newTarget) {
         controller.reset();
         inRangeSince = 0;
         holdInRangeSince = 0;
     }
 
-    if (!std::isfinite(error)) {
+    if (!std::isfinite(goal - position)) {
         controller.reset();
+        profileActive = false;
         actuator->brake();
         return;
     }
+
+    // With setProfile the PID chases a setpoint easing toward the goal; without it the setpoint is the goal. A move
+    // that starts from rest starts its setpoint where the motor is; a new target mid-move carries on from the setpoint.
+    float setpoint = goal;
+    float setpointVelocity = 0.0f;
+    if (profileAcceleration > 0.0f) {
+        if (!profileActive || (newTarget && profileVelocity == 0.0f)) {
+            profilePosition = position;
+            profileVelocity = 0.0f;
+        }
+        if (newTarget || !profileActive) {
+            profileSpan = std::fabs(goal - profilePosition);
+        }
+        profileActive = true;
+        advanceProfile(goal, position);
+        setpoint = profilePosition;
+        setpointVelocity = profileVelocity;
+    } else {
+        profileActive = false;
+    }
+    const bool arrived = setpoint == goal && setpointVelocity == 0.0f; // always true without a profile
+    const float error = setpoint - position;
+
     // Inside settleRange: keep running the PID until it has stayed there settleTimeMs,
     // then brake. Leaving the range (or sagging out after braking) restarts the timer.
     // A second, wider range (setSettleHold) brakes too, after its own (usually longer) time.
     // Each timer runs while the error stays inside its range; leaving it restarts it.
+    // With a profile, neither starts until the setpoint has reached the goal (then error is the distance to it).
     const std::uint32_t now = pros::millis();
     const std::uint32_t stamp = now == 0 ? 1 : now;
     bool settled = false;
-    if (std::fabs(error) < settleRange) {
+    if (arrived && std::fabs(error) < settleRange) {
         if (inRangeSince == 0) {
             inRangeSince = stamp;
         }
@@ -302,7 +382,7 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
         inRangeSince = 0;
     }
     const float holdRange = holdSettleRange;
-    if (holdRange > 0.0f && std::fabs(error) < holdRange) {
+    if (arrived && holdRange > 0.0f && std::fabs(error) < holdRange) {
         if (holdInRangeSince == 0) {
             holdInRangeSince = stamp;
         }
@@ -316,20 +396,22 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
         return;
     }
 
-    float output = controller.update(error) + feedforward;
+    float output = controller.update(error) + feedforward + profileKV * setpointVelocity;
     if (positionFeedforward) {
         output += positionFeedforward(position);
     }
     // Minimum power: outside settleRange, a push toward the target is raised to at least
     // minPower so friction can't stall it short. A push away from the target (the D term
-    // braking) is left alone.
+    // braking) is left alone. With a profile, only once the setpoint has reached the goal.
     const float floorPower = minPower;
     const float floorRange = minPowerRange;
-    if (floorPower > 0.0f && std::fabs(error) >= settleRange && (floorRange <= 0.0f || std::fabs(error) < floorRange) &&
-        output * error >= 0.0f && std::fabs(output) < floorPower) {
+    if (arrived && floorPower > 0.0f && std::fabs(error) >= settleRange &&
+        (floorRange <= 0.0f || std::fabs(error) < floorRange) && output * error >= 0.0f &&
+        std::fabs(output) < floorPower) {
         output = std::copysign(floorPower, error);
     }
-    if (std::fabs(error) < slowZoneRange) {
+    const float goalError = goal - position;
+    if (std::fabs(goalError) < slowZoneRange) {
         const float slow = slowZonePower;
         output = std::clamp(output, -slow, slow);
     }

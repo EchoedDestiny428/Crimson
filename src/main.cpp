@@ -36,6 +36,8 @@ void initialize() {
     logger.attach(&arm_pivot_motor);
     logger.attach(&side_toggle_motors);
     logger.register_robot_fields();
+    // How hard the arm is allowed to swing right now (it follows the lift height): pairs with imu_pitch/roll in the log.
+    logger.register_field("arm_swing_accel_dps2", [](const void*) { return elevator::arm_pivot::swing_accel(); });
     logger.start();
 
     screen::start();

@@ -75,6 +75,19 @@ public:
      * can't stall it short. Default 0 (off).
      */
     void setMinPower(float power, float range = 0.0f);
+    /**
+     * PID mode: ease into and out of every move instead of handing the PID the whole distance at once. The PID chases
+     * a setpoint that speeds up and slows down by at most maxAcceleration (position units / s^2), up to maxVelocity
+     * (units / s; 0: no cap), plus kV x the setpoint's speed (power per unit / s) so it doesn't fall behind. The
+     * setpoint never gets more than maxLag (0: no limit) ahead of the motor. Settling and the minimum power wait for
+     * the setpoint to reach the target. maxAcceleration 0 (the default) turns it off.
+     */
+    void setProfile(float maxAcceleration, float maxVelocity = 0.0f, float kV = 0.0f, float maxLag = 0.0f);
+    /**
+     * With setProfile: the last `fraction` (0..1) of every move runs at most `velocity` (units / s), slowing down to it
+     * before that part starts, so the move eases in instead of arriving at speed. fraction 0 (the default) turns it off.
+     */
+    void setProfileFinish(float fraction, float velocity);
     /** Enable or disable SmartMotor diagnostics through the configured info sink. */
     void setLogging(bool enabled);
 
@@ -82,6 +95,7 @@ private:
     bool usesMotorEncoders() const;
     void controlLoop();
     void runPid(float goal, float position, bool newTarget);
+    void advanceProfile(float goal, float position);
     void log(float goal, float position) const;
 
     pros::MotorGroup* actuator;
@@ -111,6 +125,16 @@ private:
     std::atomic<float> rawZero{0.0f};
     float averageRawCounts() const;
     std::atomic<float> decelerationDistance{0.0f};
+    std::atomic<float> profileAcceleration{0.0f};
+    std::atomic<float> profileMaxVelocity{0.0f};
+    std::atomic<float> profileKV{0.0f};
+    std::atomic<float> profileMaxLag{0.0f};
+    std::atomic<float> profileFinishFraction{0.0f};
+    std::atomic<float> profileFinishVelocity{0.0f};
+    float profileSpan = 0.0f; // control task only: the current move's length, for setProfileFinish
+    bool profileActive = false;   // control task only: the setpoint below is in use
+    float profilePosition = 0.0f; // control task only
+    float profileVelocity = 0.0f; // control task only, units / s
 
     std::atomic<float> encoderOffset{0.0f};
     std::atomic<float> target{0.0f};
