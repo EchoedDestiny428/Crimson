@@ -30,13 +30,28 @@ lemlib::Pose Chassis::getPose(bool radians, bool standardPos) {
 }
 
 void Chassis::setPose(float x, float y, float theta, bool radians) {
+    const lemlib::Pose before = getPose(); // field frame, only to log the correction
     const LemlibPoint point = to_lemlib(x, y);
     lemlib::Chassis::setPose(point.x, point.y, theta, radians);
+    reset_dx_ = x - before.x;
+    reset_dy_ = y - before.y;
     ++pose_resets_;
 }
 
 std::uint32_t Chassis::poseResets() const {
     return pose_resets_;
+}
+
+float Chassis::lastResetDx() const {
+    return reset_dx_;
+}
+
+float Chassis::lastResetDy() const {
+    return reset_dy_;
+}
+
+std::uint32_t Chassis::poseResetSkips() const {
+    return reset_skips_;
 }
 
 void Chassis::setPose(lemlib::Pose pose, bool radians) {
@@ -136,9 +151,12 @@ bool Chassis::setPoseFromGoal(float goalX, float goalY, GoalPoseParams params) {
     const float x = goalX + side * distance * std::cos(heading);
     const float y = goalY - side * distance * std::sin(heading);
     if (std::hypot(x - now.x, y - now.y) > params.maxCorrection) {
+        reset_dx_ = 0.0f; // for the log: this reset was skipped
+        reset_dy_ = 0.0f;
+        ++reset_skips_;
         return false;
     }
-    setPose(x, y, now.theta);
+    setPose(x, y, now.theta); // logs the correction
     return true;
 }
 

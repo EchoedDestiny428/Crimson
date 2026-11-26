@@ -2,6 +2,7 @@
 
 #include "autons/autons.hpp"
 #include "robotconfig.hpp"
+#include "telemetry/logger.hpp" // telemetry::route() and telemetry::mark(), which PointWeaver's generated code calls
 #include "vision/localizer.hpp"
 
 namespace autons {

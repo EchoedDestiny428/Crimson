@@ -50,6 +50,11 @@ public:
     // Goes up by one every time setPose teleports odometry (auton start, goal resets), so anything following odometry
     // by its motion can tell a reset from real driving.
     std::uint32_t poseResets() const;
+    // For the log: how far (field-frame inches) the last setPose moved odometry (new - old), and how many goal resets
+    // setPoseFromGoal skipped for being too far off. A skipped reset sets the correction to 0.
+    float lastResetDx() const;
+    float lastResetDy() const;
+    std::uint32_t poseResetSkips() const;
 
     void donut(float theta, int timeout, DonutParams params = {}, bool async = true);
     bool setPoseFromGoal(float goalX, float goalY, GoalPoseParams params = {});
@@ -60,6 +65,9 @@ public:
 
 private:
     std::atomic<std::uint32_t> pose_resets_{0};
+    std::atomic<float> reset_dx_{0.0f};
+    std::atomic<float> reset_dy_{0.0f};
+    std::atomic<std::uint32_t> reset_skips_{0};
 };
 
 }

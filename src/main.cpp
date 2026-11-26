@@ -54,6 +54,7 @@ void autonomous() {
 }
 
 void opcontrol() {
+    logger.begin_run("driver", false); // a new log file for driver control
     chassis.cancelAllMotions();
     elevator::arm_pivot::set_hold(true);
     util::start_driver_task("Elevator stages", elevator::macros::update, elevator::macros::stop);
