@@ -69,7 +69,7 @@ void skills_loop_test_start() {
     telemetry::mark(1027);
     chassis.waitUntilDone();
     telemetry::mark(1028);
-    pros::delay(500);
+    pros::delay(250);
     telemetry::mark(1029);
 }
 
@@ -101,7 +101,7 @@ void skills_loop_test_left_loop() {
     telemetry::mark(2012);
     chassis.waitUntilDone();
     telemetry::mark(2013);
-    pros::delay(500);
+    pros::delay(250);
     telemetry::mark(2014);
 }
 
@@ -173,11 +173,11 @@ void skills_loop_test_transition() {
     telemetry::mark(3032);
     chassis.turnToHeading(0, 950, {.minSpeed = 1, .earlyExitRange = 1});
     telemetry::mark(3033);
-    chassis.moveToPose(135.3, 132, 0, 1350); // claw on red right loader (141.6, 132)
+    chassis.moveToPose(135.3, 132, 0, 1250); // claw on red right loader (141.6, 132)
     telemetry::mark(3034);
     chassis.waitUntilDone();
     telemetry::mark(3035);
-    pros::delay(500);
+    pros::delay(250);
     telemetry::mark(3036);
 }
 
@@ -205,11 +205,11 @@ void skills_loop_test_right_loop() {
     telemetry::mark(4010);
     chassis.turnToHeading(0, 950, {.minSpeed = 1, .earlyExitRange = 1});
     telemetry::mark(4011);
-    chassis.moveToPose(135.3, 132, 0, 1350); // claw on red right loader (141.6, 132)
+    chassis.moveToPose(135.3, 132, 0, 1250); // claw on red right loader (141.6, 132)
     telemetry::mark(4012);
     chassis.waitUntilDone();
     telemetry::mark(4013);
-    pros::delay(500);
+    pros::delay(250);
     telemetry::mark(4014);
 }
 
@@ -223,13 +223,13 @@ void skills_loop_test_ending() {
     telemetry::mark(5003);
     chassis.turnToHeading(-26.3, 750, {.minSpeed = 1, .earlyExitRange = 1});
     telemetry::mark(5004);
-    chassis.moveToPoint(72, 72, 1000, {.forwards = false, .maxSpeed = 100}); // goal 0
+    chassis.moveToPoint(72, 72, 800, {.forwards = false, .maxSpeed = 100}); // goal 0
     telemetry::mark(5005);
-    chassis.waitUntil(20.68);
+    chassis.waitUntil(13.16);
     telemetry::mark(5006);
     chassis.cancelMotion();
     telemetry::mark(5007);
-    chassis.moveToPoint(72, 72, 850, {.forwards = false, .maxSpeed = 40, .minSpeed = 1, .earlyExitRange = 8}); // last 45%
+    chassis.moveToPoint(72, 72, 1450, {.forwards = false, .maxSpeed = 40, .minSpeed = 1, .earlyExitRange = 8}); // last 65%
     telemetry::mark(5008);
     chassis.waitUntilDone();
     telemetry::mark(5009);
@@ -302,7 +302,7 @@ void skills_loop_test_ending() {
 }
 
 void run() {
-    telemetry::route("skills-loop-test #5b3a8818");
+    telemetry::route("skills-loop-test #f2f18dd7");
     skills_loop_test_start();
     skills_loop_test_left_loop();
     skills_loop_test_transition();
