@@ -89,6 +89,14 @@ public:
     OdomSample sample();
 
     void donut(float theta, int timeout, DonutParams params = {}, bool async = true);
+    // Waits for the current motion, then drives both sides at power (out of 127; forwards, or backwards when false)
+    // until odometry stops (pressed against a wall, loader or goal), then stops the motors. Blocks up to timeoutMs.
+    // True if it stopped against something (contact), false if it timed out still moving or power / timeoutMs <= 0.
+    // The pose is left alone, and it counts as neither a pose reset nor a skip. setPoseFromGoal pushes with this.
+    // For ending a drive into a loader with a short push instead of creeping the last inch:
+    //     chassis.waitUntilDone();
+    //     chassis.pushUntilStopped(true, 45, 300);
+    bool pushUntilStopped(bool forwards, int power, int timeoutMs);
     bool setPoseFromGoal(float goalX, float goalY, GoalPoseParams params = {});
     // The robot's front (or back) is pressed against the goal at (goalX, goalY); keeps
     // the IMU heading and always applies the reset.
