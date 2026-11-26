@@ -22,10 +22,17 @@ struct DonutParams {
 inline constexpr float kGoalResetFrontIn = 15.0f / 2.54f; // front of the robot against the goal
 inline constexpr float kGoalResetBackIn = 22.0f / 2.54f;  // back of the robot against the goal
 
+// setPoseFromGoal only resets once the robot is really against the goal: it first pushes toward the goal at
+// pushPower (out of 127) until odometry stops moving (it hit the goal), then resets. A move that timed out short of
+// the goal, or a robot still coasting in, gets there first instead of being reset in mid-air. No contact within
+// pushTimeout (missed the goal, or it slid): the reset is skipped and odometry is left alone. pushPower 0: no push,
+// reset straight away (the old behaviour).
 struct GoalPoseParams {
     bool forwards = false;     // true: front against the goal; false: back against it
     float distance = 0.0f;     // 0 uses kGoalResetFrontIn or kGoalResetBackIn to match `forwards`
     float maxCorrection = 10;
+    int pushPower = 40;        // out of 127
+    int pushTimeout = 500;     // ms
 };
 
 // Every pose in and out of this class is in the field frame of constants/field_constants.hpp, the one the camera and
