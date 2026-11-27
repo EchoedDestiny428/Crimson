@@ -34,8 +34,12 @@ macros::Pose stage(int level, Goal goal = Goal::Alliance) {
 constexpr double kArriveLiftCm = 1.5;
 constexpr double kArriveArmDeg = 4.0;
 
-// Robot center to goal center when the aligner is seated. The aligner is narrower than the old 7.5 in touch.
-constexpr float kGoalTouchIn = 7.0f;
+// Robot center to goal center when the robot's back is against the goal: where every back-in aims, and the distance
+// for setPoseFromGoal and the donut re-anchor.
+constexpr float kGoalTouchIn = 7.5f;
+// Every back-in aims this far out, 1 in past touching, so it keeps pushing until the goal stops it (wait_stopped).
+// The pose reset and donut re-anchor use kGoalTouchIn.
+constexpr float kGoalStopIn = 6.5f;
 
 // The lift and chain bar are within kArrive* of their targets. macros::settled() also waits for both controllers to
 // report settled, which hangs a few hundred ms after they're already there.
@@ -55,10 +59,16 @@ template <typename Done> void wait_until(Done done, std::uint32_t timeout_ms) {
     }
 }
 
-// The arm is on its hardstop (the home's push has finished; it rests there, not on its 30 deg target) and the lift is
-// back down.
+// Low enough to go for the next pin: the chain bar is at or below kHomedEnoughDeg and the lift is back down. The home
+// keeps going in the background (the push onto the hardstop and the encoder reset there) while the robot drives.
+constexpr double kHomedEnoughDeg = 35.0;
+
 void wait_homed() {
-    wait_until([] { return !subsystems::elevator::arm_pivot::homing() && lift_arrived(); }, 2000);
+    wait_until([] {
+        const bool arm_down =
+            !subsystems::elevator::arm_pivot::homing() || macros::pose_now().arm_deg <= kHomedEnoughDeg;
+        return arm_down && lift_arrived();
+    }, 2000);
 }
 
 // At the goal after aim(): drop as soon as the lift and chain bar reach the scoring pose, then start homing straight
@@ -83,11 +93,40 @@ void wait_near(float x, float y, float within) {
     }
 }
 
+// End a goal back-in as soon as the robot stops against the goal, instead of waiting out the drive's timeout: it
+// rests past the drive's target there, so the drive never counts as done. Stopped: the tracking wheels moved under
+// 0.01 in per 10 ms (1 in/s) for 60 ms, ignoring the first 100 ms. timeout_ms is the backstop.
+void wait_stopped(std::uint32_t timeout_ms) {
+    const std::uint32_t start = pros::millis();
+    lemlib::Pose last = chassis.getPose();
+    std::uint32_t still_since = 0;
+    while (pros::millis() - start < timeout_ms) {
+        pros::delay(10);
+        const lemlib::Pose pose = chassis.getPose();
+        const bool still = std::hypot(pose.x - last.x, pose.y - last.y) < 0.01f;
+        last = pose;
+        if (!still || pros::millis() - start < 100) {
+            still_since = 0;
+            continue;
+        }
+        if (still_since == 0) {
+            still_since = pros::millis();
+        }
+        if (pros::millis() - still_since >= 60) {
+            break;
+        }
+    }
+    chassis.cancelMotion();
+}
+
 void setup() {}
 
 void run() {
     chassis.setPose(135.5, 72, 180); // the old start, turned to face blue
     claw::grab(); // hold the preload; the claw boots open
+    // Chain bar a little up off the hardstop (25 -> 40 deg, the claw ~4 cm higher, in front) so the preload doesn't
+    // drag on the tiles during the toggles and the drive out; the home after the drive brings it back down.
+    macros::aim({0.0, 40.0});
 
     // Side toggles one turn each (~0.3 s at 200 rpm), the right one 150 ms behind the left.
     pros::Motor toggle_left(ports::kSideToggleLeft);
@@ -102,8 +141,8 @@ void run() {
     chassis.moveToPoint(120, 72, 800); // 15.5 in
     chassis.waitUntilDone();
     // Only now, clear of the wall: home, then the lift goes to the preload height and the chain bar swings to 25 deg
-    // above L1 during the turn and the back-in. The pin stays clear of the goal. The last of the L1 swing happens
-    // once the robot is stopped on it.
+    // above L1 during the turn and the back-in. The pin stays clear of the goal. The last of the L1 swing starts on
+    // the slow last 6 in.
     macros::home_async();
     // L1's lift is 3 cm. This first pin releases 1.75 cm lower; later scores stay on the normal stages.
     macros::Pose preload = stage(1);
@@ -113,38 +152,41 @@ void run() {
     macros::aim_staged(hover, [] { return !subsystems::elevator::arm_pivot::homing(); });
     chassis.turnToHeading(90, 700);
     chassis.waitUntilDone();
-    // 17 in back to the goal. Full speed for the first 11 in, then the rest at 45 so it seats without bouncing.
-    chassis.moveToPoint(120, 89.0, 800, {.forwards = false});
-    chassis.waitUntil(11);
+    // Back-ins (Roy's): full speed, then the last 6 in before contact at 50 so it seats without bouncing. Every one
+    // aims 1 in past touching the goal (centre kGoalStopIn from the goal's) and ends once the goal stops it.
+    chassis.moveToPoint(120, 89.5, 800, {.forwards = false}); // red goal 2, 16.5 in to contact
+    chassis.waitUntil(10.5); // 6 in before contact
     chassis.cancelMotion();
-    chassis.moveToPoint(120, 89.0, 500, {.forwards = false, .maxSpeed = 45});
-    chassis.waitUntilDone();
+    chassis.moveToPoint(120, 89.5, 600, {.forwards = false, .maxSpeed = 50});
+    macros::aim(preload); // the rest of the L1 motion (the last 25 deg), during the slow last 6 in; it finishes in the donut
+    wait_stopped(600);
     chassis.setPoseFromGoal(120, 96, {.distance = kGoalTouchIn});
-    macros::aim(preload); // the rest of the L1 motion, only now that the robot is on the goal
-    wait_until(arrived, 800);
-    claw::release();
-    pros::delay(250); // pin has to fall onto the goal before the chain bar moves
-    macros::home_async();
 
     // skills right_start: donut(180, 1750) + moveToPoint(102.3, 96, 750)
-    chassis.donut(180, 2100, {.forwards = false, .slowSpeed = 35}); // facing pin (96, 96)
+    chassis.donut(180, 1650, {.forwards = false, .slowSpeed = 35, .reanchor = true, .goalDistance = kGoalTouchIn}); // facing pin (96, 96)
+    score(); // the preload, during the donut
     wait_homed(); // homed before the claw reaches the pin
     chassis.moveToPoint(103.05, 96, 750, {.earlyExitRange = 0.5}); // claw on yellow pin (96, 96), 0.75 in short of skills' 102.3
     wait_near(103.05, 96, 1);
     claw::grab(); // clamp during the last inch
     chassis.waitUntilDone();
-    macros::aim(stage(2)); // lift and chain bar together while backing onto the goal
-    // 10 in back. Full speed, then the last 5 in at 45 so the aligner is seated before the donut.
-    chassis.moveToPoint(113.0, 96, 900, {.forwards = false});
-    chassis.waitUntil(5);
+    // Hover: the lift goes to L2 but the chain bar stops at 270 on the way in, so it isn't still swinging back when the
+    // robot hits the goal (that rode it up onto the goal). The last ~40 deg to L2 (312) is after contact; at 180 that
+    // was ~130 deg and held up the drop.
+    macros::Pose hover_l2 = stage(2);
+    hover_l2.arm_deg = 270.0;
+    macros::aim(hover_l2);
+    // Stops at contact (centre kGoalTouchIn from the goal's) instead of pushing 1 in past it into the goal.
+    chassis.moveToPoint(112.5, 96, 900, {.forwards = false}); // red goal 2, 9.45 in to contact
+    chassis.waitUntil(3.45); // 6 in before contact
     chassis.cancelMotion();
-    chassis.moveToPoint(113.0, 96, 500, {.forwards = false, .maxSpeed = 45});
-    chassis.waitUntilDone();
+    chassis.moveToPoint(112.5, 96, 600, {.forwards = false, .maxSpeed = 50});
+    wait_stopped(600); // still ends on a stall too, in case odometry is off and it reaches the goal early
     chassis.setPoseFromGoal(120, 96, {.distance = kGoalTouchIn});
-    wait_until(arrived, 800); // chain bar done moving before the pivot, so it doesn't lever the goal off
+    macros::aim(stage(2)); // finish the swing to L2 now that the robot is on the goal; it finishes in the donut
 
-    // Inner wheel at 20, not 35: at 35 it drives forward hard enough to walk the aligner off the stake.
-    chassis.donut(-90, 2100, {.forwards = false, .slowSpeed = 20}); // facing pin (120, 120)
+    // Roy: at 35 the inner wheel drives forward hard enough to walk the aligner off the stake.
+    chassis.donut(-90, 1650, {.forwards = false, .slowSpeed = 35, .reanchor = true, .goalDistance = kGoalTouchIn}); // facing pin (120, 120)
     score(); // during the donut
     wait_homed(); // homed before the claw reaches the pin
     chassis.moveToPoint(120, 112.95, 750, {.earlyExitRange = 0.5}); // claw on yellow pin (120, 120), 0.75 in short of skills' 113.7
@@ -153,27 +195,60 @@ void run() {
     chassis.waitUntilDone();
     pros::delay(100); // allow pneumatics to fully bite before whipping arm backward
     macros::aim(stage(3)); // lift and chain bar together while backing onto the goal
-    chassis.moveToPoint(120, 103.0, 1200, {.forwards = false}); // red goal 2, centre kGoalTouchIn out
-    chassis.waitUntilDone();
+    chassis.moveToPoint(120, 102.5, 900, {.forwards = false}); // red goal 2, 9.45 in to contact
+    chassis.waitUntil(3.45); // 6 in before contact
+    chassis.cancelMotion();
+    chassis.moveToPoint(120, 102.5, 600, {.forwards = false, .maxSpeed = 50});
+    wait_stopped(600);
     chassis.setPoseFromGoal(120, 96, {.distance = kGoalTouchIn});
 
     // skills transition: donut(0, 950) + moveToPoint(135.5, 96, 700)
-    chassis.donut(0, 2100, {.forwards = false, .slowSpeed = 35}); // facing the wall pin; a 90 deg turn like the others
+    chassis.donut(0, 1650, {.forwards = false, .slowSpeed = 35, .reanchor = true, .goalDistance = kGoalTouchIn}); // facing the wall pin; a 90 deg turn like the others
     score(); // during the donut
     chassis.waitUntilDone();
-    wait_homed(); // fully home before driving at the wall, or the claw comes down on it
+    wait_homed(); // down to 35 deg before driving at the wall; the home finishes on the way
     macros::aim_lift({6.0, 30.0}); // higher than the old 4 cm so the claw bites the wall pin instead of catching it loose
-    chassis.moveToPoint(138.2, 96, 700, {.maxSpeed = 100}); // 1.5 in deeper than 136.7, into the wall pin (141.8, 96)
-    chassis.waitUntilDone();
+    // claw on wall pin (141.8, 96): at 30 deg the claw is 7.09 in ahead of centre, so this puts it 0.5 in past the pin
+    chassis.moveToPoint(135.21, 96, 900, {.earlyExitRange = 0.5});
+    wait_stopped(900); // ends once stopped, on the target or against the pin and wall
     macros::pickup();
-    pros::delay(250); // let the claw finish biting before the arm swings, so the wall pin isn't flung
-    macros::aim(stage(2, Goal::Neutral)); // L2 on the neutral goal; lift and chain bar move during the turn and drive
+    // Two steps instead of a 250 ms wait for the bite: straight after the grip, the lift goes to L2-neutral and the
+    // chain bar only a little way up (90 deg), a gentle move that doesn't fling the pin. The full swing to L2 starts
+    // once the turn is done, during the drive to the neutral goal.
+    macros::Pose lift_off = stage(2, Goal::Neutral);
+    lift_off.arm_deg = 90.0;
+    macros::aim(lift_off);
     chassis.turnToPoint(120, 48, 500, {.forwards = false});
     chassis.waitUntilDone();
+    macros::aim(stage(2, Goal::Neutral)); // L2 on the neutral goal, during the drive
     // neutral goal (120, 48), centre kGoalTouchIn out on the line from the wall pin: seated in the aligner
-    chassis.moveToPoint(122.3, 54.6, 1600, {.forwards = false});
-    chassis.waitUntilDone();
+    chassis.moveToPoint(122.44, 55.09, 1300, {.forwards = false}); // 43.3 in to contact; stops at contact, not 1 in in
+    chassis.waitUntil(34.3); // 9 in before contact
+    chassis.cancelMotion();
+    chassis.moveToPoint(122.44, 55.09, 800, {.forwards = false, .maxSpeed = 50}); // last 9 in at 50
+    wait_stopped(900); // 9 in at 50 takes longer than 600
     chassis.setPoseFromGoal(120, 48, {.distance = kGoalTouchIn});
+
+    // Donut to 0 while scoring the wall pin, facing the next wall pin (141.8, 48).
+    chassis.donut(0, 1650, {.forwards = false, .slowSpeed = 35, .reanchor = true, .goalDistance = kGoalTouchIn}); // facing wall pin (141.8, 48)
+    score(); // during the donut
+    chassis.waitUntilDone();
+
+    // Final wall pin (141.8, 48), the same pickup as the first wall pin, then straight back onto the neutral goal as
+    // its L3. The robot ends the donut on the goal at (127.5, 48), facing the pin, 7.7 in from the pickup point.
+    wait_homed(); // down to 35 deg before driving at the wall; the home finishes on the way
+    macros::aim_lift({6.0, 30.0});
+    chassis.moveToPoint(135.21, 48, 900, {.earlyExitRange = 0.5}); // claw 0.5 in past the pin at 30 deg
+    wait_stopped(900); // ends once stopped, on the target or against the pin and wall
+    macros::pickup();
+    // Gentle lift-off as at the first wall pin; the swing to L3 waits for contact, too short a drive to finish it.
+    macros::Pose lift_off_l3 = stage(3, Goal::Neutral);
+    lift_off_l3.arm_deg = 90.0;
+    macros::aim(lift_off_l3);
+    chassis.moveToPoint(127.5, 48, 800, {.forwards = false, .maxSpeed = 50}); // neutral goal, 7.7 in to contact
+    wait_stopped(900);
+    chassis.setPoseFromGoal(120, 48, {.distance = kGoalTouchIn});
+    macros::aim(stage(3, Goal::Neutral)); // L3 on the neutral goal
     score();
 }
 

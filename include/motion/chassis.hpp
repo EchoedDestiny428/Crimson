@@ -15,6 +15,16 @@ struct DonutParams {
     int fastSpeed = 127;
     int slowSpeed = 15;
     float earlyExitRange = 0;
+    // Re-anchor (from Zach's prelude-to-chaos donut): the goal stays in the hole through a donut, so when it ends the
+    // pose is put back on that goal (where it was at the start, goal distance along the new heading), wiping out what
+    // odometry drifted while spinning (0.1-0.35 in a donut in the 2026-11-27 logs). Only if the donut really stayed on
+    // the goal: the IMU heading ended within reanchorMaxDeg of theta, and the goal position odometry implies moved less
+    // than reanchorMaxDriftIn. Otherwise (the donut left the goal) the pose is left alone. Off unless asked for:
+    // goalDistance has to match the distance the auton resets from the goal with, or it re-anchors off by the difference.
+    bool reanchor = false;
+    float goalDistance = 0.0f; // 0 uses kGoalResetFrontIn or kGoalResetBackIn to match `forwards`
+    float reanchorMaxDeg = 10.0f;
+    float reanchorMaxDriftIn = 2.0f;
 };
 
 // The v1 robot's curve: exit along exitHeading, aim for a point entryLength short of the target along entryHeading,

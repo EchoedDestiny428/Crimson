@@ -11,6 +11,9 @@ namespace {
 
 constexpr std::uint32_t kPeriodMs = 10;
 constexpr float kSettleWindowDeg = 90.0f;
+// The donut ends within this of its heading, or once it passes it (turns keep LemLib's exits).
+constexpr float kDonutExitDeg = 1.5f;
+constexpr float kDonutMinSpin = 17.0f; // the PID's spin never drops below this, so the donut never stalls short
 
 struct LemlibPoint {
     float x;
@@ -112,7 +115,18 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
         return;
     }
 
-    const float start_heading = getPose().theta;
+    // The goal this donut pivots on, from where the robot starts: goal distance behind it (in front when forwards).
+    const lemlib::Pose start_pose = getPose();
+    const float side = params.forwards ? -1.0f : 1.0f; // as in setPoseFromGoal: robot = goal + side * d * facing
+    const float goal_distance =
+        params.goalDistance > 0.0f ? params.goalDistance : (params.forwards ? kGoalResetFrontIn : kGoalResetBackIn);
+    const auto goal_from = [side, goal_distance](const lemlib::Pose& pose) {
+        const float h = lemlib::degToRad(pose.theta); // facing h in the field frame points along (cos h, -sin h)
+        return lemlib::Pose(pose.x - side * goal_distance * std::cos(h), pose.y + side * goal_distance * std::sin(h));
+    };
+    const lemlib::Pose goal = goal_from(start_pose);
+
+    const float start_heading = start_pose.theta;
     const lemlib::AngularDirection direction = lemlib::angleError(theta, start_heading, false, params.direction) >= 0
                                                    ? lemlib::AngularDirection::CW_CLOCKWISE
                                                    : lemlib::AngularDirection::CCW_COUNTERCLOCKWISE;
@@ -122,17 +136,15 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
     const float max_spin = static_cast<float>(params.fastSpeed + params.slowSpeed) / 2.0f;
 
     angularPID.reset();
-    angularSmallExit.reset();
 
     const std::uint32_t start_time = pros::millis();
     std::optional<float> previous_raw_error;
     bool settling = false;
     distTraveled = 0;
 
-    // Small exit only (within 1 deg for 50 ms). The large exit ends a turn while it is still up to 3 deg off, which
-    // leaves the claw tilted into a pin. The timeout is the cap when the heading never gets there.
-    while (motionRunning && pros::millis() - start_time < static_cast<std::uint32_t>(timeout) &&
-           !angularSmallExit.getExit()) {
+    // Spin from the PID, capped at max_spin and never under kDonutMinSpin; the donut ends within kDonutExitDeg of
+    // the heading or as soon as it passes it. The timeout is the cap when the heading never gets there.
+    while (motionRunning && pros::millis() - start_time < static_cast<std::uint32_t>(timeout)) {
         const float heading = getPose().theta;
         distTraveled = std::fabs(heading - start_heading);
 
@@ -144,12 +156,12 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
         previous_raw_error = raw_error;
 
         const float error = settling ? raw_error : lemlib::angleError(theta, heading, false, direction);
-        angularSmallExit.update(error);
-        if (params.earlyExitRange > 0 && std::fabs(error) < params.earlyExitRange) {
+        if (settling || std::fabs(error) <= std::max(kDonutExitDeg, params.earlyExitRange)) {
             break;
         }
 
-        const float spin = std::clamp(angularPID.update(error), -max_spin, max_spin);
+        const float spin_size = std::clamp(std::fabs(angularPID.update(error)), kDonutMinSpin, max_spin);
+        const float spin = error > 0 ? spin_size : -spin_size;
         drivetrain.leftMotors->move(static_cast<std::int32_t>(std::lround(push + spin)));
         drivetrain.rightMotors->move(static_cast<std::int32_t>(std::lround(push - spin)));
         pros::delay(kPeriodMs);
@@ -157,6 +169,21 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
 
     drivetrain.leftMotors->move(0);
     drivetrain.rightMotors->move(0);
+
+    if (params.reanchor) {
+        // Back onto the goal it started on, if it stayed on it: ended facing about where it should (the IMU), and
+        // odometry still puts the goal about where it was.
+        const lemlib::Pose end_pose = getPose();
+        const lemlib::Pose goal_now = goal_from(end_pose);
+        const bool on_heading = std::fabs(lemlib::angleError(theta, end_pose.theta, false)) <= params.reanchorMaxDeg;
+        const bool on_goal = std::hypot(goal_now.x - goal.x, goal_now.y - goal.y) <= params.reanchorMaxDriftIn;
+        if (on_heading && on_goal) {
+            const float h = lemlib::degToRad(end_pose.theta);
+            setPose(goal.x + side * goal_distance * std::cos(h), goal.y - side * goal_distance * std::sin(h),
+                    end_pose.theta);
+        }
+    }
+
     distTraveled = -1;
     endMotion();
 }
