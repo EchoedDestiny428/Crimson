@@ -12,10 +12,9 @@ namespace {
 constexpr std::uint32_t kPeriodMs = 10;
 constexpr float kSettleWindowDeg = 90.0f;
 
-// pushUntilStopped (and setPoseFromGoal's push through it): against something once odometry has moved less than
-// kStoppedInPerTick a tick for kStoppedMs, after at least kPushMinMs of pushing (so a robot still rolling in isn't
-// mistaken for stopped).
-constexpr float kStoppedInPerTick = 0.01f; // 1 in/s
+// pushUntilStopped (and setPoseFromGoal's push through it): against something once odometry has moved slower than its
+// stillInPerS (checked every kPeriodMs tick) for kStoppedMs, after at least kPushMinMs of pushing (so a robot still
+// rolling in isn't mistaken for stopped).
 constexpr std::uint32_t kStoppedMs = 60;
 constexpr std::uint32_t kPushMinMs = 80;
 
@@ -210,11 +209,12 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
     endMotion();
 }
 
-bool Chassis::pushUntilStopped(bool forwards, int power, int timeoutMs) {
+bool Chassis::pushUntilStopped(bool forwards, int power, int timeoutMs, float stillInPerS) {
     waitUntilDone();
     if (power <= 0 || timeoutMs <= 0) {
         return false;
     }
+    const float still_in_per_tick = std::max(stillInPerS, 0.0f) * static_cast<float>(kPeriodMs) / 1000.0f;
     const int signed_power = forwards ? power : -power;
     drivetrain.leftMotors->move(signed_power);
     drivetrain.rightMotors->move(signed_power);
@@ -232,7 +232,7 @@ bool Chassis::pushUntilStopped(bool forwards, int power, int timeoutMs) {
         pros::delay(kPeriodMs);
         const std::uint32_t now_ms = pros::millis();
         const lemlib::Pose pose = raw_pose();
-        const bool still = std::hypot(pose.x - last.x, pose.y - last.y) < kStoppedInPerTick;
+        const bool still = std::hypot(pose.x - last.x, pose.y - last.y) < still_in_per_tick;
         last = pose;
         if (!still || now_ms - start < kPushMinMs) {
             stopped_since = 0;
@@ -250,7 +250,8 @@ bool Chassis::pushUntilStopped(bool forwards, int power, int timeoutMs) {
 
 bool Chassis::setPoseFromGoal(float goalX, float goalY, GoalPoseParams params) {
     // Push toward the goal until odometry stops: then the robot is really against it.
-    if (params.pushPower > 0 && !pushUntilStopped(params.forwards, params.pushPower, params.pushTimeout)) {
+    if (params.pushPower > 0 &&
+        !pushUntilStopped(params.forwards, params.pushPower, params.pushTimeout, params.stillInPerS)) {
         // never stopped against anything: don't trust a reset
         reset_dx_ = 0.0f;
         reset_dy_ = 0.0f;

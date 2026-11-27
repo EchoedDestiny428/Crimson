@@ -42,6 +42,10 @@ struct GoalPoseParams {
     float maxCorrection = 10;
     int pushPower = 40;        // out of 127
     int pushTimeout = 500;     // ms
+    // Against the goal once odometry moves slower than this (in/s; loader pushes use 1). 2, not 1: in run 37 two goal
+    // pushes crept against the goal at 1-2 in/s to their 500 ms cap; replayed at 2 they end 0.29 s sooner, with the
+    // pose within ~0.2 in and 0.5 deg of where the 1 in/s push stopped.
+    float stillInPerS = 2.0f;
 };
 
 // Every pose in and out of this class is in the field frame of constants/field_constants.hpp, the one the camera and
@@ -90,13 +94,14 @@ public:
 
     void donut(float theta, int timeout, DonutParams params = {}, bool async = true);
     // Waits for the current motion, then drives both sides at power (out of 127; forwards, or backwards when false)
-    // until odometry stops (pressed against a wall, loader or goal), then stops the motors. Blocks up to timeoutMs.
+    // until odometry stops (moving slower than stillInPerS for 60 ms: pressed against a wall, loader or goal), then
+    // stops the motors. Blocks up to timeoutMs.
     // True if it stopped against something (contact), false if it timed out still moving or power / timeoutMs <= 0.
     // The pose is left alone, and it counts as neither a pose reset nor a skip. setPoseFromGoal pushes with this.
     // For ending a drive into a loader with a short push instead of creeping the last inch:
     //     chassis.waitUntilDone();
     //     chassis.pushUntilStopped(true, 45, 300);
-    bool pushUntilStopped(bool forwards, int power, int timeoutMs);
+    bool pushUntilStopped(bool forwards, int power, int timeoutMs, float stillInPerS = 1.0f);
     bool setPoseFromGoal(float goalX, float goalY, GoalPoseParams params = {});
     // The robot's front (or back) is pressed against the goal at (goalX, goalY); keeps
     // the IMU heading and always applies the reset.

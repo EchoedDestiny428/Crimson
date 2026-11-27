@@ -82,8 +82,15 @@ public:
      * (units / s; 0: no cap), plus kV x the setpoint's speed (power per unit / s) so it doesn't fall behind. The
      * setpoint never gets more than maxLag (0: no limit) ahead of the motor. Settling and the minimum power wait for
      * the setpoint to reach the target. maxAcceleration 0 (the default) turns it off.
+     * aheadFade (units; 0, the default: off): the kV push fades out as the motor gets ahead of the setpoint, from full
+     * when level or behind to none once aheadFade ahead, so something carrying the motor along (gravity on an arm)
+     * isn't pushed on past the setpoint into an overshoot.
+     * aheadBrake (power per unit / s; 0, the default: off): while the motor is ahead of the setpoint and moving faster
+     * than it, push back by this much per unit / s of the difference, so it's braked back onto the setpoint instead of
+     * carrying on past the target.
      */
-    void setProfile(float maxAcceleration, float maxVelocity = 0.0f, float kV = 0.0f, float maxLag = 0.0f);
+    void setProfile(float maxAcceleration, float maxVelocity = 0.0f, float kV = 0.0f, float maxLag = 0.0f,
+                    float aheadFade = 0.0f, float aheadBrake = 0.0f);
     /**
      * With setProfile: the last `fraction` (0..1) of every move runs at most `velocity` (units / s), slowing down to it
      * before that part starts, so the move eases in instead of arriving at speed. fraction 0 (the default) turns it off.
@@ -130,12 +137,16 @@ private:
     std::atomic<float> profileMaxVelocity{0.0f};
     std::atomic<float> profileKV{0.0f};
     std::atomic<float> profileMaxLag{0.0f};
+    std::atomic<float> profileAheadFade{0.0f};
+    std::atomic<float> profileAheadBrake{0.0f};
     std::atomic<float> profileFinishFraction{0.0f};
     std::atomic<float> profileFinishVelocity{0.0f};
     float profileSpan = 0.0f; // control task only: the current move's length, for setProfileFinish
     bool profileActive = false;   // control task only: the setpoint below is in use
     float profilePosition = 0.0f; // control task only
     float profileVelocity = 0.0f; // control task only, units / s
+    float lastPidPosition = 0.0f; // control task only: the position runPid read last tick, for the measured speed
+    bool lastPidPositionValid = false; // control task only: false after open-loop power (or a re-zero) and at start
 
     std::atomic<float> encoderOffset{0.0f};
     std::atomic<float> target{0.0f};

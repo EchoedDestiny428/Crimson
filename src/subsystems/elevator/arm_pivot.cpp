@@ -60,6 +60,14 @@ constexpr double kSwingAccelMinDegPerS2 = 1000.0;
 constexpr float kSwingMaxSpeedDegPerS = 480.0f; // a red motor tops out at 600 deg/s; the rest is room for the PID
 constexpr float kSwingKV = 127.0f / 600.0f;     // power per deg/s of setpoint speed (full power is ~600 deg/s)
 constexpr float kSwingMaxLagDeg = 15.0f;        // the setpoint waits for the arm if it gets this far ahead
+// The speed push fades out over the first kSwingAheadFadeDeg the arm gets ahead of its setpoint (gravity carrying it
+// down the far side of a swing): full push wasn't letting the PID brake, and every swing in run 37 overshot 12-25 deg.
+constexpr float kSwingAheadFadeDeg = 5.0f;
+// And while the arm is ahead and faster than its setpoint, push back kSwingAheadBrake per deg/s of the difference: the
+// fade alone left L3 (44 deg past straight up, gravity pulling it on) overshooting ~13 deg in a model fitted to run 37;
+// with this ~7-9 deg, the low-angle swings 3-5 deg, and none stopping short, across +-20-30% model error. 0.4 started
+// ending past the 2 deg hold range.
+constexpr float kSwingAheadBrake = 0.3f;
 // Swinging home (from a stage back to the front): the last 40% at 40% speed, so the arm eases into the hardstop
 // instead of slamming. Swings out to a stage don't slow down.
 constexpr float kHomeFinishFraction = 0.4f;
@@ -79,7 +87,8 @@ void update_profile() {
     const double lift_cm = constants::extension_motor_deg_to_cm(std::max(extension::height(), extension::target()));
     const double accel = std::isfinite(lift_cm) ? swing_accel_for(lift_cm) : kSwingAccelMinDegPerS2;
     swing_accel_now = static_cast<float>(accel);
-    motor.setProfile(static_cast<float>(accel), kSwingMaxSpeedDegPerS, kSwingKV, kSwingMaxLagDeg);
+    motor.setProfile(static_cast<float>(accel), kSwingMaxSpeedDegPerS, kSwingKV, kSwingMaxLagDeg, kSwingAheadFadeDeg,
+                     kSwingAheadBrake);
 }
 
 // Homing: PID to the home angle, then once within kHomeHandoffDeg of it, push down at

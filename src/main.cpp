@@ -38,6 +38,17 @@ void initialize() {
     logger.register_robot_fields();
     // How hard the arm is allowed to swing right now (it follows the lift height): pairs with imu_pitch/roll in the log.
     logger.register_field("arm_swing_accel_dps2", [](const void*) { return elevator::arm_pivot::swing_accel(); });
+    // The elevator as the macros see it (the port columns' target_position is 0 for SmartMotor-driven motors): lift cm
+    // above its start, arm degrees from straight down, and what each is commanded to (the arm's with its slack
+    // adjustment); the claw (1 closed); settled as macros::settled() and wait_settled() see it; the arm's home still
+    // on its way to the hardstop.
+    logger.register_field("lift_cm", [](const void*) { return elevator::macros::pose_now().lift_cm; });
+    logger.register_field("lift_target_cm", [](const void*) { return elevator::macros::target_now().lift_cm; });
+    logger.register_field("arm_deg", [](const void*) { return elevator::macros::pose_now().arm_deg; });
+    logger.register_field("arm_target_deg", [](const void*) { return elevator::macros::target_now().arm_deg; });
+    logger.register_field("claw_closed", [](const void*) { return elevator::claw::is_closed() ? 1.0 : 0.0; });
+    logger.register_field("elev_settled", [](const void*) { return elevator::macros::settled() ? 1.0 : 0.0; });
+    logger.register_field("arm_homing", [](const void*) { return elevator::arm_pivot::homing() ? 1.0 : 0.0; });
     logger.start();
 
     screen::start();

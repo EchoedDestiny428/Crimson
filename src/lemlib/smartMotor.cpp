@@ -213,10 +213,13 @@ void SmartMotor::setMinPower(float power, float range) {
     minPowerRange = std::max(0.0f, range);
 }
 
-void SmartMotor::setProfile(float maxAcceleration, float maxVelocity, float kV, float maxLag) {
+void SmartMotor::setProfile(float maxAcceleration, float maxVelocity, float kV, float maxLag, float aheadFade,
+                            float aheadBrake) {
     profileMaxVelocity = std::max(0.0f, maxVelocity);
     profileKV = kV;
     profileMaxLag = std::max(0.0f, maxLag);
+    profileAheadFade = std::max(0.0f, aheadFade);
+    profileAheadBrake = std::max(0.0f, aheadBrake);
     profileAcceleration = std::max(0.0f, maxAcceleration);
 }
 
@@ -249,6 +252,7 @@ void SmartMotor::controlLoop() {
         if (manual) {
             positionCommanded = false;
             profileActive = false; // the next PID move starts its profile from wherever this leaves the motor
+            lastPidPositionValid = false; // (setPosition's re-zero also goes through here: no speed across the jump)
             const float cap = maxPower;
             float output = std::clamp(static_cast<float>(manualPower.load()), -cap, cap);
             if (outputFilter) {
@@ -346,10 +350,16 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
     if (!std::isfinite(goal - position)) {
         controller.reset();
         profileActive = false;
+        lastPidPositionValid = false;
         brakedAt = std::numeric_limits<float>::quiet_NaN();
         actuator->brake();
         return;
     }
+    // The motor's speed from this tick's and last tick's positions (units / s), for setProfile's aheadBrake.
+    const bool haveSpeed = lastPidPositionValid;
+    const float measuredSpeed = haveSpeed ? (position - lastPidPosition) * 1000.0f / static_cast<float>(kPeriodMs) : 0.0f;
+    lastPidPosition = position;
+    lastPidPositionValid = true;
 
     // With setProfile the PID chases a setpoint easing toward the goal; without it the setpoint is the goal. A move
     // that starts from rest starts its setpoint where the motor is; a new target mid-move carries on from the setpoint.
@@ -406,7 +416,32 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
     }
     brakedAt = std::numeric_limits<float>::quiet_NaN(); // driving again (or not there yet)
 
-    float output = controller.update(error) + feedforward + profileKV * setpointVelocity;
+    // The profile's speed push (kV), faded out as the motor gets ahead of the setpoint (setProfile's aheadFade). Without
+    // the fade, an arm that gravity carries past its setpoint gets the full push on top (the setpoint, held within
+    // maxLag, comes along with it), and overshoots: 12-25 deg on every swing in run 37.
+    float speedPush = profileKV * setpointVelocity;
+    const float fade = profileAheadFade;
+    if (fade > 0.0f && setpointVelocity != 0.0f) {
+        const float ahead = setpointVelocity > 0.0f ? position - setpoint : setpoint - position;
+        if (ahead > 0.0f) {
+            speedPush *= std::max(0.0f, 1.0f - ahead / fade);
+        }
+    }
+    float output = controller.update(error) + feedforward + speedPush;
+    // setProfile's aheadBrake: ahead of the setpoint and faster than it, push back in proportion to how much faster.
+    // The PID alone can't: the setpoint is held within maxLag of the motor, so its error (and braking) stays small.
+    // Added after the output filter below, so a cap on pushing toward a limit (the arm's last 15 deg before 315) can't
+    // swallow it: it only ever pushes against the motion.
+    float aheadBrake = 0.0f;
+    const float brakeGain = profileAheadBrake;
+    if (brakeGain > 0.0f && haveSpeed && setpointVelocity != 0.0f) {
+        const float direction = setpointVelocity > 0.0f ? 1.0f : -1.0f;
+        const float ahead = (position - setpoint) * direction;
+        const float faster = (measuredSpeed - setpointVelocity) * direction;
+        if (ahead > 0.0f && faster > 0.0f) {
+            aheadBrake = -direction * brakeGain * faster;
+        }
+    }
     if (positionFeedforward) {
         output += positionFeedforward(position);
     }
@@ -429,6 +464,9 @@ void SmartMotor::runPid(float goal, float position, bool newTarget) {
     output = std::clamp(output, -std::min(cap, maxReversePower.load()), cap);
     if (outputFilter) {
         output = outputFilter(position, output);
+    }
+    if (aheadBrake != 0.0f) {
+        output = std::clamp(output + aheadBrake, -std::min(cap, maxReversePower.load()), cap);
     }
     actuator->move(static_cast<std::int32_t>(output));
 }
