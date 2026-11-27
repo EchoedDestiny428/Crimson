@@ -11,7 +11,7 @@ namespace autons {
 
 namespace {
 
-constexpr std::string_view kDefaultRoutine = "Skills";
+constexpr std::string_view kDefaultRoutine = "Default";
 
 struct Routine {
     const char* name;
@@ -22,6 +22,7 @@ struct Routine {
 // Add the new robot's routines here.
 constexpr std::array kRoutines{
     Routine{"Skills", skills::setup, skills::run},
+    Routine{"Default", match::default_match::setup, match::default_match::run}, // PointWeaver's 15 s match auton
     Routine{"None", nullptr, nullptr},
 };
 
