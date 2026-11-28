@@ -3,6 +3,7 @@
 #include "config/camera.hpp"
 #include "display/controller_hud.hpp"
 #include "robotconfig.hpp"
+#include "subsystems/arm_tune.hpp"
 #include "subsystems/drive.hpp"
 #include "subsystems/elevator/claw.hpp"
 #include "subsystems/elevator/extension.hpp"
@@ -70,18 +71,20 @@ void autonomous() {
     autons::run_selected();
 }
 
+// arm-tuning branch: driver control is the drive and the arm overshoot tuner (src/subsystems/arm_tune.cpp, controls in
+// its header). The stage macros, claw buttons other than A, side toggle and HUD are off.
 void opcontrol() {
-    logger.begin_run("driver", false); // a new log file for driver control
+    logger.begin_run("arm_tune", false); // a new log file: arm_deg / arm_target_deg trace every swing
     chassis.cancelAllMotions();
     elevator::arm_pivot::set_hold(true);
-    util::start_driver_task("Elevator stages", elevator::macros::update, elevator::macros::stop);
-    util::start_driver_task("Claw", elevator::claw::update);
-    util::start_driver_task("Side toggle", side_toggle::update, side_toggle::stop);
-    util::start_driver_task("HUD", display::controller_hud::update);
 
     std::uint32_t now = pros::millis();
     while (true) {
         drive::update();
+        arm_tune::update(); // blocks while a swing or the sweep runs
+        if (pros::millis() - now > 2 * util::kLoopMs) {
+            now = pros::millis(); // back from a blocking swing: don't catch up on missed loops
+        }
         pros::Task::delay_until(&now, util::kLoopMs);
     }
 }
