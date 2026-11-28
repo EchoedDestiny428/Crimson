@@ -18,6 +18,9 @@
 >
 > Changing the kernel version is a team decision: announce it, update this file, and make sure every active branch
 > moves at the same time.
+>
+> Every push on every branch runs `.github/workflows/kernel-check.yml`, which fails the push's check (red X, and an
+> email to whoever pushed) if `include/pros/version.h`, `project.pros` or `firmware/libpros.a` isn't 4.2.3.
 
 > [!NOTE]
 > **AI AGENT COMMIT & PUSH GUIDELINE:**
