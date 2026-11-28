@@ -1,0 +1,37 @@
+name: Kernel check
+
+# Everyone builds with PROS kernel 4.2.3. A push on any other kernel uploads a different library, and the brain then
+# deletes every other slot. This fails the push's check (red X, and GitHub emails whoever pushed) when the kernel in
+# the repo isn't 4.2.3.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Kernel must be PROS 4.2.3
+        run: |
+          fail=0
+          version=$(grep -o 'PROS_VERSION_STRING "[^"]*"' include/pros/version.h | cut -d'"' -f2)
+          if [ "$version" != "4.2.3" ]; then
+            echo "::error file=include/pros/version.h::Kernel is ${version:-missing}, not 4.2.3. Pull the kernel update from new-robot before uploading, or you will wipe the other slots on the brain."
+            fail=1
+          fi
+          if [ -f project.pros ]; then
+            pv=$(python3 -c "import json;print(json.load(open('project.pros'))['py/state']['templates']['kernel']['version'])")
+            if [ "$pv" != "4.2.3" ]; then
+              echo "::error file=project.pros::project.pros says kernel $pv, not 4.2.3. The brain names the library from this, so a wrong version wipes the other slots."
+              fail=1
+            fi
+          fi
+          md5=$(md5sum firmware/libpros.a | cut -d' ' -f1)
+          if [ "$md5" != "ae8882b474f86993afeb4c1245e774bd" ]; then
+            echo "::error file=firmware/libpros.a::firmware/libpros.a isn't the 4.2.3 build everyone uses (md5 $md5)."
+            fail=1
+          fi
+          if [ $fail = 0 ]; then echo "Kernel is PROS 4.2.3."; fi
+          exit $fail
