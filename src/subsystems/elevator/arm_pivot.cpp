@@ -74,6 +74,14 @@ constexpr float kHomeFinishFraction = 0.4f;
 constexpr float kHomeFinishSpeedDegPerS = 0.4f * kSwingMaxSpeedDegPerS;
 
 std::atomic<float> swing_accel_now{static_cast<float>(kSwingAccelLiftDownDegPerS2)};
+// The fade and brake in use, from kSwingAheadFadeDeg / kSwingAheadBrake; set_swing_tuning changes them (arm-tuning).
+std::atomic<float> swing_fade_now{kSwingAheadFadeDeg};
+std::atomic<float> swing_brake_now{kSwingAheadBrake};
+// Swings out (move_to) can slow down at the end too: the last out_finish_fraction of the move at most
+// out_finish_speed deg/s. 0 = off (arm-tuning sweeps it: the arm runs ahead of the motor into its slack near the end of
+// a swing past the top, where the motor can't see it, so it has to arrive slow).
+std::atomic<float> out_finish_fraction{0.0f};
+std::atomic<float> out_finish_speed{0.0f};
 
 lemlib::SmartMotor motor(&arm_pivot_motor, lemlib::PID(kP, 0.0f, kD), kSettleRange);
 
@@ -87,8 +95,8 @@ void update_profile() {
     const double lift_cm = constants::extension_motor_deg_to_cm(std::max(extension::height(), extension::target()));
     const double accel = std::isfinite(lift_cm) ? swing_accel_for(lift_cm) : kSwingAccelMinDegPerS2;
     swing_accel_now = static_cast<float>(accel);
-    motor.setProfile(static_cast<float>(accel), kSwingMaxSpeedDegPerS, kSwingKV, kSwingMaxLagDeg, kSwingAheadFadeDeg,
-                     kSwingAheadBrake);
+    motor.setProfile(static_cast<float>(accel), kSwingMaxSpeedDegPerS, kSwingKV, kSwingMaxLagDeg, swing_fade_now,
+                     swing_brake_now);
 }
 
 // Homing: PID to the home angle, then once within kHomeHandoffDeg of it, push down at
@@ -189,6 +197,45 @@ double swing_accel() {
     return swing_accel_now;
 }
 
+void set_swing_tuning(double fade_deg, double brake) {
+    swing_fade_now = static_cast<float>(std::max(0.0, fade_deg));
+    swing_brake_now = static_cast<float>(std::max(0.0, brake));
+}
+
+double swing_fade() {
+    return swing_fade_now;
+}
+
+double swing_brake() {
+    return swing_brake_now;
+}
+
+void set_swing_finish(double fraction, double speed_fraction) {
+    out_finish_speed = static_cast<float>(std::clamp(speed_fraction, 0.0, 1.0) * kSwingMaxSpeedDegPerS);
+    out_finish_fraction = static_cast<float>(std::clamp(fraction, 0.0, 1.0));
+}
+
+double swing_finish_fraction() {
+    return out_finish_fraction;
+}
+
+double swing_finish_speed_fraction() {
+    return out_finish_speed / kSwingMaxSpeedDegPerS;
+}
+
+namespace {
+std::atomic<float> hold_power_now{kMinPower};
+}
+
+void set_hold_power(double power) {
+    hold_power_now = static_cast<float>(std::clamp(power, 0.0, 127.0));
+    motor.setMinPower(hold_power_now);
+}
+
+double hold_power() {
+    return hold_power_now;
+}
+
 void stop() {
     home_state = Home::Idle;
     motor.holdCurrent();
@@ -227,7 +274,7 @@ void set_power(int power) {
 
 void move_to(double motor_deg) {
     home_state = Home::Idle;
-    motor.setProfileFinish(0.0f, 0.0f); // only the swing home slows down at the end
+    motor.setProfileFinish(out_finish_fraction, out_finish_speed); // off unless set_swing_finish set it
     motor.setTarget(static_cast<float>(clamp_motor_deg(motor_deg)));
 }
 

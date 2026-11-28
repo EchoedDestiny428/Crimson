@@ -42,6 +42,7 @@ std::atomic<std::uint32_t> command_id{0};
 std::atomic<std::uint32_t> generation{0};
 
 double pending_arm_motor_deg = 0.0; // the arm half of the last aim_lift(), for swing_arm()
+double pending_lift_cm = 0.0;       // the lift the last aim_lift() was for (it may be holding the carry height)
 
 double offset_cm() {
     return goal_tier * constants::kGoalTierStepCm;
@@ -336,21 +337,63 @@ void start_auton_command() {
 
 }
 
+namespace {
+
+// A held piece hangs below the claw: a swing to a pose whose lift is under the carry height (L1 1.25 cm, L3 0) would set
+// it on the floor while the arm is still low in front. So with the claw closed and the arm under kFloorClearDeg, the
+// lift holds (or goes up to) the carry height, and only comes down to the pose's lift once the arm has swung past it,
+// while the arm carries on. At kFloorClearDeg the claw is already as high as it is at home with the lift at the carry
+// height (claw height = pivot - 29 cm x cos(arm): 25 cm at 60 deg vs 15 cm at home), so lowering from there can't put
+// the piece on the floor.
+constexpr double kFloorClearDeg = 60.0;
+constexpr std::uint32_t kFloorClearMaxMs = 2000;
+
+bool held_low(double lift_cm) {
+    return claw::is_closed() && lift_cm < constants::kCarryLiftCm && current_pose().arm_deg < kFloorClearDeg;
+}
+
+// The lift for a swing that has just started (the arm already commanded): lift_cm, or the carry height until the arm
+// clears kFloorClearDeg (see held_low). The lowering runs in its own task; a later lift/arm command cancels it.
+void lift_for_swing(double lift_cm) {
+    const double target = constants::extension_cm_to_motor_deg(lift_cm);
+    if (!held_low(lift_cm)) {
+        extension::set_target(target);
+        return;
+    }
+    extension::set_target(constants::extension_cm_to_motor_deg(constants::kCarryLiftCm));
+    const std::uint32_t mine = command_id;
+    pros::Task task([mine, target] {
+        const std::uint32_t start = pros::millis();
+        while (command_id == mine && current_pose().arm_deg < kFloorClearDeg && pros::millis() - start < kFloorClearMaxMs) {
+            pros::delay(kPollMs);
+        }
+        if (command_id == mine) {
+            extension::set_target(target);
+        }
+    });
+}
+
+}
+
 void aim(Pose pose) {
     start_auton_command();
-    extension::set_target(constants::extension_cm_to_motor_deg(pose.lift_cm));
     arm_pivot::move_to(constants::arm_deg_to_motor_deg(slack_adjusted(pose.arm_deg)));
+    lift_for_swing(pose.lift_cm);
 }
 
 void aim_lift(Pose pose) {
     start_auton_command();
-    extension::set_target(constants::extension_cm_to_motor_deg(pose.lift_cm));
+    pending_lift_cm = pose.lift_cm;
+    // Holding a piece with the arm low: no lower than the carry height until swing_arm() swings it clear.
+    const double lift_cm = held_low(pose.lift_cm) ? constants::kCarryLiftCm : pose.lift_cm;
+    extension::set_target(constants::extension_cm_to_motor_deg(lift_cm));
     pending_arm_motor_deg = constants::arm_deg_to_motor_deg(slack_adjusted(pose.arm_deg));
 }
 
 bool swing_arm(std::uint32_t timeout_ms) {
     ++command_id;
     arm_pivot::move_to(pending_arm_motor_deg);
+    lift_for_swing(pending_lift_cm);
     return wait_for(settled, timeout_ms);
 }
 
