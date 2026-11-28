@@ -180,7 +180,15 @@ void Chassis::donut(float theta, int timeout, DonutParams params, bool async) {
             break;
         }
 
-        const float spin = std::clamp(angularPID.update(error), -max_spin, max_spin);
+        float spin = std::clamp(angularPID.update(error), -max_spin, max_spin);
+        // minInner: until it has crossed theta, turn at least hard enough that the inner side drives minInner the slow
+        // way (|push| + minInner), toward the target.
+        if (params.minInner > 0 && !settling) {
+            const float least = std::min(max_spin, std::fabs(push) + static_cast<float>(params.minInner));
+            if (std::fabs(spin) < least) {
+                spin = std::copysign(least, error);
+            }
+        }
         drivetrain.leftMotors->move(static_cast<std::int32_t>(std::lround(push + spin)));
         drivetrain.rightMotors->move(static_cast<std::int32_t>(std::lround(push - spin)));
         pros::delay(kPeriodMs);

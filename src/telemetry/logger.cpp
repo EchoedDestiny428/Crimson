@@ -543,12 +543,16 @@ void Logger::takeSample(std::uint32_t run, std::uint32_t now) {
     for (std::size_t i = 0; i < motorPortCount; ++i) {
         pros::AbstractMotor* motor = motorPorts[i].motor;
         const std::uint8_t index = motorPorts[i].index;
-        *value++ = motor->get_position(index);
+        // In degrees whatever the motor's encoder units: something after apply_motor_config() (LemLib's calibrate(),
+        // most likely, using the right drive as a tracking wheel) leaves ports 19/20 in rotations, and changing them
+        // back could upset whatever set them.
+        const double to_deg = motor->get_encoder_units(index) == pros::MotorUnits::rotations ? 360.0 : 1.0;
+        *value++ = motor->get_position(index) * to_deg;
         *value++ = motor->get_actual_velocity(index);
         *value++ = int_or_nan(motor->get_voltage(index));
         *value++ = motor->get_temperature(index);
         *value++ = int_or_nan(motor->get_current_draw(index));
-        *value++ = motor->get_target_position(index);
+        *value++ = motor->get_target_position(index) * to_deg;
         *value++ = int_or_nan(motor->get_target_velocity(index));
     }
 

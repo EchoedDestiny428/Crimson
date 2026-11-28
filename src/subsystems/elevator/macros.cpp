@@ -446,6 +446,11 @@ void home_async() {
     go_to_stage(0);
 }
 
+void home_clear_async() {
+    go_to_stage(0);
+    extension::set_target(constants::extension_cm_to_motor_deg(constants::kCarryLiftCm));
+}
+
 bool home() {
     home_async();
     return wait_for(settled, kHomeTimeoutMs);

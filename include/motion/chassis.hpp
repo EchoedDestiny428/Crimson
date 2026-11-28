@@ -15,6 +15,12 @@ struct DonutParams {
     int fastSpeed = 127;
     int slowSpeed = 35;
     float earlyExitRange = 0;
+    // Until it first crosses theta, the inner side keeps driving at least minInner (out of 127) the slow way. Without it
+    // the turn command (a PD on the heading error, clamped) falls to the constant forward push near the end, the inner
+    // side's command reaches 0 about 8-10 deg out, and the robot parks there short of earlyExitRange and runs out its
+    // timeout (every match donut in runs 37 and 39 that didn't hang). 0 (the default) leaves it off; PointWeaver writes
+    // it per donut. Keep it right after earlyExitRange: generated code names the fields in this order.
+    int minInner = 0;
     // Re-anchor: the goal stays in the hole through a donut, so when it ends the pose is put back on that goal (where
     // it was at the start, goal distance along the new heading), wiping out what odometry drifted while spinning
     // (0.1-0.35 in a donut in the 2026-11-27 logs). Only if the donut really stayed on the goal: the IMU heading ended

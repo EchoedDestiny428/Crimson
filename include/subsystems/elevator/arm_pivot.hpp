@@ -23,20 +23,19 @@ bool is_settled(); // settled on its target, and not mid-home (autons)
 // How hard swings speed up and slow down right now (deg/s^2): 3000 with the lift down, gentler
 // the higher the lift (about 1100 at L7). See arm_pivot.cpp for the measurements behind it.
 double swing_accel();
-// arm-tuning: change the overshoot fix at runtime. fade_deg: how far ahead of its setpoint the arm gets before the
-// speed push is gone (0 = never fades); brake: power per deg/s the arm is faster than its setpoint while ahead
-// (0 = off). Start at kSwingAheadFadeDeg / kSwingAheadBrake; apply within 10 ms.
+// Runtime tuning (the arm-tuning branch's tuner uses these; every value starts at its constant in arm_pivot.cpp):
+// - set_swing_tuning: fade_deg, how far ahead of its setpoint the arm gets before the speed push is gone (0 = never
+//   fades); brake, power per deg/s the arm is faster than its setpoint while ahead (0 = off). 5 / 0.3 to start.
+// - set_swing_finish: swings out (move_to) slow to speed_fraction of full swing speed for their last `fraction` of
+//   the move, like the swing home does (0 = off). 0.2 at 0.4 to start. Applies from the next move.
+// - set_hold_power: the minimum push (out of 127) toward the target once a move has arrived and is more than 1 deg
+//   off; it is what pulls the arm back after an overshoot. 45 to start (30 could barely lift a cup-pin back at L3).
 void set_swing_tuning(double fade_deg, double brake);
 double swing_fade();
 double swing_brake();
-// arm-tuning: swings out (move_to) slow to speed_fraction of full swing speed for their last `fraction` of the move,
-// like the swing home does. fraction 0 = off. Applies from the next move.
 void set_swing_finish(double fraction, double speed_fraction);
 double swing_finish_fraction();
 double swing_finish_speed_fraction();
-// arm-tuning: the minimum push (out of 127) toward the target once a move has arrived and is more than 1 deg off
-// (kMinPower, 30 to start). It is what pulls the arm back after an overshoot: at L3 with a cup-pin, 30 can barely
-// lift it back against gravity.
 void set_hold_power(double power);
 double hold_power();
 

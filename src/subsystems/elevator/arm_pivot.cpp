@@ -20,7 +20,10 @@ namespace {
 // gravity from stalling it short. No handoffs or ranges. No kI, no kG (counterbanded).
 constexpr float kP = 1.15f;
 constexpr float kD = 6.0f;
-constexpr float kMinPower = 30.0f; // above gravity + friction (20 stalled at ~235 climbing toward 180)
+// 45, not 30 (arm-tuning run 49, 2026-11-28): after an L3 overshoot with a cup-pin, 30 (-2.8 V) could barely lift the
+// arm back against gravity (it stayed 4-9 deg past); 45 brings it back within 2 deg every time. (Empty, 20 stalled at
+// ~235 climbing toward 180.)
+constexpr float kMinPower = 45.0f;
 // Two ways to settle: inside kSettleRange (1 deg) for kSettleTimeMs, or inside the wider
 // kHoldRange (2 deg) for kHoldTimeMs. Either brakes (HOLD); the minimum speed stops at kSettleRange.
 constexpr float kSettleRange = 1.0f;         // motor deg
@@ -69,19 +72,26 @@ constexpr float kSwingAheadFadeDeg = 5.0f;
 // ending past the 2 deg hold range.
 constexpr float kSwingAheadBrake = 0.3f;
 // Swinging home (from a stage back to the front): the last 40% at 40% speed, so the arm eases into the hardstop
-// instead of slamming. Swings out to a stage don't slow down.
+// instead of slamming.
 constexpr float kHomeFinishFraction = 0.4f;
 constexpr float kHomeFinishSpeedDegPerS = 0.4f * kSwingMaxSpeedDegPerS;
+// Swings out (move_to): the last kOutFinishFraction at kOutFinishSpeed. The fade and brake above turned out not to stop
+// the overshoot (arm-tuning, 2026-11-28, cup-pin): past the top the arm and pin run ahead of the motor into the arm's
+// slack, where the motor's encoder can't see them (it pushes on at 0 mA), then the slack closes and the arm drags the
+// motor 10-15 deg past whatever the brake. Arriving slower leaves less to carry it past: with the last 20% at 40%,
+// L1 / L2 / L2N overshoot 2-3 deg (was 10-17), L3 ~10 deg and comes back (with kMinPower 45), every swing ends within
+// 1.7 deg, and the claw can open after ~1.1-1.2 s. 15% was 0.1 s faster in all but rocked the robot 4.5 deg; 25-35%
+// and 60% speed were worse.
+constexpr float kOutFinishFraction = 0.2f;
+constexpr float kOutFinishSpeedDegPerS = 0.4f * kSwingMaxSpeedDegPerS;
 
 std::atomic<float> swing_accel_now{static_cast<float>(kSwingAccelLiftDownDegPerS2)};
 // The fade and brake in use, from kSwingAheadFadeDeg / kSwingAheadBrake; set_swing_tuning changes them (arm-tuning).
 std::atomic<float> swing_fade_now{kSwingAheadFadeDeg};
 std::atomic<float> swing_brake_now{kSwingAheadBrake};
-// Swings out (move_to) can slow down at the end too: the last out_finish_fraction of the move at most
-// out_finish_speed deg/s. 0 = off (arm-tuning sweeps it: the arm runs ahead of the motor into its slack near the end of
-// a swing past the top, where the motor can't see it, so it has to arrive slow).
-std::atomic<float> out_finish_fraction{0.0f};
-std::atomic<float> out_finish_speed{0.0f};
+// The swing-out slowdown in use, from kOutFinishFraction / kOutFinishSpeedDegPerS; set_swing_finish changes it.
+std::atomic<float> out_finish_fraction{kOutFinishFraction};
+std::atomic<float> out_finish_speed{kOutFinishSpeedDegPerS};
 
 lemlib::SmartMotor motor(&arm_pivot_motor, lemlib::PID(kP, 0.0f, kD), kSettleRange);
 
@@ -274,7 +284,7 @@ void set_power(int power) {
 
 void move_to(double motor_deg) {
     home_state = Home::Idle;
-    motor.setProfileFinish(out_finish_fraction, out_finish_speed); // off unless set_swing_finish set it
+    motor.setProfileFinish(out_finish_fraction, out_finish_speed); // the last 20% at 40% (kOutFinish*)
     motor.setTarget(static_cast<float>(clamp_motor_deg(motor_deg)));
 }
 

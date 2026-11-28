@@ -53,6 +53,9 @@ bool wait_settled(std::uint32_t timeout_ms = 2000); // block until settled (a ho
 bool drop();
 bool home();       // the driver's home stage, blocking until there
 void home_async(); // start the driver's home stage (arm onto the hardstop) and return
+// home_async() with the lift at the carry height (10 cm) even with the claw empty, so it clears the ground (and cups
+// on it) on the way down. Autons lower it for a pickup off the floor, just before grabbing.
+void home_clear_async();
 bool pickup();     // close the claw on the piece in front of it, then wait for the grip
 
 // Fastest-pose solver for autons (not used by driver control): the lift + arm angle in
