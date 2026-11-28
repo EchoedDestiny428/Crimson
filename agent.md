@@ -3,7 +3,7 @@
 > [!CAUTION]
 > **EVERYONE MUST BUILD WITH PROS KERNEL 4.2.3 (this means you too, Roy).**
 > All programs on a brain share one uploaded library, and it has to be the same build for everyone. If you upload
-> with a different kernel (an old local PROS install, a branch still on 4.2.2, `pros conductor` pulling something
+> with a different kernel (an old local PROS install, an old commit still on 4.2.2, `pros conductor` pulling something
 > else), the CLI sees "Library onboard doesn't match!" and **deletes every other slot on the brain** as orphaned.
 > This has wiped teammates' slots more than once.
 >
@@ -221,7 +221,7 @@ flowchart TD
 
 ### 3.7 PROS Version & Toolchain
 - **Kernel Version:** **PROS 4.2.3**, required for everyone (defined in [`include/pros/version.h`](file:///Users/royboy/Library/CloudStorage/OneDrive-TaipeiAmericanSchool/Roy's universe/VEX/Crimson/include/pros/version.h)).
-  - Moved from 4.2.2 on 2026-11-25. Branches still on 4.2.2 (e.g. `donut-testing`) build a different library and will wipe the other slots when uploaded.
+  - Moved from 4.2.2 on 2026-11-25; every branch on origin was moved to 4.2.3 on 2026-11-28. Nobody uses 4.2.2 any more: a 4.2.2 build is a different library and wipes the other slots when uploaded. A new branch cut from an old commit still carries 4.2.2, so check `include/pros/version.h` before uploading from it.
   - Supports modern C++20, hard-float optimizations (`-mfloat-abi=hard`), AI Vision sensor API, and updated device abstractions.
 - **Library Templates:**
   - `liblvgl@9.2.0`: Light and Versatile Graphics Library v9.
